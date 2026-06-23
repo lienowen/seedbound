@@ -317,10 +317,10 @@ button { font: inherit; }
   position: absolute;
   z-index: 15;
   top: 10px;
-  right: 12px;
+  right: 10px;
   display: flex;
-  gap: 6px;
-  padding: 4px;
+  gap: 4px;
+  padding: 3px;
   border-radius: 999px;
   background: rgba(255, 248, 230, .92);
   border: 3px solid rgba(255, 255, 255, .72);
@@ -328,14 +328,43 @@ button { font: inherit; }
 }
 
 .fridge-lang-switch a {
-  min-width: 38px;
-  padding: 4px 10px;
+  min-width: 34px;
+  padding: 4px 8px;
   border-radius: 999px;
   color: #6e4730;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   text-align: center;
   text-decoration: none;
+}
+
+.fridge-quick-actions {
+  position: absolute;
+  z-index: 12;
+  left: 10px;
+  bottom: 78px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+}
+
+.fridge-quick-btn {
+  border: 3px solid rgba(255, 255, 255, .72);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: #6a3a1c;
+  background: rgba(255, 248, 230, .94);
+  box-shadow: 0 8px 18px rgba(103, 62, 26, .12);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.fridge-quick-btn.subtle {
+  color: #8b664b;
+  background: rgba(255, 255, 255, .82);
 }
 
 .fridge-lang-switch a.active {

@@ -4,7 +4,7 @@ import { StorageScene } from "./game/StorageScene.js";
 import { createUiSounds } from "./game/playFeedback.js";
 import { FRIDGE_BR_CAMPAIGN, MAKEUP_LEVEL } from "./levels/fridgePhaserLevel.js";
 import { createI18n, localizeCampaign, localizeLevel } from "./i18n/index.js";
-import { htmlLang, parseLocale, progressStorageKey, switchLocaleHref } from "./i18n/locale.js";
+import { htmlLang, parseLocale, progressStorageKey, switchLocaleHref, writeLocalePreference } from "./i18n/locale.js";
 
 function readProgress(locale) {
   const key = progressStorageKey(locale);
@@ -292,11 +292,17 @@ export function FridgePhaserGame() {
   return (
     <main className="fridge-shell">
       {!editMode && theme !== "makeup" && (
-        <nav className="fridge-lang-switch" aria-label="Language">
-          <a className={locale === "pt" ? "active" : ""} href={switchLocaleHref("pt", search)}>{i18n.ui.langPt}</a>
-          <a className={locale === "en" ? "active" : ""} href={switchLocaleHref("en", search)}>{i18n.ui.langEn}</a>
-          <a className={locale === "cn" ? "active" : ""} href={switchLocaleHref("cn", search)}>{i18n.ui.langCn}</a>
-        </nav>
+        <>
+          <nav className="fridge-lang-switch" aria-label="Language">
+            <a className={locale === "pt" ? "active" : ""} href={switchLocaleHref("pt", search)} onClick={() => writeLocalePreference("pt")}>{i18n.ui.langPt}</a>
+            <a className={locale === "en" ? "active" : ""} href={switchLocaleHref("en", search)} onClick={() => writeLocalePreference("en")}>{i18n.ui.langEn}</a>
+            <a className={locale === "cn" ? "active" : ""} href={switchLocaleHref("cn", search)} onClick={() => writeLocalePreference("cn")}>{i18n.ui.langCn}</a>
+          </nav>
+          <div className="fridge-quick-actions">
+            <button type="button" className="fridge-quick-btn" onClick={replayLevel}>{i18n.ui.replayLevelLabel}</button>
+            <button type="button" className="fridge-quick-btn subtle" onClick={resetCampaign}>{i18n.ui.resetProgressLabel}</button>
+          </div>
+        </>
       )}
       <div className="fridge-game-mount" ref={mount} />
       {complete && (

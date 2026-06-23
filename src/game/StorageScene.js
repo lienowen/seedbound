@@ -196,9 +196,9 @@ export class StorageScene extends Phaser.Scene {
       return { bg, text };
     };
 
-    this.phasePill = pill(22, 14, 110);
-    this.coinPill = pill(220, 14, 140);
-    this.progressPill = pill(494, 14, 128);
+    this.phasePill = pill(16, 14, 104);
+    this.coinPill = pill(128, 14, 92);
+    this.progressPill = pill(228, 14, 86);
     this.phasePill.text.setDepth(512);
     this.coinPill.text.setDepth(512);
     this.progressPill.text.setDepth(512);
@@ -249,42 +249,6 @@ export class StorageScene extends Phaser.Scene {
     this.uiLayer.add(this.toastText);
     this.phaseButtons = [];
     this.phaseButtonTexts = [];
-    const replayLabel = this.i18n.locale === "cn" ? "閲嶆潵鏈叧" : this.i18n.locale === "en" ? "Replay level" : "Repetir fase";
-    const resetProgressLabel = this.i18n.locale === "cn" ? "閲嶇疆杩涘害" : this.i18n.locale === "en" ? "Reset progress" : "Resetar progresso";
-
-    this.replayButton = this.add.container(0, 0).setDepth(512).setVisible(false);
-    const replayBg = this.add.graphics();
-    replayBg.fillStyle(0xfff8e6, 0.94);
-    replayBg.lineStyle(3, 0xffffff, 0.7);
-    replayBg.fillRoundedRect(0, 0, 132, 42, 21);
-    replayBg.strokeRoundedRect(0, 0, 132, 42, 21);
-    const replayText = this.add.text(66, 21, replayLabel, {
-      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 16,
-      color: "#7c5034",
-      fontStyle: "bold",
-    }).setOrigin(0.5);
-    const replayHit = this.add.rectangle(66, 21, 132, 42, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
-    replayHit.on("pointerdown", () => this.events.emit("replay-level"));
-    this.replayButton.add([replayBg, replayText, replayHit]);
-    this.uiLayer.add(this.replayButton);
-
-    this.resetProgressButton = this.add.container(0, 0).setDepth(512).setVisible(false);
-    const resetProgressBg = this.add.graphics();
-    resetProgressBg.fillStyle(0xfff8e6, 0.94);
-    resetProgressBg.lineStyle(3, 0xffffff, 0.7);
-    resetProgressBg.fillRoundedRect(0, 0, 150, 42, 21);
-    resetProgressBg.strokeRoundedRect(0, 0, 150, 42, 21);
-    const resetProgressText = this.add.text(75, 21, resetProgressLabel, {
-      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 16,
-      color: "#7c5034",
-      fontStyle: "bold",
-    }).setOrigin(0.5);
-    const resetProgressHit = this.add.rectangle(75, 21, 150, 42, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
-    resetProgressHit.on("pointerdown", () => this.events.emit("reset-campaign"));
-    this.resetProgressButton.add([resetProgressBg, resetProgressText, resetProgressHit]);
-    this.uiLayer.add(this.resetProgressButton);
     this.updateChrome(this.chromeData);
     this.setToastMessage(this.chromeData.toast || this.level.copy?.intro || this.i18n.ui.dragHint);
   }
@@ -334,8 +298,6 @@ export class StorageScene extends Phaser.Scene {
     
     this.phaseButtons.forEach((button) => { button?.circle?.setVisible(false); button?.hit?.setVisible(false); });
     this.phaseButtonTexts.forEach((text) => text?.setVisible(false));
-    this.replayButton?.setVisible(false);
-    this.resetProgressButton?.setVisible(false);
     
     if (!show) {
       return;
@@ -396,9 +358,6 @@ export class StorageScene extends Phaser.Scene {
         hit.setAlpha(locked ? 0.5 : 1);
       }
     }
-
-    this.replayButton?.setPosition(606, 78).setVisible(true);
-    this.resetProgressButton?.setPosition(597, 126).setVisible(true);
   }
 
   setToastMessage(message) {
