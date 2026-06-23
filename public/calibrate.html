@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Fridge Slot Calibrator</title>
+<style>
+  body { margin:0; background:#222; color:#fff; font:14px monospace; }
+  #wrap { position:relative; display:inline-block; }
+  canvas { display:block; }
+  #info { position:fixed; right:10px; top:10px; background:rgba(0,0,0,0.85); padding:12px; border-radius:8px; max-width:280px; }
+  button { margin:3px 2px; padding:4px 10px; cursor:pointer; }
+  .done { color:#5f5; }
+</style></head><body>
+<div id="wrap"><canvas id="c"></canvas></div>
+<div id="info">
+  <b>Click shelf surfaces (top edge where items sit)</b><br>
+  <div id="pts"></div>
+  <button onclick="undo()">Undo</button>
+  <button onclick="copyOut()">Copy JSON</button>
+  <button onclick="reset()">Reset</button>
+  <pre id="out"></pre>
+</div>
+<script>
+const GW=750, GH=1334;
+const c=document.getElementById('c');
+c.width=GW; c.height=GH;
+const ctx=c.getContext('2d');
+const img=new Image();
+img.src='/assets/tidy/fridge-board.png';
+img.onload=()=>{ ctx.drawImage(img,0,0,GW,GH); };
+
+let clicks=[];
+c.onclick=e=>{
+  const rect=c.getBoundingClientRect();
+  const x=e.clientX-rect.left, y=e.clientY-rect.top;
+  const gx=Math.round(x/rect.width*GW), gy=Math.round(y/rect.height*GH);
+  clicks.push({gx,gy});
+  redraw();
+};
+
+function redraw(){
+  ctx.clearRect(0,0,GW,GH);
+  ctx.drawImage(img,0,0,GW,GH);
+  clicks.forEach((p,i)=>{
+    ctx.fillStyle='red';
+    ctx.beginPath(); ctx.arc(p.gx,p.gy,6,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='lime'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(p.gx-10,p.gy); ctx.lineTo(p.gx+10,p.gy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.gx,p.gy-10); ctx.lineTo(p.gx,p.gy+10); ctx.stroke();
+    ctx.fillStyle='yellow'; ctx.font='bold 12px monospace';
+    ctx.fillText(`${i+1}`,p.gx+10,p.gy-8);
+  });
+  document.getElementById('pts').innerHTML=clicks.map((p,i)=>
+    `${i+1}: (${p.gx},${p.gy})`).join('<br>')||'Click shelves...';
+}
+
+function undo(){ clicks.pop(); redraw(); }
+function reset(){ clicks=[]; redraw(); document.getElementById('out').textContent=''; }
+
+function copyOut(){
+  // Expected order: click shelf_top area, shelf_mid area, door_top, door_mid, door_low
+  // Or: all 7 slots in order
+  if(clicks.length<3){ alert('Need at least 3 points (top, mid, low door shelves)'); return; }
+  
+  // Use first 5 clicks as: shelf_top, shelf_mid, door_top, door_mid, door_low
+  const [st, sm, dt, dm, dl] = clicks;
+  
+  const slots = [
+    {id:"shelf_top_1",zone:"shelf",allow:["carton","dairy","box","bottle","food"],x:st.gx-70,y:st.gy-30,w:140,h:120,baseline:0.5,anchorX:st.gx,anchorY:st.gy,depth:110},
+    {id:"shelf_top_2",zone:"shelf",allow:["carton","dairy","box","bottle","food"],x:st.gx+90,y:st.gy-30,w:140,h:120,baseline:0.5,anchorX:st.gx+180,anchorY:st.gy,depth:111},
+    {id:"shelf_mid_1",zone:"shelf",allow:["food","box","dairy","bottle"],x:sm.gx-80,y:sm.gy-30,w:160,h:120,baseline:0.5,anchorX:sm.gx,anchorY:sm.gy,depth:130},
+    {id:"shelf_mid_2",zone:"shelf",allow:["food","box","dairy","bottle"],x:sm.gx+80,y:sm.gy-30,w:160,h:120,baseline:0.5,anchorX:sm.gx+160,anchorY:sm.gy,depth:131},
+    {id:"door_top_1",zone:"door",allow:["bottle","dairy","carton"],x:dt.gx-35,y:dt.gy-30,w:70,h:110,baseline:0.5,anchorX:dt.gx,anchorY:dt.gy,depth:160},
+    {id:"door_mid_1",zone:"door",allow:["bottle","dairy","carton"],x:dm.gx-35,y:dm.gy-30,w:70,h:110,baseline:0.5,anchorX:dm.gx,anchorY:dm.gy,depth:170},
+    {id:"door_low_1",zone:"door",allow:["bottle","dairy","carton"],x:dl.gx-35,y:dl.gy-30,w:70,h:110,baseline:0.5,anchorX:dl.gx,anchorY:dl.gy,depth:180},
+  ];
+  
+  const out=JSON.stringify(slots,null,2);
+  document.getElementById('out').textContent=out;
+  navigator.clipboard.writeText(out).catch(()=>{});
+}
+</script>
+</body></html>

@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const execPath = 'C:/Users/85847/AppData/Local/ms-playwright/chromium-1217/chrome-win64/chrome.exe';
+const browser = await chromium.launch({ executablePath: execPath, headless: true });
+const page = await browser.newPage();
+await page.setViewportSize({ width: 430, height: 900 });
+await page.goto('http://127.0.0.1:5174/');
+await page.waitForTimeout(1500);
+await page.screenshot({ path: 'look.png' });
+await browser.close();
+console.log('done');

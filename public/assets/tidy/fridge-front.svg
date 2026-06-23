@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1334" viewBox="0 0 750 1334">
+  <defs>
+    <filter id="frameShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#835326" flood-opacity=".18"/>
+    </filter>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset=".55" stop-color="#ffffff" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".82"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Global foreground mask: these shapes must sit above every item. -->
+  <g filter="url(#frameShadow)">
+    <rect x="70" y="235" width="610" height="760" rx="66" fill="none" stroke="#ffffff" stroke-width="24"/>
+    <rect x="115" y="290" width="352" height="625" rx="44" fill="none" stroke="#ffffff" stroke-width="16"/>
+    <rect x="498" y="320" width="132" height="595" rx="44" fill="none" stroke="#ffffff" stroke-width="16"/>
+  </g>
+  <rect x="132" y="262" width="285" height="11" rx="5" fill="#ffffff" opacity=".72"/>
+  <rect x="132" y="300" width="9" height="602" rx="4" fill="#ffffff" opacity=".62"/>
+  <rect x="440" y="300" width="9" height="602" rx="4" fill="#ffffff" opacity=".62"/>
+
+  <!-- Side walls: hide any item that touches the fridge edges. -->
+  <rect x="79" y="269" width="38" height="680" rx="19" fill="url(#edge)" opacity=".72"/>
+  <rect x="452" y="305" width="24" height="610" rx="12" fill="#ffffff" opacity=".78"/>
+  <rect x="618" y="350" width="18" height="525" rx="9" fill="#ffffff" opacity=".52"/>
+  <rect x="489" y="347" width="10" height="534" rx="5" fill="#ffffff" opacity=".34"/>
+  <rect x="515" y="339" width="6" height="548" rx="3" fill="#ffffff" opacity=".36"/>
+
+  <!-- Door rack side lips are intentionally short, so bottles read as sitting in trays instead of inside a hard vertical box. -->
+  <rect x="508" y="448" width="13" height="38" rx="7" fill="#ffffff" opacity=".34"/>
+  <rect x="508" y="568" width="13" height="38" rx="7" fill="#ffffff" opacity=".34"/>
+  <rect x="508" y="668" width="13" height="38" rx="7" fill="#ffffff" opacity=".34"/>
+  <rect x="508" y="888" width="13" height="38" rx="7" fill="#ffffff" opacity=".34"/>
+  <rect x="612" y="448" width="13" height="38" rx="7" fill="#ffffff" opacity=".45"/>
+  <rect x="612" y="568" width="13" height="38" rx="7" fill="#ffffff" opacity=".45"/>
+  <rect x="612" y="668" width="13" height="38" rx="7" fill="#ffffff" opacity=".45"/>
+  <rect x="612" y="888" width="13" height="38" rx="7" fill="#ffffff" opacity=".45"/>
+  <rect x="632" y="448" width="5" height="58" rx="2.5" fill="#ceb492" opacity=".8"/>
+  <rect x="632" y="568" width="5" height="58" rx="2.5" fill="#ceb492" opacity=".8"/>
+  <rect x="632" y="668" width="5" height="58" rx="2.5" fill="#ceb492" opacity=".8"/>
+  <rect x="632" y="888" width="5" height="58" rx="2.5" fill="#ceb492" opacity=".8"/>
+
+  <rect x="138" y="974" width="34" height="8" rx="4" fill="#d9bf99" opacity=".84"/>
+  <rect x="402" y="974" width="34" height="8" rx="4" fill="#d9bf99" opacity=".84"/>
+  <rect x="516" y="974" width="28" height="8" rx="4" fill="#d9bf99" opacity=".84"/>
+  <rect x="591" y="974" width="28" height="8" rx="4" fill="#d9bf99" opacity=".84"/>
+
+  <rect x="58" y="1048" width="634" height="150" rx="34" fill="none" stroke="#ffffff" stroke-width="10" opacity=".92"/>
+</svg>

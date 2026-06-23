@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1334" viewBox="0 0 750 1334">
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff7df"/>
+      <stop offset=".66" stop-color="#ffe4b6"/>
+      <stop offset="1" stop-color="#ffc56d"/>
+    </linearGradient>
+    <linearGradient id="case" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#fff5dd"/>
+    </linearGradient>
+    <linearGradient id="inside" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffdf7"/>
+      <stop offset="1" stop-color="#fff0d0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="48%" cy="12%" r="55%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset=".45" stop-color="#ffffff" stop-opacity=".36"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="caseShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#8b5927" flood-opacity=".22"/>
+    </filter>
+    <filter id="innerShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#c5975f" flood-opacity=".18"/>
+    </filter>
+  </defs>
+
+  <rect width="750" height="1334" fill="url(#page)"/>
+
+  <g filter="url(#caseShadow)">
+    <rect x="70" y="235" width="610" height="760" rx="66" fill="url(#case)"/>
+  </g>
+  <rect x="125" y="252" width="300" height="20" rx="10" fill="#e0f0e7" opacity=".85"/>
+  <rect x="188" y="258" width="120" height="12" rx="6" fill="#7cb5aa" opacity=".92"/>
+
+  <rect x="115" y="290" width="352" height="625" rx="44" fill="url(#inside)" filter="url(#innerShadow)"/>
+  <rect x="115" y="290" width="352" height="625" rx="44" fill="url(#glow)"/>
+  <rect x="128" y="304" width="326" height="595" rx="32" fill="none" stroke="#f6e6c4" stroke-width="5" opacity=".92"/>
+
+  <rect x="498" y="320" width="132" height="595" rx="44" fill="#fff2d5" filter="url(#innerShadow)"/>
+  <rect x="511" y="343" width="106" height="545" rx="34" fill="#fff7e7"/>
+  <rect x="511" y="343" width="106" height="545" rx="34" fill="url(#glow)" opacity=".5"/>
+  <rect x="521" y="360" width="84" height="510" rx="26" fill="none" stroke="#f0dfbf" stroke-width="4" opacity=".9"/>
+  <rect x="624" y="446" width="8" height="62" rx="4" fill="#d7c09d" opacity=".9"/>
+  <rect x="624" y="666" width="8" height="62" rx="4" fill="#d7c09d" opacity=".9"/>
+  <rect x="624" y="886" width="8" height="62" rx="4" fill="#d7c09d" opacity=".9"/>
+
+  <rect x="114" y="916" width="354" height="16" rx="8" fill="#ead7b4" opacity=".5"/>
+  <rect x="510" y="892" width="110" height="18" rx="9" fill="#ead7b4" opacity=".42"/>
+  <rect x="142" y="968" width="26" height="18" rx="9" fill="#e7d2af"/>
+  <rect x="406" y="968" width="26" height="18" rx="9" fill="#e7d2af"/>
+  <rect x="520" y="968" width="22" height="18" rx="9" fill="#e7d2af"/>
+  <rect x="593" y="968" width="22" height="18" rx="9" fill="#e7d2af"/>
+
+  <rect x="58" y="1048" width="634" height="150" rx="34" fill="#fff7e7" opacity=".97"/>
+  <rect x="58" y="1048" width="634" height="150" rx="34" fill="none" stroke="#ffffff" stroke-width="8" opacity=".92"/>
+</svg>

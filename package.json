@@ -1,0 +1,26 @@
+{
+  "name": "pocket-planet",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "validate:fridge": "node scripts/validate-fridge-campaign.mjs",
+    "autopilot": "node scripts/autopilot.mjs",
+    "autopilot:status": "node scripts/autopilot.mjs --status",
+    "autopilot:complete": "node scripts/autopilot.mjs --complete"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "5.0.4",
+    "phaser": "^3.90.0",
+    "pixi.js": "^8.19.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "vite": "6.4.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.0"
+  }
+}

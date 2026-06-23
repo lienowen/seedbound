@@ -1,0 +1,174 @@
+{
+  "product": "Pocket Planet",
+  "northStar": "Weekly players who explore a region, solve an ecology problem, and share or return to inspect the changed world.",
+  "currentPhase": "core",
+  "phases": [
+    {
+      "id": "core",
+      "gate": "Five external testers complete the forest detail loop without explanation; at least three immediately retry or inspect another region.",
+      "tasks": [
+        {
+          "id": "forest-detail",
+          "title": "Build the forest zoom-in exploration scene",
+          "owner": "product-engineering",
+          "impact": 10,
+          "effort": 7,
+          "status": "next",
+          "acceptance": [
+            "Clicking the forest smoothly enters a detailed paper-cut scene",
+            "Watering reveals plant growth and a hidden bird nest",
+            "Returning to the valley preserves the changed forest state"
+          ]
+        },
+        {
+          "id": "curiosity-hotspots",
+          "title": "Add curiosity signals to five valley regions",
+          "owner": "game-design",
+          "impact": 9,
+          "effort": 4,
+          "status": "todo",
+          "acceptance": [
+            "Forest, mountain, river, volcano, and field each have a subtle motion cue",
+            "Hotspots are discoverable without tutorial text",
+            "Each hotspot has a unique detail-scene promise"
+          ]
+        },
+        {
+          "id": "reaction-feedback",
+          "title": "Upgrade rain, growth, fire, ice, and wind feedback",
+          "owner": "game-feel",
+          "impact": 9,
+          "effort": 5,
+          "status": "todo",
+          "acceptance": [
+            "Every action produces visible feedback within 150 ms",
+            "Successful chains have a clear anticipation, impact, and settle phase",
+            "Reduced-motion users receive a readable alternative"
+          ]
+        },
+        {
+          "id": "first-session",
+          "title": "Create a no-text first-session tutorial",
+          "owner": "ux",
+          "impact": 8,
+          "effort": 3,
+          "status": "todo",
+          "acceptance": [
+            "A new player understands select, place, inspect, and return",
+            "Tutorial can be skipped",
+            "Completion and abandonment events are recorded"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "retention",
+      "gate": "D1 retention above 30%, three-session completion above 25%, and median session above five minutes.",
+      "tasks": [
+        {
+          "id": "persistent-world",
+          "title": "Make solved ecology changes persist across sessions",
+          "owner": "systems",
+          "impact": 10,
+          "effort": 7,
+          "status": "todo",
+          "acceptance": [
+            "Each solved detail scene changes the main valley",
+            "The world shows one meaningful overnight change",
+            "Save migration is versioned"
+          ]
+        },
+        {
+          "id": "daily-mystery",
+          "title": "Add one daily ecosystem mystery",
+          "owner": "content",
+          "impact": 8,
+          "effort": 5,
+          "status": "todo",
+          "acceptance": [
+            "Daily challenge uses a deterministic seed",
+            "Result does not spoil the solution",
+            "Past seven days remain playable"
+          ]
+        },
+        {
+          "id": "collection-book",
+          "title": "Build a discovery book with hidden conditions",
+          "owner": "systems",
+          "impact": 7,
+          "effort": 4,
+          "status": "todo",
+          "acceptance": [
+            "Discoveries explain habitat and reaction",
+            "Locked entries provide curiosity without revealing exact solutions",
+            "New discovery animation is skippable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "growth",
+      "gate": "Share rate above 4%, invite landing-to-play conversion above 25%, and invited-user D1 within 20% of organic D1.",
+      "tasks": [
+        {
+          "id": "share-replay",
+          "title": "Generate a shareable 8-second ecology replay",
+          "owner": "growth-engineering",
+          "impact": 10,
+          "effort": 7,
+          "status": "todo",
+          "acceptance": [
+            "Replay shows before, action, chain, and reveal",
+            "Shared media contains no solution-spoiling input order",
+            "Link opens the same challenge directly"
+          ]
+        },
+        {
+          "id": "friend-seed",
+          "title": "Create friend-seed asynchronous challenges",
+          "owner": "growth-engineering",
+          "impact": 9,
+          "effort": 6,
+          "status": "todo",
+          "acceptance": [
+            "Sender and receiver play the same world state",
+            "Receiver can start without account creation",
+            "Both players see comparison only after completing"
+          ]
+        },
+        {
+          "id": "creator-kit",
+          "title": "Create a short-video creator challenge kit",
+          "owner": "marketing",
+          "impact": 7,
+          "effort": 3,
+          "status": "todo",
+          "acceptance": [
+            "Includes three hooks, five challenge seeds, and clean footage",
+            "Creators can link directly to a playable challenge",
+            "Attribution parameters are recorded"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "monetization",
+      "gate": "Retention and growth gates both pass before monetization experiments begin.",
+      "tasks": [
+        {
+          "id": "cosmetic-biomes",
+          "title": "Test optional cosmetic biome packs",
+          "owner": "monetization",
+          "impact": 6,
+          "effort": 6,
+          "status": "todo",
+          "acceptance": [
+            "No gameplay advantage is sold",
+            "A purchase visibly transforms the personal world",
+            "Price test includes lifetime and seasonal options"
+          ]
+        }
+      ]
+    }
+  ]
+}

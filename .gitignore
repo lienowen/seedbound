@@ -1,0 +1,16 @@
+﻿node_modules/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+
+# local automation outputs
+autoplay-result.png
+check-*.png
+final.png
+look.png
+right-door-fix-check.png
+snap.png
+ss.png
+verify-*.png
+work-*.png

@@ -1,0 +1,364 @@
+* { box-sizing: border-box; }
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  min-width: 320px;
+  min-height: 100%;
+}
+body {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  min-height: 100dvh;
+  background: #ffe9bd;
+  font-family: "Trebuchet MS", "Avenir Next", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; }
+
+.fridge-shell {
+  position: relative;
+  width: min(100vw, 430px, calc(100dvh * 750 / 1334));
+  aspect-ratio: 750 / 1334;
+  height: auto;
+  margin: 0 auto;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fff5dc, #ffc977);
+  touch-action: none;
+  user-select: none;
+  align-self: center;
+}
+
+.fridge-game-mount,
+.fridge-game-mount canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.fridge-react-hud {
+  position: absolute;
+  z-index: 10;
+  top: 12px;
+  left: 18px;
+  right: 18px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.fridge-react-hud span,
+.fridge-coin-pill,
+.fridge-react-hud b,
+.fridge-toast,
+.fridge-result {
+  border: 4px solid rgba(255,255,255,.72);
+  background: rgba(255, 248, 230, .92);
+  box-shadow: 0 10px 24px rgba(103, 62, 26, .16);
+}
+
+.fridge-react-hud span,
+.fridge-coin-pill,
+.fridge-react-hud b {
+  min-width: 92px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: #5b2c1d;
+  font-size: 20px;
+  text-align: center;
+}
+
+.fridge-coin-pill {
+  justify-self: center;
+  min-width: 110px;
+  color: #6a3a1c;
+  background: rgba(255, 250, 236, .96);
+}
+
+.fridge-title-card {
+  position: absolute;
+  z-index: 9;
+  top: 70px;
+  left: 28px;
+  right: 28px;
+  padding: 4px 16px 0;
+  text-align: center;
+  pointer-events: none;
+}
+
+.fridge-title-card h1 {
+  margin: 0;
+  color: #6a341d;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.fridge-title-card p {
+  margin: 3px 0 0;
+  color: #9d7154;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.fridge-progress-note {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fridge-progress-note span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #6e4730;
+  background: rgba(255,255,255,.62);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.fridge-goal-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px auto 0;
+  padding: 7px 12px;
+  max-width: 320px;
+  border-radius: 16px;
+  background: rgba(255, 249, 234, .9);
+  box-shadow: 0 8px 22px rgba(102, 63, 28, .1);
+}
+
+.fridge-goal-card strong {
+  flex: 0 0 auto;
+  color: #2c9b7f;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.fridge-goal-card span {
+  overflow: hidden;
+  color: #7a5438;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.fridge-toast {
+  position: absolute;
+  z-index: 10;
+  left: 28px;
+  right: 28px;
+  bottom: 24px;
+  padding: 9px 14px;
+  border-radius: 18px;
+  color: #70432a;
+  text-align: center;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.fridge-result {
+  position: absolute;
+  z-index: 12;
+  left: 28px;
+  right: 28px;
+  bottom: 82px;
+  padding: 16px;
+  border-radius: 28px;
+  text-align: center;
+  color: #5b2c1d;
+}
+
+.fridge-result small { color: #58aa8d; letter-spacing: .12em; font-weight: 800; }
+.fridge-result h1 { margin: 2px 0 10px; font-size: 34px; line-height: 1; }
+.fridge-result button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 24px;
+  color: #fff;
+  background: linear-gradient(180deg, #89dd39, #55bc28);
+  font-weight: 900;
+}
+
+.fridge-result p {
+  margin: 4px 0 14px;
+  color: #8b664b;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.fridge-result-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fridge-result button.secondary {
+  color: #6a3a1c;
+  background: rgba(255,255,255,.85);
+ }
+
+.fridge-editor {
+  position: absolute;
+  z-index: 20;
+  right: 10px;
+  bottom: 76px;
+  width: min(400px, calc(100% - 20px));
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 248, 230, .96);
+  box-shadow: 0 10px 28px rgba(73, 40, 21, .2);
+  max-height: min(48vh, 420px);
+  overflow: auto;
+}
+
+.fridge-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.fridge-editor b { display: block; color: #5b2c1d; }
+.fridge-editor button {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: #fff;
+  background: linear-gradient(180deg, #63d0b2, #289b84);
+  font-weight: 800;
+}
+
+.fridge-editor-controls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .55);
+}
+
+.fridge-editor-chip {
+  justify-self: start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #5b2c1d;
+  background: rgba(255, 207, 88, .32);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.fridge-editor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fridge-editor-meta span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #6e4730;
+  background: rgba(255, 255, 255, .72);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fridge-editor-grid,
+.fridge-editor-row {
+  display: grid;
+  gap: 6px;
+}
+
+.fridge-editor-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.fridge-editor-row {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.fridge-editor textarea {
+  width: 100%;
+  height: 108px;
+  resize: none;
+  border: 1px solid rgba(91, 44, 29, .2);
+  border-radius: 10px;
+  padding: 8px;
+  font: 11px/1.35 Consolas, monospace;
+}
+
+.fridge-editor-grid button,
+.fridge-editor-row button {
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+@media (min-width: 720px) {
+  .fridge-shell {
+    width: min(430px, calc(94vh * 750 / 1334));
+    max-height: 94vh;
+    border-radius: 28px;
+    box-shadow: 0 30px 90px rgba(92, 53, 23, .35);
+  }
+}
+
+.fridge-lang-switch {
+  position: absolute;
+  z-index: 15;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 248, 230, .92);
+  border: 3px solid rgba(255, 255, 255, .72);
+  box-shadow: 0 8px 20px rgba(103, 62, 26, .14);
+}
+
+.fridge-lang-switch a {
+  min-width: 38px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #6e4730;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.fridge-lang-switch a.active {
+  color: #fff4b0;
+  background: linear-gradient(180deg, #63d0b2, #289b84);
+}
+
+@media (max-height: 780px) {
+  .fridge-title-card h1 {
+    font-size: 30px;
+  }
+
+  .fridge-title-card p {
+    font-size: 13px;
+  }
+
+  .fridge-goal-card {
+    gap: 6px;
+    padding: 6px 10px;
+  }
+
+  .fridge-goal-card span {
+    font-size: 12px;
+  }
+
+}
