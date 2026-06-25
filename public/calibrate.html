@@ -23,7 +23,7 @@ const c=document.getElementById('c');
 c.width=GW; c.height=GH;
 const ctx=c.getContext('2d');
 const img=new Image();
-img.src='/assets/tidy/fridge-board.png';
+img.src='./assets/tidy/fridge-board.png';
 img.onload=()=>{ ctx.drawImage(img,0,0,GW,GH); };
 
 let clicks=[];

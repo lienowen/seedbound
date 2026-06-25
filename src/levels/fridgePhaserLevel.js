@@ -14,10 +14,6 @@ const FRIDGE_FRONTS = [
   { kind: "roundedRect", x: 132, y: 575, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.32, depth: 360, line: { width: 1, color: 0xffffff, alpha: 0.35 } },
   { kind: "roundedRect", x: 132, y: 735, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.32, depth: 380, line: { width: 1, color: 0xffffff, alpha: 0.35 } },
   { kind: "roundedRect", x: 132, y: 846, w: 348, h: 10, r: 5, fill: 0xbcded5, alpha: 0.42, depth: 400, line: { width: 1, color: 0xffffff, alpha: 0.44 } },
-  { kind: "roundedRect", x: 500, y: 402, w: 144, h: 10, r: 5, fill: 0xc3d4c8, alpha: 0.38, depth: 390, line: { width: 1, color: 0xffffff, alpha: 0.28 } },
-  { kind: "roundedRect", x: 500, y: 581, w: 144, h: 10, r: 5, fill: 0xc3d4c8, alpha: 0.38, depth: 400, line: { width: 1, color: 0xffffff, alpha: 0.28 } },
-  { kind: "roundedRect", x: 500, y: 760, w: 144, h: 10, r: 5, fill: 0xc3d4c8, alpha: 0.38, depth: 410, line: { width: 1, color: 0xffffff, alpha: 0.28 } },
-  { kind: "roundedRect", x: 500, y: 1008, w: 144, h: 10, r: 5, fill: 0xc3d4c8, alpha: 0.38, depth: 430, line: { width: 1, color: 0xffffff, alpha: 0.28 } },
 ];
 
 const FRIDGE_SLOTS = [
@@ -32,12 +28,12 @@ const FRIDGE_SLOTS = [
   { id: "door_top_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 402, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 210 },
   { id: "door_upper_2", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 581, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 215 },
   { id: "door_mid_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 760, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 220 },
-  { id: "door_low_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 1008, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 230 },
+  { id: "door_low_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 966, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 230 },
 ];
 
 const FRIDGE_ASSETS = {
   back: { key: "fridge-board", file: "fridge-board.png" },
-  front: null,
+  front: { key: "fridge-door-front", file: "fridge-door-front.png", depth: 430 },
 };
 
 function renderProfile(key) {

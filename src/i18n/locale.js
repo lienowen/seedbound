@@ -1,11 +1,21 @@
 export const LOCALES = ["pt", "en", "cn"];
 export const LOCALE_PREF_KEY = "seedbound.locale";
 
-export function parseLocale(pathname = typeof window !== "undefined" ? window.location.pathname : "/") {
+function supportedLocale(locale) {
+  return LOCALES.includes(locale) ? locale : null;
+}
+
+export function parseLocale(locationLike = typeof window !== "undefined" ? window.location : { pathname: "/", search: "" }) {
+  const search = typeof locationLike === "string" ? "" : locationLike.search || "";
+  const queryLocale = new URLSearchParams(search).get("lang")?.toLowerCase();
+  const fromQuery = supportedLocale(queryLocale);
+  if (fromQuery) return fromQuery;
+
+  const pathname = typeof locationLike === "string" ? locationLike : locationLike.pathname || "/";
   const seg = pathname.split("/").filter(Boolean)[0]?.toLowerCase();
   if (seg === "en") return "en";
   if (seg === "cn") return "cn";
-  return "pt";
+  return readLocalePreference() || detectBrowserLocale();
 }
 
 /** Map browser language tags to supported game locales. */
@@ -41,11 +51,17 @@ export function writeLocalePreference(locale) {
   }
 }
 
-/** Redirect `/` to `/en` or `/cn` when browser or saved preference differs from default pt. */
+/** Store an initial locale without changing the URL; static game portals do not support SPA paths. */
 export function redirectToLocaleIfNeeded() {
   if (typeof window === "undefined") return;
 
-  const { pathname, search, hash } = window.location;
+  const { pathname, search } = window.location;
+  const queryLocale = new URLSearchParams(search).get("lang")?.toLowerCase();
+  if (supportedLocale(queryLocale)) {
+    writeLocalePreference(queryLocale);
+    return;
+  }
+
   const pathSeg = pathname.split("/").filter(Boolean)[0]?.toLowerCase();
 
   if (pathSeg === "en" || pathSeg === "cn") {
@@ -55,10 +71,6 @@ export function redirectToLocaleIfNeeded() {
 
   const preferred = readLocalePreference() || detectBrowserLocale();
   writeLocalePreference(preferred);
-  const targetPath = localePath(preferred);
-  if (targetPath !== pathname) {
-    window.location.replace(`${targetPath}${search}${hash}`);
-  }
 }
 
 export function localePath(locale) {
@@ -80,5 +92,8 @@ export function htmlLang(locale) {
 }
 
 export function switchLocaleHref(locale, search = typeof window !== "undefined" ? window.location.search : "") {
-  return `${localePath(locale)}${search || ""}`;
+  const params = new URLSearchParams(search || "");
+  params.set("lang", supportedLocale(locale) || "pt");
+  const query = params.toString();
+  return query ? `?${query}` : "?lang=pt";
 }

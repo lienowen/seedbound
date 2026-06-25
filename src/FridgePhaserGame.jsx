@@ -32,13 +32,20 @@ function writeProgress(locale, progress) {
   }
 }
 
+function splitQuickActionLabel(label) {
+  if (label === "重玩本关") return ["重玩", "本关"];
+  if (label === "重置进度") return ["重置", "进度"];
+  const parts = label.split(/\s+/).filter(Boolean);
+  return parts.length ? [parts[0], parts.slice(1).join(" ")] : [label, ""];
+}
+
 export function FridgePhaserGame() {
   const mount = useRef(null);
   const sceneRef = useRef(null);
   const soundRef = useRef(null);
   const gameRef = useRef(null);
   const pendingFreshRef = useRef(false);
-  const locale = useMemo(() => parseLocale(window.location.pathname), []);
+  const locale = useMemo(() => parseLocale(window.location), []);
   const i18n = useMemo(() => createI18n(locale), [locale]);
   const campaign = useMemo(() => localizeCampaign(FRIDGE_BR_CAMPAIGN, locale), [locale]);
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -288,6 +295,8 @@ export function FridgePhaserGame() {
   }, [level, progress, hud.placed, hud.total, locale]);
 
   const search = window.location.search;
+  const quickReplayLabel = splitQuickActionLabel(i18n.ui.replayLevelLabel);
+  const quickResetLabel = splitQuickActionLabel(i18n.ui.resetProgressLabel);
 
   return (
     <main className="fridge-shell">
@@ -299,8 +308,14 @@ export function FridgePhaserGame() {
             <a className={locale === "cn" ? "active" : ""} href={switchLocaleHref("cn", search)} onClick={() => writeLocalePreference("cn")}>{i18n.ui.langCn}</a>
           </nav>
           <div className="fridge-quick-actions">
-            <button type="button" className="fridge-quick-btn" onClick={replayLevel}>{i18n.ui.replayLevelLabel}</button>
-            <button type="button" className="fridge-quick-btn subtle" onClick={resetCampaign}>{i18n.ui.resetProgressLabel}</button>
+            <button type="button" className="fridge-quick-btn" onClick={replayLevel} title={i18n.ui.replayLevelLabel}>
+              <span>{quickReplayLabel[0]}</span>
+              {quickReplayLabel[1] && <small>{quickReplayLabel[1]}</small>}
+            </button>
+            <button type="button" className="fridge-quick-btn subtle" onClick={resetCampaign} title={i18n.ui.resetProgressLabel}>
+              <span>{quickResetLabel[0]}</span>
+              {quickResetLabel[1] && <small>{quickResetLabel[1]}</small>}
+            </button>
           </div>
         </>
       )}
