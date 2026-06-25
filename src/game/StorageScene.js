@@ -108,6 +108,8 @@ export class StorageScene extends Phaser.Scene {
     this.chromeData = structuredClone(payload.uiState || {});
     this.i18n = createI18n(this.chromeData.locale || "pt");
     this.engine = new StorageEngine(this.level, { forceFresh: !!payload.forceFresh });
+    this.winSent = false;
+    this.completionPolishStarted = false;
     this.cameras.main.setBackgroundColor(this.level.theme.background || "#ffecc8");
     this.ensureItemTextures();
     this.buildStage();
@@ -821,6 +823,36 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
+  playCompletionPolish() {
+    if (this.completionPolishStarted) return;
+    this.completionPolishStarted = true;
+    this.cameras.main.flash(180, 255, 246, 210, false);
+    const glow = this.add.graphics().setDepth(540);
+    glow.fillGradientStyle(0xffffff, 0xfff4ba, 0xffffff, 0xffe9a5, 0, 0.38, 0, 0.18);
+    glow.fillRoundedRect(76, 248, 600, 788, 44);
+    glow.setAlpha(0);
+    this.tweens.add({
+      targets: glow,
+      alpha: { from: 0, to: 0.55 },
+      duration: 260,
+      yoyo: true,
+      ease: "Sine.inOut",
+      onComplete: () => glow.destroy(),
+    });
+    for (const sprite of this.sprites.values()) {
+      const home = sprite.getData("home");
+      if (home?.status !== "packed") continue;
+      this.tweens.add({
+        targets: sprite,
+        y: sprite.y - 3,
+        duration: 120,
+        yoyo: true,
+        ease: "Sine.inOut",
+      });
+    }
+    this.setToastMessage(this.level.copy?.successToast || this.i18n.ui.snapOk);
+  }
+
   renderState(state, validation) {
     this.updateChrome({
       placed: validation.packed,
@@ -840,7 +872,8 @@ export class StorageScene extends Phaser.Scene {
     this.sortItems();
     if (validation.complete && !this.winSent) {
       this.winSent = true;
-      this.time.delayedCall(450, () => {
+      this.playCompletionPolish();
+      this.time.delayedCall(780, () => {
         const reward = this.level.reward || 50;
         window.dispatchEvent(new CustomEvent("game-success", { detail: { score: 100, gold: reward } }));
         this.game.events.emit("game-success", { score: 100, gold: reward });

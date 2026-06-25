@@ -341,47 +341,63 @@ button { font: inherit; }
 .fridge-quick-actions {
   position: absolute;
   z-index: 12;
-  left: 8px;
-  bottom: 118px;
+  left: 18px;
+  right: 18px;
+  bottom: 28px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 72px;
+  justify-content: space-between;
+  gap: 10px;
   pointer-events: none;
 }
 
 .fridge-quick-btn {
-  border: 3px solid rgba(255, 255, 255, .72);
-  border-radius: 18px 999px 999px 18px;
-  min-height: 46px;
-  padding: 6px 7px 6px 9px;
+  width: 46px;
+  height: 46px;
+  border: 3px solid rgba(255, 255, 255, .78);
+  border-radius: 999px;
+  padding: 0;
   color: #6a3a1c;
-  background: rgba(255, 248, 230, .9);
-  box-shadow: 0 8px 18px rgba(103, 62, 26, .1);
-  font-size: 14px;
+  background: rgba(255, 248, 230, .82);
+  box-shadow: 0 8px 18px rgba(103, 62, 26, .14);
+  font-size: 0;
   font-weight: 800;
   line-height: 1;
   pointer-events: auto;
   text-align: center;
-  white-space: normal;
   backdrop-filter: blur(3px);
+  transition: transform .16s ease, background .16s ease, opacity .16s ease;
+  opacity: .84;
 }
 
-.fridge-quick-btn span,
-.fridge-quick-btn small {
-  display: block;
+.fridge-quick-btn::before {
+  content: attr(data-icon);
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 25px;
+  line-height: 1;
 }
 
-.fridge-quick-btn small {
-  margin-top: 2px;
-  color: #9a7050;
-  font-size: 11px;
-  font-weight: 900;
+.fridge-quick-btn:hover,
+.fridge-quick-btn:focus-visible {
+  background: rgba(255, 248, 230, .96);
+  opacity: 1;
+  transform: translateY(-1px) scale(1.03);
+}
+
+.fridge-quick-btn span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .fridge-quick-btn.subtle {
   color: #8b664b;
-  background: rgba(255, 255, 255, .76);
+  background: rgba(255, 255, 255, .7);
 }
 
 .fridge-lang-switch a.active {

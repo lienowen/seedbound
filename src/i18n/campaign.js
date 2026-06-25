@@ -1,10 +1,10 @@
 export const CAMPAIGN_I18N = {
   en: {
     "fridge-br-1": {
-      title: "Door and Sauces",
-      subtitle: "Door first, shelves second.",
-      intro: "If drinks fill the shelf, you'll run out of room.",
-      goal: "Send sauces and sodas to the door, strawberries on the middle-right shelf.",
+      title: "Showcase Fridge",
+      subtitle: "Full, neat, and easy.",
+      intro: "A display level: watch the fridge fill up nicely.",
+      goal: "Four bottles go on the door; cake and the extra can use the open shelves.",
       difficulty: "Easy",
     },
     "fridge-br-2": {
@@ -147,10 +147,10 @@ export const CAMPAIGN_I18N = {
   },
   cn: {
     "fridge-br-1": {
-      title: "门架与酱料",
-      subtitle: "先填门架，再填主层。",
-      intro: "饮料占满主层就会没地方放。",
-      goal: "酱料汽水放门架，草莓放中层右侧。",
+      title: "满冰箱展示",
+      subtitle: "看起来满，但不难。",
+      intro: "这一关先让冰箱变得满当整齐。",
+      goal: "四个瓶罐放门架，蛋糕和多余罐装放空着的主层。",
       difficulty: "轻松",
     },
     "fridge-br-2": {

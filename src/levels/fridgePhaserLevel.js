@@ -6,6 +6,13 @@ const FRIDGE_STAGE = {
   shapes: [
     { kind: "roundedRect", x: 160, y: 798, w: 292, h: 152, r: 24, fill: 0xf8f4ee, alpha: 0.94, line: { width: 3, color: 0xf2fbf8, alpha: 0.6 } },
     { kind: "roundedRect", x: 176, y: 816, w: 260, h: 116, r: 18, fill: 0xfffcf7, alpha: 0.96, line: { width: 2, color: 0xffffff, alpha: 0.8 } },
+    { kind: "roundedRect", x: 82, y: 1052, w: 588, h: 118, r: 34, fill: 0xfff3d5, alpha: 0.68, line: { width: 3, color: 0xffffff, alpha: 0.58 } },
+    { kind: "roundedRect", x: 104, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
+    { kind: "roundedRect", x: 198, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
+    { kind: "roundedRect", x: 292, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
+    { kind: "roundedRect", x: 386, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
+    { kind: "roundedRect", x: 480, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
+    { kind: "roundedRect", x: 574, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
   ],
 };
 
@@ -57,14 +64,14 @@ function scaleFromVisibleHeight(key, targetHeight) {
 }
 
 const ITEM_SCALE = {
-  cartonTall: scaleFromVisibleHeight("milk", 112),
-  sauceBottle: scaleFromVisibleHeight("juice", 102),
-  sodaCan: scaleFromVisibleHeight("green-soda", 92),
-  dairyCup: scaleFromVisibleHeight("yogurt", 98),
-  produceWide: 0.376,
-  mealWide: 0.358,
-  dessertWide: 0.305,
-  leafyProduce: 0.49,
+  cartonTall: scaleFromVisibleHeight("milk", 124),
+  sauceBottle: scaleFromVisibleHeight("juice", 112),
+  sodaCan: scaleFromVisibleHeight("green-soda", 102),
+  dairyCup: scaleFromVisibleHeight("yogurt", 108),
+  produceWide: 0.414,
+  mealWide: 0.392,
+  dessertWide: 0.338,
+  leafyProduce: 0.54,
 };
 
 const ITEM_LIBRARY = {
@@ -83,15 +90,17 @@ const ITEM_LIBRARY = {
 };
 
 const TRAY_POSITIONS = [
-  [120, 1125],
-  [225, 1125],
-  [330, 1125],
-  [435, 1125],
-  [540, 1125],
-  [170, 1205],
-  [275, 1205],
-  [380, 1205],
-  [485, 1205],
+  [142, 1126],
+  [236, 1126],
+  [330, 1126],
+  [424, 1126],
+  [518, 1126],
+  [612, 1126],
+  [188, 1190],
+  [282, 1190],
+  [376, 1190],
+  [470, 1190],
+  [564, 1190],
 ];
 
 function buildItem(key, overrides = {}) {
@@ -163,10 +172,11 @@ export const FRIDGE_BR_CAMPAIGN = [
   buildFridgeLevel({
     id: "fridge-br-1",
     phase: 1,
-    title: "Porta e Molhos",
-    subtitle: "Porta primeiro, resto depois.",
-    intro: "Se encher a prateleira com bebida, vai faltar lugar.",
-    goal: "Leve molhos e refri para a porta; morangos na prateleira do meio.",
+    reward: 140,
+    title: "Geladeira Vitrine",
+    subtitle: "Cheia, bonita e facil.",
+    intro: "Uma fase de apresentacao: veja a geladeira ficando cheia.",
+    goal: "Quatro bebidas no porta; bolo e lata extra nas prateleiras livres.",
     difficulty: "Leve",
     fixedItems: [
       { key: "milk", slot: "shelf_top_1", id: "milk_fixed" },
@@ -174,15 +184,15 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
       { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
       { key: "mealbox", slot: "drawer_left", id: "mealbox_fixed" },
-      { key: "cake", slot: "drawer_right", id: "cake_fixed" },
+      { key: "strawberries", slot: "drawer_right", id: "strawberries_fixed" },
     ],
     trayItems: [
       { key: "mustard" },
       { key: "ketchup" },
       { key: "juice" },
-      { key: "greenSoda" },
       { key: "redSoda" },
-      { key: "strawberries" },
+      { key: "cake" },
+      { key: "greenSoda" },
     ],
   }),
   buildFridgeLevel({
