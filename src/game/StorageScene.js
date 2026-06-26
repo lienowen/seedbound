@@ -59,7 +59,8 @@ export class StorageScene extends Phaser.Scene {
     this.loadStageAsset(level.assets?.front);
     for (const item of level.items) {
       if (this.textures.exists(item.image)) continue;
-      this.load.image(item.image, `${ASSET}${item.image}.png`);
+      const file = item.file || `${item.image}.png`;
+      this.load.image(item.image, `${ASSET}${file}`);
     }
   }
 

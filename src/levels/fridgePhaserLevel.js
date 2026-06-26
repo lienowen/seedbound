@@ -39,8 +39,8 @@ const FRIDGE_SLOTS = [
 ];
 
 const FRIDGE_ASSETS = {
-  back: { key: "fridge-board", file: "fridge-board.png" },
-  front: { key: "fridge-door-front", file: "fridge-door-front.png", depth: 430 },
+  back: { key: "fridge-board", file: "fridge-board.webp" },
+  front: { key: "fridge-door-front", file: "fridge-door-front.webp", depth: 430 },
 };
 
 function renderProfile(key) {
@@ -75,18 +75,18 @@ const ITEM_SCALE = {
 };
 
 const ITEM_LIBRARY = {
-  milk: { image: "milk", name: "Leite", tags: ["carton", "dairy"], size: [1, 1], scale: ITEM_SCALE.cartonTall, anchor: [renderProfile("milk").originX, renderProfile("milk").originY], surface: renderProfile("milk"), bounds: { w: 90, h: 116 } },
-  eggs: { image: "eggs", name: "Ovos", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.produceWide, anchor: [renderProfile("eggs").originX, renderProfile("eggs").originY], surface: renderProfile("eggs"), bounds: { w: 136, h: 88 }, nudge: { shelf: { x: -4 } } },
-  strawberries: { image: "strawberries", name: "Morangos", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.produceWide, anchor: [renderProfile("strawberries").originX, renderProfile("strawberries").originY], surface: renderProfile("strawberries"), bounds: { w: 136, h: 90 }, nudge: { shelf: { x: 4 }, chill: { x: 4 } } },
-  mustard: { image: "mustard", name: "Mostarda", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("mustard").originX, renderProfile("mustard").originY], surface: renderProfile("mustard"), bounds: { w: 48, h: 100 } },
-  ketchup: { image: "ketchup", name: "Ketchup", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("ketchup").originX, renderProfile("ketchup").originY], surface: renderProfile("ketchup"), bounds: { w: 48, h: 100 } },
-  juice: { image: "juice", name: "Suco", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("juice").originX, renderProfile("juice").originY], surface: renderProfile("juice"), bounds: { w: 48, h: 100 } },
-  yogurt: { image: "yogurt", name: "Iogurte", tags: ["dairy"], size: [1, 1], scale: ITEM_SCALE.dairyCup, anchor: [renderProfile("yogurt").originX, renderProfile("yogurt").originY], surface: renderProfile("yogurt"), bounds: { w: 88, h: 86 } },
-  lettuce: { image: "lettuce", name: "Alface", tags: ["food"], size: [1, 1], scale: ITEM_SCALE.leafyProduce, anchor: [renderProfile("lettuce").originX, renderProfile("lettuce").originY], surface: renderProfile("lettuce"), bounds: { w: 128, h: 104 } },
-  mealbox: { image: "mealbox", name: "Marmita", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.mealWide, anchor: [renderProfile("mealbox").originX, renderProfile("mealbox").originY], surface: renderProfile("mealbox"), bounds: { w: 132, h: 98 }, nudge: { drawer: { x: -4 } } },
-  cake: { image: "cake", name: "Bolo", tags: ["food"], size: [2, 1], scale: ITEM_SCALE.dessertWide, anchor: [renderProfile("cake").originX, renderProfile("cake").originY], surface: renderProfile("cake"), bounds: { w: 106, h: 86 }, nudge: { drawer: { x: 4 } } },
-  greenSoda: { image: "green-soda", name: "Guarana", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("green-soda").originX, renderProfile("green-soda").originY], surface: renderProfile("green-soda"), bounds: { w: 48, h: 100 } },
-  redSoda: { image: "red-soda", name: "Refri", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("red-soda").originX, renderProfile("red-soda").originY], surface: renderProfile("red-soda"), bounds: { w: 48, h: 100 } },
+  milk: { image: "milk", file: "milk.webp", name: "Leite", tags: ["carton", "dairy"], size: [1, 1], scale: ITEM_SCALE.cartonTall, anchor: [renderProfile("milk").originX, renderProfile("milk").originY], surface: renderProfile("milk"), bounds: { w: 90, h: 116 } },
+  eggs: { image: "eggs", file: "eggs.webp", name: "Ovos", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.produceWide, anchor: [renderProfile("eggs").originX, renderProfile("eggs").originY], surface: renderProfile("eggs"), bounds: { w: 136, h: 88 }, nudge: { shelf: { x: -4 } } },
+  strawberries: { image: "strawberries", file: "strawberries.webp", name: "Morangos", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.produceWide, anchor: [renderProfile("strawberries").originX, renderProfile("strawberries").originY], surface: renderProfile("strawberries"), bounds: { w: 136, h: 90 }, nudge: { shelf: { x: 4 }, chill: { x: 4 } } },
+  mustard: { image: "mustard", file: "mustard.webp", name: "Mostarda", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("mustard").originX, renderProfile("mustard").originY], surface: renderProfile("mustard"), bounds: { w: 48, h: 100 } },
+  ketchup: { image: "ketchup", file: "ketchup.webp", name: "Ketchup", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("ketchup").originX, renderProfile("ketchup").originY], surface: renderProfile("ketchup"), bounds: { w: 48, h: 100 } },
+  juice: { image: "juice", file: "juice.webp", name: "Suco", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("juice").originX, renderProfile("juice").originY], surface: renderProfile("juice"), bounds: { w: 48, h: 100 } },
+  yogurt: { image: "yogurt", file: "yogurt.webp", name: "Iogurte", tags: ["dairy"], size: [1, 1], scale: ITEM_SCALE.dairyCup, anchor: [renderProfile("yogurt").originX, renderProfile("yogurt").originY], surface: renderProfile("yogurt"), bounds: { w: 88, h: 86 } },
+  lettuce: { image: "lettuce", file: "lettuce.webp", name: "Alface", tags: ["food"], size: [1, 1], scale: ITEM_SCALE.leafyProduce, anchor: [renderProfile("lettuce").originX, renderProfile("lettuce").originY], surface: renderProfile("lettuce"), bounds: { w: 128, h: 104 } },
+  mealbox: { image: "mealbox", file: "mealbox.webp", name: "Marmita", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.mealWide, anchor: [renderProfile("mealbox").originX, renderProfile("mealbox").originY], surface: renderProfile("mealbox"), bounds: { w: 132, h: 98 }, nudge: { drawer: { x: -4 } } },
+  cake: { image: "cake", file: "cake.webp", name: "Bolo", tags: ["food"], size: [2, 1], scale: ITEM_SCALE.dessertWide, anchor: [renderProfile("cake").originX, renderProfile("cake").originY], surface: renderProfile("cake"), bounds: { w: 106, h: 86 }, nudge: { drawer: { x: 4 } } },
+  greenSoda: { image: "green-soda", file: "green-soda.webp", name: "Guarana", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("green-soda").originX, renderProfile("green-soda").originY], surface: renderProfile("green-soda"), bounds: { w: 48, h: 100 } },
+  redSoda: { image: "red-soda", file: "red-soda.webp", name: "Refri", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("red-soda").originX, renderProfile("red-soda").originY], surface: renderProfile("red-soda"), bounds: { w: 48, h: 100 } },
 };
 
 const TRAY_POSITIONS = [
