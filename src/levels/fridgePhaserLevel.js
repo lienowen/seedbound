@@ -6,13 +6,13 @@ const FRIDGE_STAGE = {
   shapes: [
     { kind: "roundedRect", x: 160, y: 798, w: 292, h: 152, r: 24, fill: 0xf8f4ee, alpha: 0.94, line: { width: 3, color: 0xf2fbf8, alpha: 0.6 } },
     { kind: "roundedRect", x: 176, y: 816, w: 260, h: 116, r: 18, fill: 0xfffcf7, alpha: 0.96, line: { width: 2, color: 0xffffff, alpha: 0.8 } },
-    { kind: "roundedRect", x: 82, y: 1052, w: 588, h: 118, r: 34, fill: 0xfff3d5, alpha: 0.68, line: { width: 3, color: 0xffffff, alpha: 0.58 } },
-    { kind: "roundedRect", x: 104, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
-    { kind: "roundedRect", x: 198, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
-    { kind: "roundedRect", x: 292, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
-    { kind: "roundedRect", x: 386, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
-    { kind: "roundedRect", x: 480, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
-    { kind: "roundedRect", x: 574, y: 1074, w: 76, h: 74, r: 18, fill: 0xffffff, alpha: 0.22, line: { width: 2, color: 0xd7a96f, alpha: 0.16 } },
+    { kind: "roundedRect", x: 68, y: 1040, w: 614, h: 142, r: 38, fill: 0xfff0ce, alpha: 0.84, line: { width: 3, color: 0xffffff, alpha: 0.62 } },
+    { kind: "roundedRect", x: 94, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
+    { kind: "roundedRect", x: 188, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
+    { kind: "roundedRect", x: 282, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
+    { kind: "roundedRect", x: 376, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
+    { kind: "roundedRect", x: 470, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
+    { kind: "roundedRect", x: 564, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
   ],
 };
 
@@ -32,10 +32,10 @@ const FRIDGE_SLOTS = [
   { id: "shelf_low_2", zone: "chill", allow: ["food", "box", "dairy", "bottle"], x: 390, y: 735, w: 170, h: 102, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 151 },
   { id: "drawer_left", zone: "drawer", allow: ["food", "box", "dairy"], x: 243, y: 890, w: 148, h: 96, cols: 2, rows: 1, stackLayers: 1, baseline: 0.62, depth: 176 },
   { id: "drawer_right", zone: "drawer", allow: ["food", "box", "dairy"], x: 389, y: 890, w: 148, h: 96, cols: 2, rows: 1, stackLayers: 1, baseline: 0.62, depth: 177 },
-  { id: "door_top_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 402, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 210 },
-  { id: "door_upper_2", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 581, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 215 },
-  { id: "door_mid_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 760, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 220 },
-  { id: "door_low_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 573, y: 966, w: 94, h: 108, cols: 1, rows: 1, baseline: 0.5, depth: 230 },
+  { id: "door_top_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 578, y: 404, w: 102, h: 104, cols: 1, rows: 1, baseline: 0.54, depth: 210 },
+  { id: "door_upper_2", zone: "door", allow: ["bottle", "dairy", "carton"], x: 579, y: 583, w: 102, h: 104, cols: 1, rows: 1, baseline: 0.54, depth: 215 },
+  { id: "door_mid_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 581, y: 762, w: 104, h: 104, cols: 1, rows: 1, baseline: 0.55, depth: 220 },
+  { id: "door_low_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 589, y: 971, w: 118, h: 106, cols: 1, rows: 1, baseline: 0.58, depth: 230 },
 ];
 
 const FRIDGE_ASSETS = {
@@ -64,43 +64,77 @@ function scaleFromVisibleHeight(key, targetHeight) {
 }
 
 const ITEM_SCALE = {
-  cartonTall: scaleFromVisibleHeight("milk", 124),
-  sauceBottle: scaleFromVisibleHeight("juice", 112),
-  sodaCan: scaleFromVisibleHeight("green-soda", 102),
-  dairyCup: scaleFromVisibleHeight("yogurt", 108),
-  produceWide: 0.414,
-  mealWide: 0.392,
-  dessertWide: 0.338,
-  leafyProduce: 0.54,
+  cartonTall: scaleFromVisibleHeight("milk", 132),
+  sauceBottle: scaleFromVisibleHeight("juice", 120),
+  sodaCan: scaleFromVisibleHeight("green-soda", 112),
+  dairyCup: scaleFromVisibleHeight("yogurt", 116),
+  produceWide: 0.432,
+  mealWide: 0.404,
+  dessertWide: 0.35,
+  leafyProduce: 0.562,
 };
 
 const ITEM_LIBRARY = {
-  milk: { image: "milk", file: "milk.webp", name: "Leite", tags: ["carton", "dairy"], size: [1, 1], scale: ITEM_SCALE.cartonTall, anchor: [renderProfile("milk").originX, renderProfile("milk").originY], surface: renderProfile("milk"), bounds: { w: 90, h: 116 } },
-  eggs: { image: "eggs", file: "eggs.webp", name: "Ovos", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.produceWide, anchor: [renderProfile("eggs").originX, renderProfile("eggs").originY], surface: renderProfile("eggs"), bounds: { w: 136, h: 88 }, nudge: { shelf: { x: -4 } } },
-  strawberries: { image: "strawberries", file: "strawberries.webp", name: "Morangos", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.produceWide, anchor: [renderProfile("strawberries").originX, renderProfile("strawberries").originY], surface: renderProfile("strawberries"), bounds: { w: 136, h: 90 }, nudge: { shelf: { x: 4 }, chill: { x: 4 } } },
-  mustard: { image: "mustard", file: "mustard.webp", name: "Mostarda", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("mustard").originX, renderProfile("mustard").originY], surface: renderProfile("mustard"), bounds: { w: 48, h: 100 } },
-  ketchup: { image: "ketchup", file: "ketchup.webp", name: "Ketchup", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("ketchup").originX, renderProfile("ketchup").originY], surface: renderProfile("ketchup"), bounds: { w: 48, h: 100 } },
-  juice: { image: "juice", file: "juice.webp", name: "Suco", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("juice").originX, renderProfile("juice").originY], surface: renderProfile("juice"), bounds: { w: 48, h: 100 } },
-  yogurt: { image: "yogurt", file: "yogurt.webp", name: "Iogurte", tags: ["dairy"], size: [1, 1], scale: ITEM_SCALE.dairyCup, anchor: [renderProfile("yogurt").originX, renderProfile("yogurt").originY], surface: renderProfile("yogurt"), bounds: { w: 88, h: 86 } },
-  lettuce: { image: "lettuce", file: "lettuce.webp", name: "Alface", tags: ["food"], size: [1, 1], scale: ITEM_SCALE.leafyProduce, anchor: [renderProfile("lettuce").originX, renderProfile("lettuce").originY], surface: renderProfile("lettuce"), bounds: { w: 128, h: 104 } },
-  mealbox: { image: "mealbox", file: "mealbox.webp", name: "Marmita", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.mealWide, anchor: [renderProfile("mealbox").originX, renderProfile("mealbox").originY], surface: renderProfile("mealbox"), bounds: { w: 132, h: 98 }, nudge: { drawer: { x: -4 } } },
-  cake: { image: "cake", file: "cake.webp", name: "Bolo", tags: ["food"], size: [2, 1], scale: ITEM_SCALE.dessertWide, anchor: [renderProfile("cake").originX, renderProfile("cake").originY], surface: renderProfile("cake"), bounds: { w: 106, h: 86 }, nudge: { drawer: { x: 4 } } },
-  greenSoda: { image: "green-soda", file: "green-soda.webp", name: "Guarana", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("green-soda").originX, renderProfile("green-soda").originY], surface: renderProfile("green-soda"), bounds: { w: 48, h: 100 } },
-  redSoda: { image: "red-soda", file: "red-soda.webp", name: "Refri", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("red-soda").originX, renderProfile("red-soda").originY], surface: renderProfile("red-soda"), bounds: { w: 48, h: 100 } },
+  milk: {
+    image: "milk",
+    file: "milk.webp",
+    name: "Leite",
+    tags: ["carton", "dairy"],
+    size: [1, 1],
+    scale: ITEM_SCALE.cartonTall,
+    anchor: [renderProfile("milk").originX, renderProfile("milk").originY],
+    surface: renderProfile("milk"),
+    bounds: { w: 90, h: 116 },
+    nudge: {
+      door_top_1: { x: 12, y: -3 },
+      door_upper_2: { x: 13, y: -4 },
+      door_mid_1: { x: 15, y: -6 },
+      door_low_1: { x: 22, y: -8 },
+    },
+    renderNudge: {
+      drawer: { x: 4, y: -2 },
+    },
+    prefs: { zone: "door", needsCold: true, likesNeighbors: ["yogurt", "eggs"] },
+  },
+  eggs: { image: "eggs", file: "eggs.webp", name: "Ovos", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.produceWide, anchor: [renderProfile("eggs").originX, renderProfile("eggs").originY], surface: renderProfile("eggs"), bounds: { w: 136, h: 88 }, nudge: { shelf: { x: -4 } }, prefs: { zone: "shelf", needsCold: false, likesNeighbors: ["milk", "strawberries"] } },
+  strawberries: { image: "strawberries", file: "strawberries.webp", name: "Morangos", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.produceWide, anchor: [renderProfile("strawberries").originX, renderProfile("strawberries").originY], surface: renderProfile("strawberries"), bounds: { w: 136, h: 90 }, nudge: { shelf: { x: 4 }, chill: { x: 4 } }, prefs: { zone: "chill", needsCold: true, likesNeighbors: ["eggs", "yogurt"] } },
+  mustard: { image: "mustard", file: "mustard.webp", name: "Mostarda", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("mustard").originX, renderProfile("mustard").originY], surface: renderProfile("mustard"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 12, y: -4 } }, prefs: { zone: "door", needsCold: false, likesNeighbors: ["ketchup", "juice"], hatesNeighbors: ["cake"] } },
+  ketchup: { image: "ketchup", file: "ketchup.webp", name: "Ketchup", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("ketchup").originX, renderProfile("ketchup").originY], surface: renderProfile("ketchup"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 12, y: -4 } }, prefs: { zone: "door", needsCold: false, likesNeighbors: ["mustard", "green-soda"] } },
+  juice: { image: "juice", file: "juice.webp", name: "Suco", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sauceBottle, anchor: [renderProfile("juice").originX, renderProfile("juice").originY], surface: renderProfile("juice"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 12, y: -4 } }, prefs: { zone: "door", needsCold: true, likesNeighbors: ["milk", "green-soda"] } },
+  yogurt: { image: "yogurt", file: "yogurt.webp", name: "Iogurte", tags: ["dairy"], size: [1, 1], scale: ITEM_SCALE.dairyCup, anchor: [renderProfile("yogurt").originX, renderProfile("yogurt").originY], surface: renderProfile("yogurt"), bounds: { w: 88, h: 86 }, nudge: { door: { x: 10, y: -2 } }, prefs: { zone: "shelf", needsCold: true, likesNeighbors: ["milk", "strawberries"] } },
+  lettuce: {
+    image: "lettuce",
+    file: "lettuce.webp",
+    name: "Alface",
+    tags: ["food"],
+    size: [1, 1],
+    scale: ITEM_SCALE.leafyProduce,
+    anchor: [renderProfile("lettuce").originX, renderProfile("lettuce").originY],
+    surface: renderProfile("lettuce"),
+    bounds: { w: 128, h: 104 },
+    renderNudge: {
+      drawer: { x: -6, y: -2 },
+    },
+    prefs: { zone: "drawer", needsCold: true, hatesNeighbors: ["mealbox", "cake"] },
+  },
+  mealbox: { image: "mealbox", file: "mealbox.webp", name: "Marmita", tags: ["food", "box"], size: [2, 1], scale: ITEM_SCALE.mealWide, anchor: [renderProfile("mealbox").originX, renderProfile("mealbox").originY], surface: renderProfile("mealbox"), bounds: { w: 132, h: 98 }, nudge: { drawer: { x: -4 } }, prefs: { zone: "chill", needsCold: true, hatesNeighbors: ["lettuce", "cake"] } },
+  cake: { image: "cake", file: "cake.webp", name: "Bolo", tags: ["food"], size: [2, 1], scale: ITEM_SCALE.dessertWide, anchor: [renderProfile("cake").originX, renderProfile("cake").originY], surface: renderProfile("cake"), bounds: { w: 106, h: 86 }, nudge: { drawer: { x: 4 } }, prefs: { zone: "shelf", likesVisible: true, hatesNeighbors: ["mustard", "mealbox"] } },
+  greenSoda: { image: "green-soda", file: "green-soda.webp", name: "Guarana", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("green-soda").originX, renderProfile("green-soda").originY], surface: renderProfile("green-soda"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 10, y: -1 } }, prefs: { zone: "door", needsCold: false, likesNeighbors: ["red-soda", "juice"] } },
+  redSoda: { image: "red-soda", file: "red-soda.webp", name: "Refri", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("red-soda").originX, renderProfile("red-soda").originY], surface: renderProfile("red-soda"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 10, y: -1 } }, prefs: { zone: "door", needsCold: false, likesNeighbors: ["green-soda", "juice"] } },
 };
 
 const TRAY_POSITIONS = [
-  [142, 1126],
-  [236, 1126],
-  [330, 1126],
-  [424, 1126],
-  [518, 1126],
-  [612, 1126],
-  [188, 1190],
-  [282, 1190],
-  [376, 1190],
-  [470, 1190],
-  [564, 1190],
+  [148, 1108],
+  [240, 1108],
+  [332, 1108],
+  [424, 1108],
+  [516, 1108],
+  [608, 1108],
+  [194, 1168],
+  [286, 1168],
+  [378, 1168],
+  [470, 1168],
+  [562, 1168],
 ];
 
 function buildItem(key, overrides = {}) {
@@ -120,6 +154,9 @@ function buildFridgeLevel({
   goal,
   difficulty,
   reward = 50,
+  harmonyTarget = 300, // ⭐ target — must reach this to pass
+  harmonyGold = 380,   // ⭐⭐ 
+  harmonyPerfect = 440, // ⭐⭐⭐
   fixedItems = [],
   trayItems = [],
 }) {
@@ -128,6 +165,7 @@ function buildFridgeLevel({
     revision: 10,
     phase,
     reward,
+    harmony: { target: harmonyTarget, gold: harmonyGold, perfect: harmonyPerfect },
     copy: {
       intro,
       goal,
@@ -156,7 +194,16 @@ function buildFridgeLevel({
     items: [
       ...fixedItems.map((item) => buildItem(item.key, { fixed: true, slot: item.slot, id: item.id || item.key })),
       ...trayItems.map((item, index) => {
-        const [trayX, trayY] = TRAY_POSITIONS[index] || TRAY_POSITIONS[TRAY_POSITIONS.length - 1];
+        // Dynamic tray: spread items across 2 rows, even spacing
+        const count = trayItems.length;
+        const row1Count = Math.ceil(count / 2);
+        const row2Count = count - row1Count;
+        const row1Start = 375 - ((row1Count - 1) * 100) / 2;
+        const row2Start = 375 - ((row2Count - 1) * 100) / 2;
+        const inFirstRow = index < row1Count;
+        const col = inFirstRow ? index : index - row1Count;
+        const trayX = inFirstRow ? row1Start + col * 100 : row2Start + col * 100;
+        const trayY = inFirstRow ? 1140 : 1200;
         return buildItem(item.key, {
           id: item.id || `${item.key}_${index + 1}`,
           trayX,
@@ -169,30 +216,35 @@ function buildFridgeLevel({
 }
 
 export const FRIDGE_BR_CAMPAIGN = [
+  // ====== Level 1: Ad Showcase — "looks lived-in, needs your touch" ======
   buildFridgeLevel({
     id: "fridge-br-1",
     phase: 1,
-    reward: 140,
-    title: "Geladeira Vitrine",
-    subtitle: "Cheia, bonita e facil.",
-    intro: "Uma fase de apresentacao: veja a geladeira ficando cheia.",
-    goal: "Quatro bebidas no porta; bolo e lata extra nas prateleiras livres.",
-    difficulty: "Leve",
+    reward: 150,
+    harmonyTarget: 300,   // 6 items × 50 base, easy pass
+    harmonyGold: 400,     // 2★
+    harmonyPerfect: 480,   // 3★ — needs chain + good placement
+    title: "Your First Fridge",
+    subtitle: "Easy, cozy, satisfying.",
+    intro: "The fridge already has a few things. Finish the door with four drinks.",
+    goal: "Place 4 drinks on the door. They love being next to each other!",
+    difficulty: "Cozy",
     fixedItems: [
-      { key: "milk", slot: "shelf_top_1", id: "milk_fixed" },
-      { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
+      // Decorative only — make the fridge look lived-in, don't block door puzzle
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
+      { key: "mealbox", slot: "shelf_mid_2", id: "mealbox_fixed" },
+      { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
       { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
-      { key: "mealbox", slot: "drawer_left", id: "mealbox_fixed" },
-      { key: "strawberries", slot: "drawer_right", id: "strawberries_fixed" },
     ],
     trayItems: [
-      { key: "mustard" },
-      { key: "ketchup" },
-      { key: "juice" },
-      { key: "redSoda" },
-      { key: "cake" },
+      // 4 drinks → door (guaranteed chain: all like each other)
       { key: "greenSoda" },
+      { key: "redSoda" },
+      { key: "juice" },
+      { key: "milk" },
+      // 2 items → fill out the fridge
+      { key: "strawberries" },
+      { key: "cake" },
     ],
   }),
   buildFridgeLevel({
@@ -201,25 +253,25 @@ export const FRIDGE_BR_CAMPAIGN = [
     title: "Cafe da Manha",
     subtitle: "Leve, rapido e gostoso.",
     intro: "Se os grandes entrarem tarde, a manha trava.",
-    goal: "Grandoes no lugar certo; bolo na gaveta direita e molhos na porta.",
+    goal: "Complete a prateleira do cafe e deixe os frascos pequenos na porta.",
     difficulty: "Suave",
     reward: 60,
+    harmonyTarget: 340,
+    harmonyGold: 420,
+    harmonyPerfect: 500,
     fixedItems: [
-      { key: "milk", slot: "door_top_1", id: "milk_fixed" },
-      { key: "juice", slot: "door_low_1", id: "juice_fixed" },
       { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
       { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
-      { key: "mealbox", slot: "drawer_left", id: "mealbox_fixed" },
     ],
     trayItems: [
+      { key: "milk" },
       { key: "strawberries" },
       { key: "cake" },
       { key: "mustard" },
+      { key: "ketchup" },
+      { key: "juice" },
       { key: "greenSoda" },
-      { key: "redSoda" },
-      { key: "milk" },
-      { key: "yogurt" },
     ],
   }),
   buildFridgeLevel({
@@ -228,26 +280,25 @@ export const FRIDGE_BR_CAMPAIGN = [
     title: "Feira Fresquinha",
     subtitle: "Fresco embaixo, bebidas na porta.",
     intro: "A parte fria de baixo ja salva espaco de verdade.",
-    goal: "Leve folha e sobra para baixo, sen茫o o meio vai entupir antes do fim.",
+    goal: "Se o item grande entrar tarde, o resto trava. Porta para bebidas, frio para a sobra.",
     difficulty: "Medio",
     reward: 70,
+    harmonyTarget: 380,
+    harmonyGold: 460,
+    harmonyPerfect: 540,
     fixedItems: [
-      { key: "lettuce", slot: "drawer_left", id: "lettuce_fixed" },
-      { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
-      { key: "ketchup", slot: "door_low_1", id: "ketchup_fixed" },
-      { key: "mealbox", slot: "shelf_low_2", id: "mealbox_fixed" },
+      { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
       { key: "juice", slot: "door_mid_1", id: "juice_fixed" },
     ],
     trayItems: [
+      { key: "mealbox" },
       { key: "strawberries" },
       { key: "greenSoda" },
       { key: "redSoda" },
       { key: "milk" },
       { key: "cake" },
       { key: "mustard" },
-      { key: "yogurt" },
-      { key: "eggs" },
     ],
   }),
   buildFridgeLevel({
@@ -256,26 +307,22 @@ export const FRIDGE_BR_CAMPAIGN = [
     title: "Jantar Corrido",
     subtitle: "Sobrou comida, mas tem que caber.",
     intro: "Grande vai primeiro, ou o resto trava.",
-    goal: "Sobras grandes pedem prioridade; molho perdido na prateleira mata seu espaco cedo.",
+    goal: "Abra o frio de baixo para o bolo e mande as bebidas para a porta.",
     difficulty: "Aperto bom",
     reward: 80,
     fixedItems: [
-      { key: "mealbox", slot: "drawer_right", id: "mealbox_fixed" },
-      { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
-      { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
-      { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
+      { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
+      { key: "mealbox", slot: "shelf_low_1", id: "mealbox_fixed" },
     ],
     trayItems: [
+      { key: "cake" },
       { key: "lettuce" },
-      { key: "greenSoda" },
       { key: "strawberries" },
-      { key: "yogurt" },
-      { key: "mustard" },
-      { key: "juice" },
+      { key: "greenSoda" },
       { key: "redSoda" },
-      { key: "mealbox" },
-      { key: "milk" },
+      { key: "juice" },
+      { key: "ketchup" },
     ],
   }),
   buildFridgeLevel({
@@ -284,26 +331,23 @@ export const FRIDGE_BR_CAMPAIGN = [
     title: "Sextou na Geladeira",
     subtitle: "Organize tudo antes da visita chegar.",
     intro: "Aqui ja nao cabe improviso.",
-    goal: "Misture porta, prateleira e base fria sem desperdi莽ar nenhum bloco grande.",
+    goal: "Feche uma fileira bonita de bebidas e preserve o espaco grande para comida.",
     difficulty: "Cheia",
     reward: 100,
     fixedItems: [
-      { key: "milk", slot: "door_top_1", id: "milk_fixed" },
-      { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
-      { key: "redSoda", slot: "door_low_1", id: "redSoda_fixed" },
       { key: "mealbox", slot: "shelf_mid_1", id: "mealbox_fixed" },
       { key: "eggs", slot: "shelf_low_1", id: "eggs_fixed" },
       { key: "lettuce", slot: "drawer_left", id: "lettuce_fixed" },
-      { key: "cake", slot: "drawer_right", id: "cake_fixed" },
     ],
     trayItems: [
+      { key: "greenSoda" },
       { key: "milk" },
-      { key: "strawberries" },
       { key: "juice" },
       { key: "yogurt" },
-      { key: "mustard" },
       { key: "ketchup" },
-      { key: "mealbox" },
+      { key: "redSoda" },
+      { key: "cake" },
+      { key: "strawberries" },
     ],
   }),
 
@@ -319,15 +363,16 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 110,
     fixedItems: [
       { key: "lettuce", slot: "shelf_top_1", id: "lettuce_fixed" },
+      { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "eggs", slot: "drawer_left", id: "eggs_fixed" },
       { key: "cake", slot: "shelf_low_1", id: "cake_fixed" },
       { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
       { key: "juice", slot: "door_low_1", id: "juice_fixed" },
+      { key: "strawberries", slot: "drawer_right", id: "strawberries_fixed" },
     ],
     trayItems: [
       { key: "mealbox" },
-      { key: "strawberries" },
       { key: "greenSoda" },
       { key: "mustard" },
       { key: "redSoda" },
@@ -348,16 +393,16 @@ export const FRIDGE_BR_CAMPAIGN = [
     fixedItems: [
       { key: "juice", slot: "door_top_1", id: "juice_fixed" },
       { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
+      { key: "strawberries", slot: "shelf_top_2", id: "strawberries_fixed" },
       { key: "eggs", slot: "shelf_mid_2", id: "eggs_fixed" },
       { key: "mealbox", slot: "drawer_left", id: "mealbox_fixed" },
       { key: "milk", slot: "door_low_1", id: "milk_fixed" },
       { key: "lettuce", slot: "shelf_low_2", id: "lettuce_fixed" },
+      { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
     ],
     trayItems: [
-      { key: "strawberries" },
       { key: "yogurt" },
       { key: "milk" },
-      { key: "greenSoda" },
       { key: "redSoda" },
       { key: "mustard" },
       { key: "juice" },
@@ -376,16 +421,16 @@ export const FRIDGE_BR_CAMPAIGN = [
     fixedItems: [
       { key: "mealbox", slot: "shelf_mid_1", id: "mealbox_fixed_1" },
       { key: "mealbox", slot: "shelf_mid_2", id: "mealbox_fixed_2" },
+      { key: "strawberries", slot: "shelf_top_1", id: "strawberries_fixed" },
       { key: "eggs", slot: "shelf_low_1", id: "eggs_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "lettuce", slot: "drawer_right", id: "lettuce_fixed" },
+      { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
     ],
     trayItems: [
-      { key: "strawberries" },
       { key: "cake" },
       { key: "ketchup" },
       { key: "mustard" },
-      { key: "greenSoda" },
       { key: "redSoda" },
       { key: "yogurt" },
       { key: "juice" },
@@ -403,18 +448,18 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 140,
     fixedItems: [
       { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
+      { key: "strawberries", slot: "shelf_top_2", id: "strawberries_fixed" },
       { key: "mealbox", slot: "drawer_left", id: "mealbox_fixed" },
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
       { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "lettuce", slot: "shelf_low_2", id: "lettuce_fixed" },
+      { key: "juice", slot: "door_low_1", id: "juice_fixed" },
     ],
     trayItems: [
       { key: "greenSoda" },
       { key: "redSoda" },
-      { key: "juice" },
       { key: "yogurt" },
-      { key: "strawberries" },
       { key: "mustard" },
       { key: "milk" },
       { key: "cake" },
@@ -431,17 +476,17 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 150,
     fixedItems: [
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
+      { key: "greenSoda", slot: "door_upper_2", id: "greenSoda_fixed" },
       { key: "mealbox", slot: "shelf_mid_1", id: "mealbox_fixed" },
       { key: "eggs", slot: "shelf_low_1", id: "eggs_fixed" },
+      { key: "lettuce", slot: "shelf_top_2", id: "lettuce_fixed" },
       { key: "strawberries", slot: "drawer_right", id: "strawberries_fixed" },
       { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
+      { key: "juice", slot: "door_low_1", id: "juice_fixed" },
     ],
     trayItems: [
-      { key: "milk" },
       { key: "eggs" },
-      { key: "juice" },
       { key: "yogurt" },
-      { key: "greenSoda" },
       { key: "redSoda" },
       { key: "mealbox" },
       { key: "cake" },
@@ -459,7 +504,10 @@ export const FRIDGE_BR_CAMPAIGN = [
     difficulty: "Ressaca",
     reward: 160,
     fixedItems: [
+      { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
+      { key: "juice", slot: "door_top_1", id: "juice_fixed" },
       { key: "mealbox", slot: "shelf_mid_1", id: "mealbox_fixed" },
+      { key: "lettuce", slot: "drawer_right", id: "lettuce_fixed" },
       { key: "greenSoda", slot: "door_low_1", id: "gsoda_fixed" },
     ],
     trayItems: [
@@ -480,7 +528,10 @@ export const FRIDGE_BR_CAMPAIGN = [
     difficulty: "Leve mas preciso",
     reward: 170,
     fixedItems: [
+      { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "lettuce", slot: "shelf_top_2", id: "lettuce_fixed" },
+      { key: "yogurt", slot: "door_mid_1", id: "yogurt_fixed" },
+      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
     ],
     trayItems: [
       { key: "milk" },
@@ -501,7 +552,10 @@ export const FRIDGE_BR_CAMPAIGN = [
     difficulty: "Medio",
     reward: 180,
     fixedItems: [
+      { key: "mustard", slot: "door_top_1", id: "mustard_fixed" },
       { key: "mealbox", slot: "shelf_mid_2", id: "mealbox_fixed" },
+      { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
+      { key: "greenSoda", slot: "door_low_1", id: "greenSoda_fixed" },
     ],
     trayItems: [
       { key: "mustard" },
@@ -521,7 +575,11 @@ export const FRIDGE_BR_CAMPAIGN = [
     goal: "Distribua 8 itens sem deixar sobrar nenhum canto.",
     difficulty: "Apertado",
     reward: 190,
-    fixedItems: [],
+    fixedItems: [
+      { key: "milk", slot: "door_top_1", id: "milk_fixed" },
+      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
+    ],
     trayItems: [
       { key: "milk" },
       { key: "strawberries" },
@@ -543,7 +601,10 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 200,
     fixedItems: [
       { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
+      { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "juice", slot: "door_mid_1", id: "juice_fixed" },
+      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
     ],
     trayItems: [
       { key: "milk" },
@@ -566,6 +627,9 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 220,
     fixedItems: [
       { key: "cake", slot: "shelf_top_2", id: "cake_fixed" },
+      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
+      { key: "juice", slot: "door_low_1", id: "juice_fixed" },
     ],
     trayItems: [
       { key: "greenSoda" },
@@ -587,7 +651,10 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 230,
     fixedItems: [
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
+      { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
+      { key: "juice", slot: "door_mid_1", id: "juice_fixed" },
+      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
     ],
     trayItems: [
       { key: "juice" },
@@ -607,6 +674,9 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 250,
     fixedItems: [
       { key: "milk", slot: "shelf_top_1", id: "milk_fixed" },
+      { key: "greenSoda", slot: "door_top_1", id: "greenSoda_fixed" },
+      { key: "redSoda", slot: "door_mid_1", id: "redSoda_fixed" },
+      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
     ],
     trayItems: [
       { key: "eggs" },
@@ -624,9 +694,14 @@ export const FRIDGE_BR_CAMPAIGN = [
     subtitle: "Ultima organizacao do ano.",
     intro: "Ano novo, geladeira nova.",
     goal: "Deixe tudo impecavel para a virada.",
-    difficulty: "Premiun",
+    difficulty: "Premium",
     reward: 280,
-    fixedItems: [],
+    fixedItems: [
+      { key: "milk", slot: "door_top_1", id: "milk_fixed" },
+      { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
+      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
+    ],
     trayItems: [
       { key: "milk" },
       { key: "strawberries" },
@@ -648,6 +723,10 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 300,
     fixedItems: [
       { key: "lettuce", slot: "shelf_top_1", id: "lettuce_fixed" },
+      { key: "milk", slot: "door_top_1", id: "milk_fixed" },
+      { key: "mealbox", slot: "shelf_low_1", id: "mealbox_fixed" },
+      { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
+      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
     ],
     trayItems: [
       { key: "milk" },
@@ -695,12 +774,3 @@ export const MAKEUP_LEVEL = {
     { id: "case_low_2", zone: "tray", allow: ["bottle", "dairy"], x: 425, y: 800, w: 150, h: 140, cols: 2, rows: 1, baseline: 0.92, depth: 151 },
   ],
 };
-
-
-
-
-
-
-
-
-

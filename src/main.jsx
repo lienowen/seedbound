@@ -3,8 +3,9 @@ import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
 import "./fridge-phaser.css";
 
+const fridgePhaserGameImport = import("./FridgePhaserGame.jsx");
 const FridgePhaserGame = lazy(() =>
-  import("./FridgePhaserGame.jsx").then((module) => ({ default: module.FridgePhaserGame })),
+  fridgePhaserGameImport.then((module) => ({ default: module.FridgePhaserGame })),
 );
 
 redirectToLocaleIfNeeded();
@@ -14,10 +15,31 @@ createRoot(document.getElementById("root")).render(
     <Suspense
       fallback={(
         <main className="fridge-shell fridge-boot-shell">
-          <section className="fridge-boot-card" aria-live="polite">
+          <section className="fridge-boot-card fridge-boot-card--transition" aria-live="polite">
             <div className="fridge-boot-badge">Seedbound</div>
-            <h1>Loading fridge...</h1>
-            <p>Preparing shelves, bottles, and the first cozy level.</p>
+            <div className="fridge-boot-portal" aria-hidden="true">
+              <div className="fridge-boot-portal__glow" />
+              <div className="fridge-boot-portal__frame">
+                <div className="fridge-boot-portal__shelves">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <div className="fridge-boot-portal__door">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <div className="fridge-boot-portal__items">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </div>
+              </div>
+            </div>
+            <h1>Seedbound</h1>
+            <p>Opening the cozy fridge...</p>
           </section>
         </main>
       )}

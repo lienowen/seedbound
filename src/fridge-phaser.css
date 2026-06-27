@@ -38,6 +38,7 @@ button { font: inherit; }
 }
 
 .fridge-boot-card {
+  position: relative;
   width: min(100%, 320px);
   padding: 26px 24px 24px;
   border: 4px solid rgba(255,255,255,.72);
@@ -48,6 +49,16 @@ button { font: inherit; }
   box-shadow: 0 18px 48px rgba(103, 62, 26, .18);
   text-align: center;
   color: #6a341d;
+}
+
+.fridge-boot-card--skeleton {
+  width: min(100%, 360px);
+  padding: 16px;
+}
+
+.fridge-boot-card--transition {
+  width: min(100%, 360px);
+  padding: 18px 18px 22px;
 }
 
 .fridge-boot-badge {
@@ -78,6 +89,253 @@ button { font: inherit; }
   font-size: 15px;
   line-height: 1.45;
   font-weight: 700;
+}
+
+.fridge-boot-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .24s ease;
+}
+
+.fridge-boot-overlay.visible {
+  opacity: 1;
+}
+
+.fridge-boot-overlay--swap {
+  z-index: 16;
+}
+
+.fridge-boot-overlay__veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top center, rgba(255,255,255,.22), transparent 34%),
+    linear-gradient(180deg, rgba(255, 242, 212, .68), rgba(255, 220, 156, .82));
+  backdrop-filter: blur(8px) saturate(1.04);
+}
+
+.fridge-boot-overlay--swap .fridge-boot-overlay__veil {
+  background:
+    radial-gradient(circle at top center, rgba(255,255,255,.16), transparent 32%),
+    linear-gradient(180deg, rgba(255, 243, 214, .18), rgba(255, 224, 170, .28));
+  backdrop-filter: blur(4px) saturate(1.02);
+}
+
+.fridge-boot-overlay__card {
+  position: relative;
+  z-index: 1;
+  width: min(82%, 330px);
+  padding: 18px 18px 22px;
+  border: 3px solid rgba(255,255,255,.72);
+  border-radius: 30px;
+  background: linear-gradient(180deg, rgba(255, 249, 236, .92), rgba(255, 241, 214, .88));
+  box-shadow: 0 18px 60px rgba(103, 62, 26, .16);
+  text-align: center;
+}
+
+.fridge-boot-overlay.visible .fridge-boot-overlay__card {
+  animation: fridgeBootCardIn .26s cubic-bezier(.22,1,.36,1);
+}
+
+.fridge-boot-overlay--swap .fridge-boot-overlay__card {
+  width: min(74%, 286px);
+  padding: 14px 16px 18px;
+  border-width: 2px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 249, 236, .78), rgba(255, 240, 212, .72));
+  box-shadow: 0 12px 30px rgba(103, 62, 26, .1);
+}
+
+.fridge-boot-overlay__card strong {
+  display: block;
+  margin-top: 14px;
+  color: #6a341d;
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.fridge-boot-overlay--swap .fridge-boot-overlay__card strong {
+  margin-top: 10px;
+  font-size: 22px;
+}
+
+.fridge-boot-overlay__card p {
+  margin: 8px 8px 0;
+  color: #8b664b;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.fridge-boot-overlay--swap .fridge-boot-overlay__card p {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.fridge-boot-portal {
+  position: relative;
+  height: 250px;
+  margin-top: 8px;
+  border-radius: 26px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top center, rgba(255, 255, 255, .72), transparent 26%),
+    linear-gradient(180deg, #fff5dd, #ffe7b8 56%, #ffd38c);
+}
+
+.fridge-boot-overlay--swap .fridge-boot-portal {
+  height: 176px;
+  margin-top: 2px;
+  border-radius: 20px;
+}
+
+.fridge-boot-overlay--swap .fridge-boot-badge {
+  min-width: 102px;
+  margin-bottom: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.fridge-boot-portal__glow {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: 120px;
+  height: 26px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 239, 192, .92), rgba(255, 239, 192, 0));
+  transform: translateX(-50%);
+  filter: blur(6px);
+  animation: fridgeBootPulse 1.6s ease-in-out infinite;
+}
+
+.fridge-boot-portal__frame {
+  position: absolute;
+  inset: 18px 18px 16px;
+  display: grid;
+  grid-template-columns: 1.4fr .72fr;
+  gap: 14px;
+}
+
+.fridge-boot-portal__shelves,
+.fridge-boot-portal__door {
+  position: relative;
+  border-radius: 24px;
+  background: rgba(255,255,255,.54);
+  box-shadow:
+    inset 0 0 0 3px rgba(255,255,255,.82),
+    inset 0 -14px 28px rgba(229, 208, 171, .24);
+}
+
+.fridge-boot-portal__shelves span,
+.fridge-boot-portal__door span {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(188, 223, 215, .92), rgba(142, 195, 183, .72));
+}
+
+.fridge-boot-portal__shelves span:nth-child(1) { top: 26%; }
+.fridge-boot-portal__shelves span:nth-child(2) { top: 49%; }
+.fridge-boot-portal__shelves span:nth-child(3) { top: 72%; }
+
+.fridge-boot-portal__door span {
+  left: 10%;
+  right: 10%;
+  height: 16%;
+  border-radius: 14px 14px 22px 22px;
+  background: rgba(193, 221, 214, .92);
+}
+
+.fridge-boot-portal__door span:nth-child(1) { top: 8%; }
+.fridge-boot-portal__door span:nth-child(2) { top: 39%; }
+.fridge-boot-portal__door span:nth-child(3) { top: 72%; }
+
+.fridge-boot-portal__items i {
+  position: absolute;
+  bottom: 24px;
+  width: 24px;
+  border-radius: 12px 12px 10px 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,.74), rgba(255,255,255,.14));
+  box-shadow: 0 4px 12px rgba(115, 80, 40, .12);
+  animation: fridgeBootFloat 1.8s ease-in-out infinite;
+}
+
+.fridge-boot-portal__items i:nth-child(1) {
+  left: 28%;
+  height: 52px;
+  background-color: rgba(130, 209, 180, .9);
+  animation-delay: 0s;
+}
+
+.fridge-boot-portal__items i:nth-child(2) {
+  left: 41%;
+  height: 46px;
+  background-color: rgba(255, 180, 114, .9);
+  animation-delay: .15s;
+}
+
+.fridge-boot-portal__items i:nth-child(3) {
+  right: 18%;
+  bottom: 50px;
+  height: 42px;
+  background-color: rgba(255, 112, 112, .86);
+  animation-delay: .3s;
+}
+
+.fridge-boot-portal__items i:nth-child(4) {
+  right: 8%;
+  bottom: 94px;
+  height: 34px;
+  background-color: rgba(255, 221, 95, .9);
+  animation-delay: .45s;
+}
+
+@keyframes fridgeSkeletonShimmer {
+  from {
+    background-position: -220px 0;
+  }
+  to {
+    background-position: calc(100% + 220px) 0;
+  }
+}
+
+@keyframes fridgeBootPulse {
+  0%, 100% {
+    opacity: .72;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.08);
+  }
+}
+
+@keyframes fridgeBootFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes fridgeBootCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .fridge-game-mount,
@@ -218,31 +476,106 @@ button { font: inherit; }
 .fridge-result {
   position: absolute;
   z-index: 12;
-  left: 28px;
-  right: 28px;
-  bottom: 82px;
-  padding: 16px;
-  border-radius: 28px;
+  left: 34px;
+  right: 34px;
+  bottom: 96px;
+  padding: 20px 18px 18px;
+  border-radius: 32px;
   text-align: center;
   color: #5b2c1d;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top center, rgba(255,255,255,.64), transparent 28%),
+    linear-gradient(180deg, rgba(255, 251, 242, .94), rgba(255, 240, 212, .9));
+  backdrop-filter: blur(10px);
 }
 
+.fridge-result--celebrate::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,.42);
+  pointer-events: none;
+}
+
+.fridge-result-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.fridge-result-sparkles span {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255,255,255,.92), rgba(255,245,190,.2));
+  box-shadow: 0 0 18px rgba(255, 232, 160, .8);
+  animation: fridgeResultTwinkle 1.8s ease-in-out infinite;
+}
+
+.fridge-result-sparkles span:nth-child(1) { top: 18px; left: 58px; animation-delay: 0s; }
+.fridge-result-sparkles span:nth-child(2) { top: 28px; right: 64px; animation-delay: .35s; }
+.fridge-result-sparkles span:nth-child(3) { bottom: 28px; right: 104px; animation-delay: .7s; }
+
 .fridge-result small { color: #58aa8d; letter-spacing: .12em; font-weight: 800; }
-.fridge-result h1 { margin: 2px 0 10px; font-size: 34px; line-height: 1; }
+.fridge-result-stars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.fridge-result-stars span {
+  font-size: 42px;
+  color: #d4c8b8;
+  transition: transform .3s ease, color .3s ease;
+}
+.fridge-result-stars span.earned {
+  color: #ffd166;
+  text-shadow: 0 2px 12px rgba(255, 184, 0, .55);
+  animation: star-pop .45s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+.fridge-result-stars span.earned:nth-child(1) { animation-delay: .3s; }
+.fridge-result-stars span.earned:nth-child(2) { animation-delay: .5s; }
+.fridge-result-stars span.earned:nth-child(3) { animation-delay: .7s; }
+@keyframes star-pop {
+  0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.fridge-result h1 { margin: 4px 0 10px; font-size: 38px; line-height: 1; }
+.fridge-result-reward {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 124px;
+  margin: 0 0 10px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: #7a4c14;
+  background: linear-gradient(180deg, rgba(255, 248, 208, .98), rgba(255, 232, 156, .94));
+  border: 2px solid rgba(255,255,255,.88);
+  box-shadow: 0 10px 22px rgba(186, 147, 48, .18);
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: .02em;
+}
 .fridge-result button {
   border: 0;
   border-radius: 999px;
-  padding: 10px 24px;
+  padding: 12px 26px;
   color: #fff;
   background: linear-gradient(180deg, #89dd39, #55bc28);
   font-weight: 900;
+  box-shadow: 0 10px 20px rgba(84, 176, 35, .26);
 }
 
 .fridge-result p {
-  margin: 4px 0 14px;
+  margin: 4px 10px 16px;
   color: #8b664b;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
+  line-height: 1.35;
 }
 
 .fridge-result-actions {
@@ -390,24 +723,97 @@ button { font: inherit; }
 .fridge-quick-actions {
   position: absolute;
   z-index: 12;
-  left: 18px;
-  right: 18px;
-  bottom: 28px;
+  left: 14px;
+  right: 14px;
+  bottom: 16px;
   display: flex;
   justify-content: space-between;
   gap: 10px;
   pointer-events: none;
 }
 
+.fridge-quick-pill {
+  min-width: 98px;
+  height: 50px;
+  align-self: center;
+  border: 3px solid rgba(255, 255, 255, .82);
+  border-radius: 999px;
+  padding: 0 16px;
+  color: #6a3a1c;
+  background: linear-gradient(180deg, rgba(255, 249, 236, .94), rgba(255, 238, 204, .88));
+  box-shadow: 0 8px 16px rgba(103, 62, 26, .12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: auto;
+  backdrop-filter: blur(4px);
+  transition: transform .16s ease, background .16s ease, opacity .16s ease, box-shadow .16s ease;
+}
+
+.fridge-quick-pill strong {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.fridge-quick-pill span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.92);
+  font-size: 18px;
+  font-weight: 900;
+  color: #8b4513;
+  box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.fridge-quick-pill:hover,
+.fridge-quick-pill:focus-visible {
+  background: linear-gradient(180deg, rgba(255, 250, 240, .98), rgba(255, 242, 214, .94));
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 10px 18px rgba(103, 62, 26, .16);
+}
+
+.fridge-quick-pill:disabled {
+  opacity: .5;
+  transform: none;
+}
+
+.fridge-quick-pill.low-coins {
+  box-shadow: 0 0 0 3px rgba(255, 218, 116, .24), 0 8px 16px rgba(103, 62, 26, .12);
+}
+
+.fridge-quick-pill.accent {
+  background: linear-gradient(180deg, #89dd39, #55bc28);
+  border-color: rgba(255, 255, 255, .92);
+  color: #fff;
+}
+.fridge-quick-pill.accent strong { color: #fff; }
+.fridge-quick-pill.accent span { color: #2d6a0a; background: rgba(255,255,255,.95); }
+
+.fridge-quick-pill.danger {
+  background: linear-gradient(180deg, #ff8b6e, #e85d3a);
+  border-color: rgba(255, 255, 255, .92);
+  color: #fff;
+}
+.fridge-quick-pill.danger strong { color: #fff; }
+.fridge-quick-pill.danger span { color: #8b1a00; background: rgba(255,255,255,.95); }
+
 .fridge-quick-btn {
-  width: 46px;
-  height: 46px;
+  width: 38px;
+  height: 38px;
   border: 3px solid rgba(255, 255, 255, .78);
   border-radius: 999px;
   padding: 0;
   color: #6a3a1c;
-  background: rgba(255, 248, 230, .82);
-  box-shadow: 0 8px 18px rgba(103, 62, 26, .14);
+  background: rgba(255, 248, 230, .72);
+  box-shadow: 0 6px 14px rgba(103, 62, 26, .1);
   font-size: 0;
   font-weight: 800;
   line-height: 1;
@@ -424,7 +830,7 @@ button { font: inherit; }
   place-items: center;
   width: 100%;
   height: 100%;
-  font-size: 25px;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -446,7 +852,7 @@ button { font: inherit; }
 
 .fridge-quick-btn.subtle {
   color: #8b664b;
-  background: rgba(255, 255, 255, .7);
+  background: rgba(255, 255, 255, .64);
 }
 
 .fridge-lang-switch a.active {
@@ -472,4 +878,21 @@ button { font: inherit; }
     font-size: 12px;
   }
 
+  .fridge-result {
+    bottom: 84px;
+    left: 28px;
+    right: 28px;
+  }
+
+}
+
+@keyframes fridgeResultTwinkle {
+  0%, 100% {
+    transform: scale(.82);
+    opacity: .44;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
 }

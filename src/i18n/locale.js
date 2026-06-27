@@ -1,15 +1,40 @@
 export const LOCALES = ["pt", "en", "cn"];
 export const LOCALE_PREF_KEY = "seedbound.locale";
+const configuredReviewLocaleRaw = String(import.meta.env.VITE_REVIEW_LOCALE_LOCK ?? "en").trim().toLowerCase();
+const configuredReviewLocale = configuredReviewLocaleRaw === "off" ? "" : configuredReviewLocaleRaw;
+export const REVIEW_LOCALE_LOCK = LOCALES.includes(configuredReviewLocale) ? configuredReviewLocale : "en";
+const MULTILANG_QUERY_KEY = "multilang";
+
+export function effectiveLocale(locale) {
+  return REVIEW_LOCALE_LOCK || (LOCALES.includes(locale) ? locale : null) || "en";
+}
+
+export function isLocaleSwitcherEnabled() {
+  if (REVIEW_LOCALE_LOCK) return false;
+  if (typeof window === "undefined") return false;
+  try {
+    const url = new URL(window.location.href);
+    const flag = String(url.searchParams.get(MULTILANG_QUERY_KEY) || "").toLowerCase();
+    return flag === "1" || flag === "true" || flag === "yes";
+  } catch {
+    return false;
+  }
+}
 
 function supportedLocale(locale) {
   return LOCALES.includes(locale) ? locale : null;
 }
 
 export function parseLocale(locationLike = typeof window !== "undefined" ? window.location : { pathname: "/", search: "" }) {
+  if (REVIEW_LOCALE_LOCK) return REVIEW_LOCALE_LOCK;
   const search = typeof locationLike === "string" ? "" : locationLike.search || "";
   const queryLocale = new URLSearchParams(search).get("lang")?.toLowerCase();
   const fromQuery = supportedLocale(queryLocale);
   if (fromQuery) return fromQuery;
+
+  if (typeof window !== "undefined" && !isLocaleSwitcherEnabled()) {
+    return "en";
+  }
 
   const pathname = typeof locationLike === "string" ? locationLike : locationLike.pathname || "/";
   const seg = pathname.split("/").filter(Boolean)[0]?.toLowerCase();
@@ -20,6 +45,8 @@ export function parseLocale(locationLike = typeof window !== "undefined" ? windo
 
 /** Map browser language tags to supported game locales. */
 export function detectBrowserLocale(languages = []) {
+  if (REVIEW_LOCALE_LOCK) return REVIEW_LOCALE_LOCK;
+  if (typeof window !== "undefined" && !isLocaleSwitcherEnabled()) return "en";
   const tags = languages.length
     ? languages
     : (typeof navigator !== "undefined" ? navigator.languages || [navigator.language] : []);
@@ -34,6 +61,7 @@ export function detectBrowserLocale(languages = []) {
 }
 
 export function readLocalePreference() {
+  if (REVIEW_LOCALE_LOCK) return REVIEW_LOCALE_LOCK;
   try {
     const saved = localStorage.getItem(LOCALE_PREF_KEY);
     if (saved && LOCALES.includes(saved)) return saved;
@@ -44,6 +72,7 @@ export function readLocalePreference() {
 }
 
 export function writeLocalePreference(locale) {
+  if (REVIEW_LOCALE_LOCK) return;
   try {
     if (LOCALES.includes(locale)) localStorage.setItem(LOCALE_PREF_KEY, locale);
   } catch {
@@ -54,6 +83,18 @@ export function writeLocalePreference(locale) {
 /** Store an initial locale without changing the URL; static game portals do not support SPA paths. */
 export function redirectToLocaleIfNeeded() {
   if (typeof window === "undefined") return;
+  if (REVIEW_LOCALE_LOCK) {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("lang") !== REVIEW_LOCALE_LOCK) {
+        url.searchParams.set("lang", REVIEW_LOCALE_LOCK);
+        window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+      }
+    } catch {
+      // Ignore malformed URLs in embedded runtimes.
+    }
+    return;
+  }
 
   const { pathname, search } = window.location;
   const queryLocale = new URLSearchParams(search).get("lang")?.toLowerCase();
@@ -80,18 +121,21 @@ export function localePath(locale) {
 }
 
 export function progressStorageKey(locale) {
+  if (REVIEW_LOCALE_LOCK) return "seedbound.en.progress";
   if (locale === "en") return "seedbound.en.progress";
   if (locale === "cn") return "seedbound.cn.progress";
   return "seedbound.br.progress";
 }
 
 export function htmlLang(locale) {
+  if (REVIEW_LOCALE_LOCK) return "en";
   if (locale === "en") return "en";
   if (locale === "cn") return "zh-CN";
   return "pt-BR";
 }
 
 export function switchLocaleHref(locale, search = typeof window !== "undefined" ? window.location.search : "") {
+  if (REVIEW_LOCALE_LOCK) return "?lang=en";
   const params = new URLSearchParams(search || "");
   params.set("lang", supportedLocale(locale) || "pt");
   const query = params.toString();

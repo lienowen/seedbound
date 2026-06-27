@@ -34,6 +34,12 @@ export class StorageScene extends Phaser.Scene {
     this.winSent = false;
     this.selectedSlotId = null;
     this.previewSprite = null;
+    this.hintTimer = null;
+    this.hintFx = null;
+    this.remainingSpotlightId = null;
+    this.comboCount = 0;
+    this.mistakeCount = 0;
+    this.comboSparkTimer = null;
   }
 
   init(data = {}) {
@@ -45,6 +51,14 @@ export class StorageScene extends Phaser.Scene {
     this.winSent = false;
     this.selectedSlotId = null;
     this.previewSprite = null;
+    this.hintTimer?.remove?.();
+    this.hintTimer = null;
+    this.hintFx = null;
+    this.remainingSpotlightId = null;
+    this.comboCount = 0;
+    this.mistakeCount = 0;
+    this.comboSparkTimer?.remove?.();
+    this.comboSparkTimer = null;
     this.phaseButtons = [];
     this.phaseButtonTexts = [];
   }
@@ -109,7 +123,7 @@ export class StorageScene extends Phaser.Scene {
     this.chromeData = structuredClone(payload.uiState || {});
     this.i18n = createI18n(this.chromeData.locale || "pt");
     this.engine = new StorageEngine(this.level, { forceFresh: !!payload.forceFresh });
-    this.winSent = false;
+    this.winSent = this.engine.validate().complete;
     this.completionPolishStarted = false;
     this.cameras.main.setBackgroundColor(this.level.theme.background || "#ffecc8");
     this.ensureItemTextures();
@@ -205,43 +219,55 @@ export class StorageScene extends Phaser.Scene {
     this.phasePill.text.setDepth(512);
     this.coinPill.text.setDepth(512);
     this.progressPill.text.setDepth(512);
-    this.titleText = this.add.text(375, 104, "", {
+    this.titleText = this.add.text(375, 90, "", {
       fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 36,
+      fontSize: 38,
       color: "#6a341d",
       fontStyle: "bold",
       align: "center",
     }).setOrigin(0.5, 0);
-    this.subtitleText = this.add.text(375, 148, "", {
+    this.subtitleText = this.add.text(375, 128, "", {
       fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 16,
+      fontSize: 15,
       color: "#9d7154",
       fontStyle: "bold",
       align: "center",
     }).setOrigin(0.5, 0);
-    this.goalBg = this.add.graphics().setDepth(510);
-    this.goalLabel = this.add.text(48, 196, this.i18n.ui.metaLabel, {
+    // Harmony progress bar
+    this.harmonyBarBg = this.add.graphics().setDepth(510);
+    this.harmonyBarFill = this.add.graphics().setDepth(511);
+    this.harmonyLabel = this.add.text(375, 145, "", {
       fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 18,
+      fontSize: 12,
+      color: "#7a5438",
+      fontStyle: "bold",
+      align: "center",
+    }).setOrigin(0.5, 0).setDepth(512);
+    this.goalBg = this.add.graphics().setDepth(510);
+    this.goalLabel = this.add.text(62, 184, this.i18n.ui.metaLabel, {
+      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+      fontSize: 17,
       color: "#2c9b7f",
       fontStyle: "bold",
     }).setOrigin(0, 0.5).setDepth(512);
-    this.goalText = this.add.text(118, 196, "", {
+    this.goalText = this.add.text(142, 184, "", {
       fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 18,
+      fontSize: 17,
       color: "#7a5438",
       fontStyle: "bold",
-      wordWrap: { width: 560 },
+      wordWrap: { width: 498 },
       maxLines: 2,
-      lineSpacing: 4,
+      lineSpacing: 3,
     }).setOrigin(0, 0.5).setDepth(512);
     this.toastBg = this.add.graphics().setDepth(510);
-    this.toastText = this.add.text(375, 1238, "", {
+    this.toastText = this.add.text(375, 1280, "", {
       fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 24,
+      fontSize: 22,
       color: "#70432a",
       fontStyle: "bold",
       align: "center",
+      wordWrap: { width: 620, useAdvancedWrap: true },
+      lineSpacing: 3,
     }).setOrigin(0.5).setDepth(512);
     this.uiLayer.add(this.titleText);
     this.uiLayer.add(this.subtitleText);
@@ -263,20 +289,22 @@ export class StorageScene extends Phaser.Scene {
   layoutGoalCard(goal = "") {
     const text = goal || "";
     const twoLine = text.length > 24 || text.includes("，") || text.includes("；") || text.includes(";");
-    const cardH = twoLine ? 72 : 54;
-    const cardY = 168;
+    const cardH = twoLine ? 64 : 48;
+    const cardY = 150;
     const centerY = cardY + cardH / 2;
     this.goalBg?.clear();
-    this.goalBg?.fillStyle(0xffffff, 1.0);
-    this.goalBg?.lineStyle(3, 0x2ca184, 0.8);
-    this.goalBg?.fillRoundedRect(34, cardY, 682, cardH, 22);
-    this.goalBg?.strokeRoundedRect(34, cardY, 682, cardH, 22);
+    this.goalBg?.fillStyle(0xffffff, 0.96);
+    this.goalBg?.lineStyle(3, 0x2ca184, 0.7);
+    this.goalBg?.fillRoundedRect(52, cardY, 646, cardH, 20);
+    this.goalBg?.strokeRoundedRect(52, cardY, 646, cardH, 20);
     this.goalLabel?.setY(centerY);
     this.goalText?.setY(centerY);
     this.goalText?.setText(text);
   }
 
   updateChrome(patch = {}) {
+    const previousPlaced = this.chromeData?.placed ?? 0;
+    const previousCoins = this.chromeData?.coins ?? 0;
     this.chromeData = { ...this.chromeData, ...patch };
     const phase = this.chromeData.phase ?? this.level.phase ?? 1;
     const coins = this.chromeData.coins ?? 0;
@@ -291,6 +319,67 @@ export class StorageScene extends Phaser.Scene {
     const goal = this.chromeData.goal || this.level.copy?.goal || this.level.goal || "";
     this.layoutGoalCard(goal);
     this.updateCampaignControls();
+    if (placed > previousPlaced) this.pulseChromeText(this.progressPill?.text);
+    if (coins !== previousCoins) this.pulseChromeText(this.coinPill?.text);
+
+    // Harmony bar
+    const harmony = patch.harmonyScore ?? this.chromeData?.harmonyScore ?? 0;
+    const target = this.level.harmony?.target ?? 300;
+    this.drawHarmonyBar(harmony, target);
+  }
+
+  drawHarmonyBar(score, target) {
+    this.harmonyBarBg?.clear();
+    this.harmonyBarFill?.clear();
+    if (!score && score !== 0) {
+      this.harmonyLabel?.setText("");
+      return;
+    }
+    const barW = 200;
+    const barH = 8;
+    const barX = 375 - barW / 2;
+    const barY = 162;
+    const pct = Math.min(1, score / Math.max(1, target));
+    const color = pct >= 1 ? 0x67edb8 : pct >= 0.7 ? 0xffd166 : 0xff7d62;
+
+    this.harmonyBarBg.fillStyle(0xe8dcc8, 0.6);
+    this.harmonyBarBg.fillRoundedRect(barX, barY, barW, barH, 4);
+    this.harmonyBarFill.fillStyle(color, 0.9);
+    this.harmonyBarFill.fillRoundedRect(barX, barY, Math.max(4, barW * pct), barH, 4);
+    this.harmonyLabel?.setText(`${score}/${target}`);
+  }
+
+  pulseChromeText(node) {
+    if (!node) return;
+    this.tweens.killTweensOf(node);
+    node.setScale(1);
+    this.tweens.add({
+      targets: node,
+      scaleX: 1.14,
+      scaleY: 1.14,
+      duration: 95,
+      yoyo: true,
+      ease: "Back.out(1.4)",
+    });
+  }
+
+  applyLocale(locale, localizedLevel, uiState = {}) {
+    this.i18n = createI18n(locale || "pt");
+    if (localizedLevel) {
+      this.level = {
+        ...this.level,
+        theme: { ...this.level.theme, ...localizedLevel.theme },
+        copy: { ...this.level.copy, ...localizedLevel.copy },
+        items: this.level.items.map((item) => {
+          const localizedItem = localizedLevel.items?.find((entry) => entry.id === item.id);
+          return localizedItem ? { ...item, name: localizedItem.name } : item;
+        }),
+      };
+    }
+    this.updateChrome({ ...uiState, locale: this.i18n.locale });
+    if (!this.dragItem) {
+      this.setToastMessage(uiState.toast || this.level.copy?.intro || this.i18n.ui.dragHint);
+    }
   }
 
   updateCampaignControls() {
@@ -365,13 +454,191 @@ export class StorageScene extends Phaser.Scene {
 
   setToastMessage(message) {
     const text = message || "";
+    const twoLine = text.length > 42 || /\s.{18,}\s/.test(text);
+    const cardH = twoLine ? 76 : 60;
+    const cardY = twoLine ? 1220 : 1236;
+    const centerY = cardY + cardH / 2;
     this.toastBg?.clear();
     this.toastBg?.fillStyle(0x5b2c1d, 0.95);
     this.toastBg?.lineStyle(3, 0xffffff, 0.8);
-    this.toastBg?.fillRoundedRect(20, 1208, 710, 60, 20);
-    this.toastBg?.strokeRoundedRect(20, 1208, 710, 60, 20);
+    this.toastBg?.fillRoundedRect(20, cardY, 710, cardH, 20);
+    this.toastBg?.strokeRoundedRect(20, cardY, 710, cardH, 20);
     this.toastText?.setText(text);
+    this.toastText?.setFontSize(twoLine ? 18 : 22);
+    this.toastText?.setY(centerY);
     this.toastText?.setColor("#ffffff");
+  }
+
+  clearHintFx() {
+    if (!this.hintFx) return;
+    const { layer, sourceSprite, targetSprite, sourceBaseScale, targetBaseScale } = this.hintFx;
+    if (sourceSprite) {
+      this.tweens.killTweensOf(sourceSprite);
+      sourceSprite.clearTint().setAngle(0);
+      if (sourceBaseScale != null) sourceSprite.setScale(sourceBaseScale);
+      const home = sourceSprite.getData("home");
+      const item = sourceSprite.getData("item");
+      if (home && item && home.status === "outside") {
+        const display = this.displayPointFor(item, home);
+        sourceSprite.setPosition(display.x, display.y);
+      }
+    }
+    if (targetSprite) {
+      this.tweens.killTweensOf(targetSprite);
+      targetSprite.clearTint();
+      if (targetBaseScale != null) targetSprite.setScale(targetBaseScale);
+    }
+    layer?.destroy?.(true);
+    this.hintFx = null;
+  }
+
+  slotHintLabel(slot) {
+    if (!slot) return "";
+    const slotLabels = {
+      door_top_1: {
+        en: "on the top door rack",
+        pt: "na prateleira de cima da porta",
+        cn: "在冰箱门上层",
+      },
+      door_upper_2: {
+        en: "on the upper-middle door rack",
+        pt: "na prateleira alta do meio da porta",
+        cn: "在冰箱门上中层",
+      },
+      door_mid_1: {
+        en: "on the middle door rack",
+        pt: "na prateleira do meio da porta",
+        cn: "在冰箱门中层",
+      },
+      door_low_1: {
+        en: "on the bottom door rack",
+        pt: "na prateleira de baixo da porta",
+        cn: "在冰箱门下层",
+      },
+      drawer_left: {
+        en: "in the left cold drawer spot",
+        pt: "no lado esquerdo da gaveta fria",
+        cn: "在左侧冷藏抽屉",
+      },
+      drawer_right: {
+        en: "in the right cold drawer spot",
+        pt: "no lado direito da gaveta fria",
+        cn: "在右侧冷藏抽屉",
+      },
+      shelf_top_1: {
+        en: "on the top shelf",
+        pt: "na prateleira de cima",
+        cn: "在上层架子",
+      },
+      shelf_top_2: {
+        en: "on the top shelf",
+        pt: "na prateleira de cima",
+        cn: "在上层架子",
+      },
+      shelf_mid_1: {
+        en: "on the middle shelf",
+        pt: "na prateleira do meio",
+        cn: "在中层架子",
+      },
+      shelf_mid_2: {
+        en: "on the middle shelf",
+        pt: "na prateleira do meio",
+        cn: "在中层架子",
+      },
+      shelf_low_1: {
+        en: "on the lower shelf",
+        pt: "na prateleira de baixo",
+        cn: "在下层架子",
+      },
+      shelf_low_2: {
+        en: "on the lower shelf",
+        pt: "na prateleira de baixo",
+        cn: "在下层架子",
+      },
+    };
+    const locale = this.i18n?.locale || "en";
+    return slotLabels[slot.id]?.[locale] || "";
+  }
+
+  playHintGuidance(item, hint) {
+    this.clearHintFx();
+    const sourceSprite = this.sprites.get(item.id);
+    const targetSprite = this.previewSprite?.visible ? this.previewSprite : null;
+    const layer = this.add.layer().setDepth(958);
+    const sourceBaseScale = sourceSprite ? this.displayScaleFor(item, sourceSprite.getData("home")) : null;
+    const targetBaseScale = targetSprite ? targetSprite.scaleX : null;
+
+    if (sourceSprite) {
+      const sourceHalo = this.add.circle(sourceSprite.x, sourceSprite.y - 28, 34, 0xfff3c3, 0.2);
+      sourceHalo.setStrokeStyle(3, 0xfff9e8, 0.92);
+      layer.add(sourceHalo);
+      this.tweens.add({
+        targets: sourceHalo,
+        scale: { from: 0.94, to: 1.18 },
+        alpha: { from: 0.82, to: 0.18 },
+        duration: 620,
+        repeat: 1,
+        yoyo: false,
+        ease: "Sine.inOut",
+      });
+      this.tweens.add({
+        targets: sourceSprite,
+        scaleX: sourceBaseScale * 1.08,
+        scaleY: sourceBaseScale * 1.08,
+        y: sourceSprite.y - 10,
+        angle: { from: -3, to: 3 },
+        duration: 170,
+        repeat: 3,
+        yoyo: true,
+        ease: "Sine.inOut",
+        onComplete: () => {
+          sourceSprite.setAngle(0);
+          const home = sourceSprite.getData("home");
+          if (home?.status === "outside") {
+            const display = this.displayPointFor(item, home);
+            sourceSprite.setPosition(display.x, display.y);
+          }
+          sourceSprite.setScale(sourceBaseScale);
+        },
+      });
+    }
+
+    const guideLine = this.add.graphics();
+    guideLine.lineStyle(5, 0xfff8df, 0.76);
+    if (sourceSprite) {
+      guideLine.beginPath();
+      guideLine.moveTo(sourceSprite.x + 18, sourceSprite.y - 18);
+      guideLine.quadraticCurveTo((sourceSprite.x + hint.x) / 2 + 28, Math.min(sourceSprite.y, hint.y) - 64, hint.x, hint.y - 22);
+      guideLine.strokePath();
+    }
+    layer.add(guideLine);
+
+    const guideDot = this.add.circle(sourceSprite?.x || hint.x, (sourceSprite?.y || hint.y) - 18, 8, 0xfff7d6, 0.96);
+    layer.add(guideDot);
+    this.tweens.add({
+      targets: guideDot,
+      x: hint.x,
+      y: hint.y - 18,
+      duration: 560,
+      ease: "Sine.inOut",
+      onComplete: () => guideDot.destroy(),
+    });
+
+    if (targetSprite) {
+      targetSprite.setTint(0xf8ffe7).setAlpha(0.34);
+      this.tweens.add({
+        targets: targetSprite,
+        scaleX: targetBaseScale * 1.04,
+        scaleY: targetBaseScale * 1.04,
+        alpha: { from: 0.24, to: 0.38 },
+        duration: 240,
+        yoyo: true,
+        repeat: 2,
+        ease: "Sine.inOut",
+      });
+    }
+
+    this.hintFx = { layer, sourceSprite, targetSprite, sourceBaseScale, targetBaseScale };
   }
 
   buildSlots() {
@@ -408,6 +675,7 @@ export class StorageScene extends Phaser.Scene {
 
   buildItems() {
     const snapshot = this.engine.snapshot();
+    this.introSprites = [];
     for (const item of this.level.items) {
       const entry = snapshot.items[item.id] || {
         x: item.trayX,
@@ -415,14 +683,18 @@ export class StorageScene extends Phaser.Scene {
         status: "outside",
       };
       const display = this.displayPointFor(item, entry);
+      const displayScale = this.displayScaleFor(item, entry);
       const sprite = this.add.image(display.x, display.y, item.image)
         .setOrigin(item.anchor[0], item.anchor[1])
-        .setScale(item.scale)
+        .setScale(displayScale)
         .setData("item", item)
         .setData("home", entry)
         .setDepth(item.fixed ? 140 : 420);
+      sprite.setAlpha(0);
+      sprite.setY(display.y + (entry.status === "outside" ? 18 : 12));
       this.itemLayer.add(sprite);
       this.sprites.set(item.id, sprite);
+      this.introSprites.push({ sprite, x: display.x, y: display.y, packed: entry.status === "packed" });
       if (!item.fixed) {
         sprite.setInteractive({ draggable: true, pixelPerfect: false });
         this.input.setDraggable(sprite);
@@ -438,6 +710,23 @@ export class StorageScene extends Phaser.Scene {
       this.itemLayer.add(this.previewSprite);
     }
     this.sortItems();
+    this.playLevelIntroPolish();
+    this.updateRemainingSpotlight(this.engine.validate());
+  }
+
+  playLevelIntroPolish() {
+    const introSprites = this.introSprites || [];
+    introSprites.forEach(({ sprite, x, y, packed }, index) => {
+      this.tweens.add({
+        targets: sprite,
+        alpha: 1,
+        x,
+        y,
+        duration: packed ? 240 : 220,
+        delay: Math.min(index, 7) * 55,
+        ease: packed ? "Back.out(1.4)" : "Sine.out",
+      });
+    });
   }
 
   buildEditor() {
@@ -569,24 +858,113 @@ export class StorageScene extends Phaser.Scene {
     this.adjustSelectedSlot({ baseline: slot.baseline + delta });
   }
 
-  visualOffsetFor() {
-    return { x: 0, y: 0 };
+  renderNudgeFor(item, entry) {
+    const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
+    const slotKey = slot?.id || null;
+    const slotModeKey = slotKey ? `${slotKey}:${entry?.status || "packed"}` : null;
+    const zoneKey = slot?.zone ? `${slot.zone}:${entry?.status || "packed"}` : null;
+    const nudge = item?.renderNudge?.[slotModeKey]
+      || item?.renderNudge?.[slotKey]
+      || item?.renderNudge?.[zoneKey]
+      || item?.renderNudge?.[slot?.zone]
+      || item?.renderNudge?.[entry?.status || "packed"]
+      || item?.renderNudge
+      || {};
+    return {
+      x: Math.round(nudge.x || 0),
+      y: Math.round(nudge.y || 0),
+    };
+  }
+
+  drawerSeatOffset(item, entry) {
+    const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
+    if (entry?.status !== "packed" || slot?.zone !== "drawer") return { x: 0, y: 0 };
+    const surface = item?.surface || {};
+    const visibleHeight = Math.max(
+      item?.bounds?.h || 96,
+      Math.round((surface.visibleHeight || 1) * (surface.textureHeight || 362) * (item?.scale || 1)),
+    );
+    const supportHeight = this.engine.itemSupportHeight(item.id);
+    const excessHeight = Math.max(0, Math.max(visibleHeight, supportHeight) - 96);
+    return {
+      x: 0,
+      // Taller items need to sit slightly deeper in the drawer to avoid the
+      // pasted-on look that shows up most clearly on the bottom compartment.
+      y: -Math.min(14, Math.round(excessHeight * 0.16)),
+    };
+  }
+
+  itemVisibleMetrics(item) {
+    const profile = item?.surface || {};
+    const visibleHeight = Math.max(
+      item?.bounds?.h || 96,
+      Math.round((profile.visibleHeight || 1) * (profile.textureHeight || 362) * (item?.scale || 1)),
+    );
+    const visibleWidth = Math.max(
+      item?.bounds?.w || 48,
+      Math.round((((profile.contactRight ?? 0.65) - (profile.contactLeft ?? 0.35)) || 0.3) * (profile.textureWidth || 362) * (item?.scale || 1)),
+    );
+    return { visibleHeight, visibleWidth };
+  }
+
+  doorSeatOffset(item, entry) {
+    const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
+    if (entry?.status !== "packed" || slot?.zone !== "door") return { x: 0, y: 0 };
+    const { visibleHeight } = this.itemVisibleMetrics(item);
+    const perSlot = {
+      door_top_1: { x: 8, y: 0 },
+      door_upper_2: { x: 10, y: -1 },
+      door_mid_1: { x: 12, y: -2 },
+      // The bottom door rack has a stronger perspective taper in the front
+      // artwork, so items need to sit a little deeper and slightly more to
+      // the right to feel inside the rail rather than pasted in front of it.
+      door_low_1: { x: 18, y: -6 },
+    };
+    const base = perSlot[slot.id] || { x: 8, y: -2 };
+    const tallNudge = visibleHeight >= 120 ? -1 : 0;
+    return {
+      x: base.x,
+      y: base.y + tallNudge,
+    };
+  }
+
+  visualOffsetFor(item, entry) {
+    const seatOffset = this.drawerSeatOffset(item, entry);
+    const doorOffset = this.doorSeatOffset(item, entry);
+    const renderNudge = this.renderNudgeFor(item, entry);
+    return {
+      x: seatOffset.x + doorOffset.x + renderNudge.x,
+      y: seatOffset.y + doorOffset.y + renderNudge.y,
+    };
   }
 
   displayPointFor(item, entry) {
-    const offset = this.visualOffsetFor(item, entry.status);
+    const offset = this.visualOffsetFor(item, entry);
     return {
       x: entry.x + offset.x,
       y: entry.y + offset.y,
     };
   }
 
-  logicalDragPoint(item, x, y, status) {
-    const offset = this.visualOffsetFor(item, status);
+  logicalDragPoint(item, x, y, entry) {
+    const offset = this.visualOffsetFor(item, entry);
     return {
       x: x - offset.x,
       y: y - offset.y,
     };
+  }
+
+  displayScaleFor(item, entry) {
+    if (entry?.status === "outside") {
+      return Number((item.scale * 1.08).toFixed(3));
+    }
+    const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
+    if (slot?.zone !== "door") return item.scale;
+    const { visibleHeight } = this.itemVisibleMetrics(item);
+    if (visibleHeight >= 126) {
+      return Number((item.scale * 0.982).toFixed(3));
+    }
+    return item.scale;
   }
 
   previewFootprint(item, preview) {
@@ -634,10 +1012,22 @@ export class StorageScene extends Phaser.Scene {
     this.previewText.setVisible(false);
     if (this.previewSprite) this.previewSprite.setVisible(false);
     if (!preview) return;
-    if (!preview.valid && !preview.inside) return;
+    // Show preview for all placements now, not just valid ones
+    if (!preview.inside && !preview.valid) return;
     const rect = this.placementRect(preview);
     if (!rect) return;
-    const palette = preview.valid ? PREVIEW_COLORS.good : PREVIEW_COLORS.bad;
+
+    // Score-based color: happy=green, ok=yellow, sad=red
+    const sc = preview.score ?? 50;
+    let palette;
+    if (sc >= 70) {
+      palette = { fill: 0x67edb8, line: 0xeafff7, fillAlpha: 0.14, lineAlpha: 0.9, lineWidth: 3 };
+    } else if (sc >= 40) {
+      palette = { fill: 0xffd166, line: 0xfff6cf, fillAlpha: 0.14, lineAlpha: 0.85, lineWidth: 3 };
+    } else {
+      palette = { fill: 0xff7d62, line: 0xffefe7, fillAlpha: 0.16, lineAlpha: 0.85, lineWidth: 3 };
+    }
+
     const layerLift = Math.max(0, preview.layer || 0) * 10;
     const drawY = rect.y - layerLift;
     const footprint = this.previewFootprint(item, preview);
@@ -661,29 +1051,104 @@ export class StorageScene extends Phaser.Scene {
         this.previewGraphic.fillRoundedRect(support.x - 28, support.topY - 6, 56, 12, 6);
       }
     }
+
+    // Mood emoji label
+    const moodEmoji = preview.mood === "happy" ? "😊" : preview.mood === "ok" ? "😐" : "😟";
     const placementLabel = this.previewPlacementLabel(preview);
+    const scoreLabel = `${moodEmoji} ${sc}%`;
     const dropHint = this.i18n.ui.dropHere;
     const supportText = preview.valid
-      ? (placementLabel ? `${dropHint} · ${placementLabel}` : dropHint)
-      : this.translateReason(preview.reason || "reject.generic");
+      ? `${dropHint} · ${scoreLabel}${placementLabel ? ` · ${placementLabel}` : ""}`
+      : (preview.alwaysPlaceable
+        ? `${this.i18n.ui.dropHere} ${moodEmoji} ${sc}%`
+        : this.translateReason(preview.reason || "reject.generic"));
     this.previewText
       .setText(supportText)
       .setPosition(preview.x, drawY - 8)
       .setVisible(true);
     if (this.previewSprite) {
+      const tintColor = preview.mood === "happy" ? 0xa8ffe0 : preview.mood === "ok" ? 0xfff3c0 : 0xffb39f;
       this.previewSprite
         .setTexture(item.image)
         .setOrigin(item.anchor[0], item.anchor[1])
         .setScale(item.scale)
         .setPosition(preview.x, preview.y)
-        .setTint(preview.valid ? 0xa8ffe0 : 0xffb39f)
-        .setAlpha(preview.valid ? 0.22 : 0.26)
+        .setTint(tintColor)
+        .setAlpha(0.26)
         .setDepth(960)
         .setVisible(true);
     }
   }
 
+  // ---- KILL-STYLE CALLOUT: big screen text + sound + shake ----
+  playCallout(text, { color = "#ffd166", size = 52, shake = 0.004, sound = "fanfare" } = {}) {
+    // Big text flying in from center
+    const label = this.add.text(375, 500, text, {
+      fontFamily: "Trebuchet MS, Impact, sans-serif",
+      fontSize: size,
+      color,
+      fontStyle: "bold",
+      stroke: "#1a0a00",
+      strokeThickness: 8,
+      shadow: { offsetX: 3, offsetY: 3, color: "#00000044", blur: 12, fill: true },
+    }).setOrigin(0.5).setDepth(970).setAlpha(0).setScale(0.1);
+
+    // Screen flash
+    const flash = this.add.rectangle(375, 667, 750, 1334, 0xffffff, 0).setDepth(965);
+    this.tweens.add({
+      targets: flash,
+      alpha: { from: 0.25, to: 0 },
+      duration: 250,
+      ease: "Quad.out",
+      onComplete: () => flash.destroy(),
+    });
+
+    // Animate in
+    this.tweens.add({
+      targets: label,
+      alpha: { from: 0, to: 1 },
+      scale: { from: 0.1, to: 1.15 },
+      duration: 220,
+      ease: "Back.out(3)",
+      onComplete: () => {
+        // Settle
+        this.tweens.add({
+          targets: label,
+          scale: 1,
+          duration: 100,
+          ease: "Sine.out",
+          onComplete: () => {
+            // Hold then fade
+            this.tweens.add({
+              targets: label,
+              alpha: 0,
+              y: 440,
+              scale: 0.9,
+              duration: 500,
+              delay: 600,
+              ease: "Sine.in",
+              onComplete: () => label.destroy(),
+            });
+          },
+        });
+      },
+    });
+
+    // Camera shake
+    if (shake) this.cameras.main.shake(150, shake);
+
+    // Sound
+    if (sound === "fanfare") {
+      this.events.emit("callout", "fanfare");
+    } else if (sound === "snap") {
+      this.events.emit("callout", "snap");
+    }
+  }
+
   onDragStart(obj) {
+    this.hintTimer?.remove?.();
+    this.hintTimer = null;
+    this.clearHintFx();
     this.dragItem = obj;
     obj.setDepth(980);
     this.tweens.add({ targets: obj, scale: obj.scale * 1.06, duration: 90, ease: "Sine.out" });
@@ -694,11 +1159,11 @@ export class StorageScene extends Phaser.Scene {
     const item = obj.getData("item");
     if (!item) return;
     const home = obj.getData("home");
-    const previewPoint = this.logicalDragPoint(item, pointer.worldX, pointer.worldY, home?.status);
+    const previewPoint = this.logicalDragPoint(item, pointer.worldX, pointer.worldY, home);
     const preview = this.engine.previewMove(item.id, previewPoint.x, previewPoint.y, this.level.tuning.magnetPreviewDistance);
     this.hoverPlacement = preview;
     this.drawPlacementPreview(item, preview);
-    this.refreshHoverZone(preview?.slotId || null, !!preview?.valid);
+    this.refreshHoverZone(preview?.slotId || null, !!preview?.valid, preview?.score ?? 50);
   }
 
   onDragEnd(obj) {
@@ -707,32 +1172,55 @@ export class StorageScene extends Phaser.Scene {
     const preview = this.hoverPlacement;
     this.clearHover();
     if (!preview) return this.returnHome(obj);
-    if (!preview.valid) {
+
+    // Only hard-reject for grid overflow / occupied space
+    if (!preview.valid && !preview.alwaysPlaceable) {
+      this.mistakeCount += 1;
+      this.comboCount = 0;
       for (const conflictId of preview.conflicts || []) this.bumpPair(obj, this.sprites.get(conflictId));
       return this.returnHome(obj, this.translateReason(preview.reason || "reject.generic"));
     }
+
     const result = this.engine.placeItem(item.id, preview);
     if (!result.ok) {
+      this.mistakeCount += 1;
+      this.comboCount = 0;
       for (const [aId, bId] of result.conflicts || []) this.bumpPair(this.sprites.get(aId), this.sprites.get(bId));
       return this.returnHome(obj, this.translateReason(result.reason || "reject.generic"));
     }
 
+    // Placement accepted — count combo if it's a good placement
+    const score = result.score ?? 50;
+    if (score >= 70) {
+      this.comboCount += 1;
+    } else if (score < 40) {
+      this.mistakeCount += 1;
+      this.comboCount = 0;
+    }
+
     const entry = result.state.items[item.id];
     const display = this.displayPointFor(item, entry);
+    const targetScale = this.displayScaleFor(item, entry);
     obj.setData("home", entry);
+
+    // Show mood animation
+    const mood = result.mood || "ok";
+    this.showItemMood(display.x, display.y, mood, score);
+
+    this.playPlacementPulse(preview.slotId, display.x, display.y, score >= 70 ? this.comboCount : 0);
     this.tweens.add({
       targets: obj,
       x: display.x,
       y: display.y,
-      scaleX: item.scale * 1.05,
-      scaleY: item.scale * 0.94,
+      scaleX: targetScale * 1.05,
+      scaleY: targetScale * 0.94,
       duration: Math.round(this.level.tuning.snapDuration * 0.72),
       ease: "Quad.out",
       onComplete: () => {
         this.tweens.add({
           targets: obj,
-          scaleX: item.scale,
-          scaleY: item.scale,
+          scaleX: targetScale,
+          scaleY: targetScale,
           duration: 90,
           ease: "Back.out",
           onComplete: () => {
@@ -742,14 +1230,430 @@ export class StorageScene extends Phaser.Scene {
         });
       },
     });
-    this.setToastMessage(this.i18n.ui.snapOk);
-    this.events.emit("snap", { item: item.id, slot: preview.slotId });
+
+    if (mood === "happy") {
+      if (this.comboCount >= 7) {
+        this.playCallout(this.i18n.ui.calloutUnstoppable, "fire");
+        this.setToastMessage(this.i18n.ui.comboFire(this.comboCount));
+      } else if (this.comboCount >= 5) {
+        this.playCallout(this.i18n.ui.calloutOnFire, "fire");
+        this.setToastMessage(this.i18n.ui.comboFire(this.comboCount));
+      } else if (this.comboCount >= 3) {
+        this.playCallout(this.i18n.ui.calloutGreat, "gold");
+        this.setToastMessage(this.i18n.ui.comboFire(this.comboCount));
+      } else if (this.comboCount >= 2) {
+        this.playCallout(this.i18n.ui.calloutNice, "ice");
+        this.setToastMessage(this.i18n.ui.comboNice);
+      } else {
+        this.setToastMessage(this.i18n.ui.snapOk);
+      }
+    } else if (mood === "sad") {
+      this.setToastMessage(this.i18n.ui.placementMeh);
+    } else {
+      this.setToastMessage(this.i18n.ui.snapOk);
+    }
+    this.events.emit("snap", { item: item.id, slot: preview.slotId, combo: this.comboCount, score, mood });
+
+    // Fire chain reaction animation
+    if (result.chain && result.chain.length) {
+      this.playChainReaction(result.chain, item.id);
+    }
   }
 
-  refreshHoverZone(slotId, valid) {
+  showItemMood(x, y, mood, score) {
+    const emoji = mood === "happy" ? "😊" : mood === "ok" ? "😐" : "😟";
+    const color = mood === "happy" ? "#67edb8" : mood === "ok" ? "#ffd166" : "#ff7d62";
+    const moodText = this.add.text(x, y - 50, `${emoji} ${score}%`, {
+      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+      fontSize: 22,
+      color,
+      fontStyle: "bold",
+      stroke: "#2d1f14",
+      strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(955).setAlpha(0);
+
+    // Halo ring
+    const haloColor = mood === "happy" ? 0x67edb8 : mood === "ok" ? 0xffd166 : 0xff7d62;
+    const halo = this.add.circle(x, y - 14, 20, haloColor, 0.18).setDepth(950);
+    halo.setStrokeStyle(2, haloColor, 0.7);
+
+    this.tweens.add({
+      targets: [moodText],
+      alpha: { from: 0, to: 1 },
+      y: y - 70,
+      scale: { from: 0.6, to: 1.1 },
+      duration: 200,
+      ease: "Back.out(1.5)",
+      onComplete: () => {
+        this.tweens.add({
+          targets: [moodText],
+          alpha: 0,
+          y: y - 100,
+          scale: 0.8,
+          duration: 500,
+          delay: 400,
+          ease: "Sine.in",
+          onComplete: () => moodText.destroy(),
+        });
+      },
+    });
+
+    this.tweens.add({
+      targets: halo,
+      alpha: { from: 0.8, to: 0 },
+      scale: { from: 1, to: 1.6 },
+      duration: 350,
+      ease: "Sine.out",
+      onComplete: () => halo.destroy(),
+    });
+  }
+
+  // ---- CALLOUT: big animated text for "Double Kill" moments ----
+  playCallout(text, style = "gold") {
+    const configs = {
+      gold: { color: "#ffd166", stroke: "#6b3a10", glow: 0xffd166, size: 56, shake: 0.003 },
+      fire: { color: "#ff6b4a", stroke: "#4a1000", glow: 0xff6b4a, size: 62, shake: 0.005 },
+      ice:  { color: "#67edb8", stroke: "#0a3a28", glow: 0x67edb8, size: 48, shake: 0.002 },
+    };
+    const cfg = configs[style] || configs.gold;
+
+    const calloutLayer = this.add.layer().setDepth(970);
+    const centerX = 375, centerY = 500;
+
+    // Dark flash background
+    const bgFlash = this.add.rectangle(centerX, centerY, 800, 1400, 0x000000, 0).setDepth(969);
+    calloutLayer.add(bgFlash);
+    this.tweens.add({
+      targets: bgFlash,
+      alpha: { from: 0, to: 0.15 },
+      duration: 80,
+      yoyo: true,
+    });
+
+    // Screen shake
+    this.cameras.main.shake(150, cfg.shake);
+    this.cameras.main.flash(100, cfg.glow >> 16 & 0xff, cfg.glow >> 8 & 0xff, cfg.glow & 0xff, false);
+
+    // Main callout text
+    const label = this.add.text(centerX, centerY, text, {
+      fontFamily: "Trebuchet MS, Impact, sans-serif",
+      fontSize: cfg.size,
+      color: cfg.color,
+      fontStyle: "bold",
+      stroke: cfg.stroke,
+      strokeThickness: 6,
+      shadow: { offsetX: 0, offsetY: 0, color: cfg.color, blur: 20, fill: true },
+    }).setOrigin(0.5).setDepth(971).setAlpha(0).setScale(0.2).setAngle(-8);
+    calloutLayer.add(label);
+
+    // Fly in
+    this.tweens.add({
+      targets: label,
+      alpha: { from: 0, to: 1 },
+      scale: { from: 0.2, to: 1.25 },
+      angle: { from: -8, to: 3 },
+      duration: 250,
+      ease: "Back.out(2.5)",
+      onComplete: () => {
+        // Settle
+        this.tweens.add({
+          targets: label,
+          scale: 1.08,
+          angle: 0,
+          duration: 100,
+          ease: "Sine.out",
+          onComplete: () => {
+            // Hold then fade out
+            this.tweens.add({
+              targets: label,
+              alpha: 0,
+              scale: 0.9,
+              y: centerY - 30,
+              duration: 350,
+              delay: 500,
+              ease: "Sine.in",
+              onComplete: () => calloutLayer.destroy(),
+            });
+          },
+        });
+      },
+    });
+
+    // Glow ring expanding
+    const glow = this.add.circle(centerX, centerY, 60, cfg.glow, 0.12).setDepth(970);
+    calloutLayer.add(glow);
+    this.tweens.add({
+      targets: glow,
+      alpha: 0,
+      scale: 4,
+      duration: 700,
+      ease: "Sine.out",
+      onComplete: () => glow.destroy(),
+    });
+
+    // Small sparkles around
+    for (let i = 0; i < 10; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 120 + Math.random() * 80;
+      const spark = this.add.circle(
+        centerX + Math.cos(angle) * dist * 0.3,
+        centerY + Math.sin(angle) * dist * 0.3,
+        2 + Math.random() * 3,
+        cfg.glow, 0.9,
+      ).setDepth(971);
+      calloutLayer.add(spark);
+      this.tweens.add({
+        targets: spark,
+        x: centerX + Math.cos(angle) * dist,
+        y: centerY + Math.sin(angle) * dist,
+        alpha: 0,
+        duration: 500 + Math.random() * 400,
+        delay: Math.random() * 150,
+        ease: "Quad.out",
+        onComplete: () => spark.destroy(),
+      });
+    }
+
+    // Emit for sound
+    this.game.events.emit("callout", { text, style });
+    return calloutLayer;
+  }
+
+  playChainReaction(chain, placedItemId) {
+    if (!chain || !chain.length) return;
+
+    const chainLayer = this.add.layer().setDepth(948);
+
+    chain.forEach((link, index) => {
+      const sprite = this.sprites.get(link.itemId);
+      if (!sprite) return;
+
+      const delay = 200 + index * 320;
+
+      // BIG golden ring (2x bigger than before)
+      this.time.delayedCall(delay, () => {
+        const ring = this.add.circle(sprite.x, sprite.y, 36, 0xffd166, 0.28).setDepth(949);
+        ring.setStrokeStyle(4, 0xfff9e8, 0.95);
+        chainLayer.add(ring);
+        this.tweens.add({
+          targets: ring,
+          alpha: 0,
+          scale: 2.5,
+          duration: 550,
+          ease: "Sine.out",
+          onComplete: () => ring.destroy(),
+        });
+
+        // Inner flash
+        const flash = this.add.circle(sprite.x, sprite.y, 20, 0xffffff, 0.4).setDepth(950);
+        chainLayer.add(flash);
+        this.tweens.add({
+          targets: flash,
+          alpha: 0,
+          scale: 3,
+          duration: 300,
+          ease: "Quad.out",
+          onComplete: () => flash.destroy(),
+        });
+      });
+
+      // Item bounce
+      this.tweens.add({
+        targets: sprite,
+        scaleX: sprite.scaleX * 1.2,
+        scaleY: sprite.scaleY * 1.2,
+        y: sprite.y - 12,
+        duration: 150,
+        delay,
+        yoyo: true,
+        ease: "Back.out(2.5)",
+      });
+
+      // Big "+15" score popup
+      this.time.delayedCall(delay + 40, () => {
+        const label = this.add.text(sprite.x, sprite.y - 50, `+${link.bonus}`, {
+          fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+          fontSize: 30,
+          color: "#ffd166",
+          fontStyle: "bold",
+          stroke: "#3b2010",
+          strokeThickness: 4,
+        }).setOrigin(0.5).setDepth(955).setAlpha(0).setScale(0.3);
+        chainLayer.add(label);
+        this.tweens.add({
+          targets: label,
+          alpha: { from: 0, to: 1 },
+          y: sprite.y - 88,
+          scale: { from: 0.3, to: 1.2 },
+          duration: 200,
+          ease: "Back.out(2)",
+          onComplete: () => {
+            this.tweens.add({
+              targets: label,
+              alpha: 0,
+              y: sprite.y - 120,
+              scale: 0.7,
+              duration: 400,
+              delay: 300,
+              ease: "Sine.in",
+              onComplete: () => label.destroy(),
+            });
+          },
+        });
+      });
+    });
+
+    // BIG center callout for chains
+    if (chain.length >= 4) {
+      this.time.delayedCall(200 + chain.length * 320, () => {
+        this.playCallout(this.i18n.ui.calloutAmazing, "fire");
+      });
+    } else if (chain.length >= 3) {
+      this.time.delayedCall(200 + chain.length * 320, () => {
+        this.playCallout(this.i18n.ui.calloutPerfect, "gold");
+      });
+    } else if (chain.length >= 2) {
+      this.time.delayedCall(200 + chain.length * 320, () => {
+        this.playCallout(this.i18n.ui.calloutNice, "ice");
+      });
+      this.setToastMessage(this.i18n.ui.chainNice(chain.length, chain.reduce((s, c) => s + c.bonus, 0)));
+    } else {
+      this.setToastMessage(this.i18n.ui.chainOne(chain[0].bonus));
+    }
+
+    this.time.delayedCall(300 + chain.length * 320 + 1500, () => chainLayer.destroy());
+  }
+
+  playMissFeedback(x, y) {
+    const ring = this.add.circle(x, y - 18, 12, 0xff8b76, 0.18).setDepth(950);
+    ring.setStrokeStyle(3, 0xff8b76, 0.75);
+    const crossA = this.add.rectangle(x, y - 18, 18, 3, 0xfff0ea, 0.92).setDepth(951).setAngle(45);
+    const crossB = this.add.rectangle(x, y - 18, 18, 3, 0xfff0ea, 0.92).setDepth(951).setAngle(-45);
+    this.tweens.add({
+      targets: [ring, crossA, crossB],
+      alpha: { from: 1, to: 0 },
+      scaleX: { from: 1, to: 1.18 },
+      scaleY: { from: 1, to: 1.18 },
+      y: "-=6",
+      duration: 190,
+      ease: "Quad.out",
+      onComplete: () => {
+        ring.destroy();
+        crossA.destroy();
+        crossB.destroy();
+      },
+    });
+  }
+
+  playPlacementPulse(slotId, x, y, combo = 1) {
+    const slot = this.findSlot(slotId);
+    const burstLayer = this.add.layer().setDepth(950);
+    const isBigCombo = combo >= 5;
+    const isMidCombo = combo >= 3;
+    const ringRadius = isBigCombo ? 28 : isMidCombo ? 22 : 18;
+    const ringColor = isBigCombo ? 0xffd166 : isMidCombo ? 0xffe28c : 0x67edb8;
+    const ringLineColor = isBigCombo ? 0xfff6cf : isMidCombo ? 0xfff8df : 0xeafff7;
+    const ring = this.add.circle(x, y - 14, ringRadius, ringColor, 0.14);
+    ring.setStrokeStyle(isBigCombo ? 5 : 3, ringLineColor, isBigCombo ? 0.95 : 0.88);
+    burstLayer.add(ring);
+
+    if (slot) {
+      const halo = this.add.graphics();
+      halo.fillStyle(ringColor, isBigCombo ? 0.16 : 0.1);
+      halo.lineStyle(isBigCombo ? 4 : 3, ringLineColor, isBigCombo ? 0.9 : 0.82);
+      halo.fillRoundedRect(slot.x - slot.w / 2 + 8, slot.y - slot.h / 2 + 8, slot.w - 16, slot.h - 16, 18);
+      halo.strokeRoundedRect(slot.x - slot.w / 2 + 8, slot.y - slot.h / 2 + 8, slot.w - 16, slot.h - 16, 18);
+      burstLayer.add(halo);
+      this.tweens.add({
+        targets: halo,
+        alpha: { from: 0.9, to: 0 },
+        duration: isBigCombo ? 320 : 210,
+        ease: "Sine.out",
+        onComplete: () => halo.destroy(),
+      });
+    }
+
+    const sparkCount = isBigCombo ? 8 : isMidCombo ? 6 : 4;
+    for (let i = 0; i < sparkCount; i += 1) {
+      const angle = (Math.PI * 2 * i) / sparkCount - Math.PI / 2;
+      const dist = isBigCombo ? 32 + Math.random() * 20 : 26;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      const spark = this.add.circle(x, y - 12, isBigCombo ? 5 : isMidCombo ? 4 : 3, 0xfff8df, 0.95).setDepth(951);
+      burstLayer.add(spark);
+      this.tweens.add({
+        targets: spark,
+        x: x + dx,
+        y: y - 12 + dy,
+        alpha: { from: 0.95, to: 0 },
+        scale: { from: 1, to: 0.5 },
+        duration: isBigCombo ? 280 : 210,
+        delay: i * 15,
+        ease: "Quad.out",
+        onComplete: () => spark.destroy(),
+      });
+    }
+
+    // Combo number popup for mid+ combos
+    if (isMidCombo) {
+      const comboText = this.add.text(x, y - 60, `x${combo}`, {
+        fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+        fontSize: isBigCombo ? 42 : 34,
+        color: isBigCombo ? "#ffd166" : "#ffb85c",
+        fontStyle: "bold",
+        stroke: "#4a2c16",
+        strokeThickness: 4,
+      }).setOrigin(0.5).setDepth(955).setAlpha(0);
+      burstLayer.add(comboText);
+      this.tweens.add({
+        targets: comboText,
+        alpha: { from: 0, to: 1 },
+        y: y - 80,
+        scale: { from: 0.5, to: 1.15 },
+        duration: 180,
+        ease: "Back.out(1.7)",
+        onComplete: () => {
+          this.tweens.add({
+            targets: comboText,
+            alpha: 0,
+            y: y - 110,
+            scale: 0.8,
+            duration: 400,
+            delay: 200,
+            ease: "Sine.in",
+            onComplete: () => comboText.destroy(),
+          });
+        },
+      });
+    }
+
+    this.tweens.add({
+      targets: ring,
+      alpha: { from: 0.9, to: 0 },
+      scale: { from: 1, to: isBigCombo ? 2.0 : 1.55 },
+      duration: isBigCombo ? 320 : 210,
+      ease: "Sine.out",
+      onComplete: () => {
+        ring.destroy();
+        burstLayer.destroy();
+      },
+    });
+
+    // Camera shake on big combos
+    if (combo >= 7) {
+      this.cameras.main.shake(100, 0.003);
+    } else if (combo >= 5) {
+      this.cameras.main.shake(60, 0.0015);
+    }
+  }
+
+  refreshHoverZone(slotId, valid, score = 50) {
     this.slots.forEach((slot) => {
       const selected = slot.id === slotId;
-      const line = valid ? 0x65e7b3 : 0xff8667;
+      let line;
+      if (score >= 70) line = 0x65e7b3;
+      else if (score >= 40) line = 0xffd166;
+      else line = 0xff8667;
       slot.marker
         .setScale(selected ? 1.02 : 1)
         .setFillStyle(selected ? line : 0x61e7b0, selected ? 0.16 : 0.001)
@@ -772,16 +1676,18 @@ export class StorageScene extends Phaser.Scene {
       ? { ...home, x: item.trayX ?? home.x, y: item.trayY ?? home.y }
       : home;
     const display = this.displayPointFor(item, trayHome);
+    const targetScale = this.displayScaleFor(item, trayHome);
     if (trayHome.status !== "packed") {
       this.engine.moveOutside(item.id, trayHome.x, trayHome.y);
     }
     obj.setData("home", this.engine.snapshot().items[item.id] || trayHome);
+    this.playMissFeedback(obj.x, obj.y);
     this.tweens.add({
       targets: obj,
       x: display.x,
       y: display.y,
-      scaleX: item.scale,
-      scaleY: item.scale,
+      scaleX: targetScale,
+      scaleY: targetScale,
       duration: 220,
       ease: "Sine.out",
       onComplete: () => { this.dragItem = null; },
@@ -791,6 +1697,9 @@ export class StorageScene extends Phaser.Scene {
   }
 
   clearHover() {
+    this.hintTimer?.remove?.();
+    this.hintTimer = null;
+    this.clearHintFx();
     this.previewGraphic.clear();
     this.previewText.setVisible(false);
     if (this.previewSprite) this.previewSprite.setVisible(false);
@@ -804,6 +1713,283 @@ export class StorageScene extends Phaser.Scene {
     if (this.editMode) this.refreshSlotVisuals();
   }
 
+  showHint() {
+    // New hint: find the lowest-scoring PLACED item and highlight it
+    const state = this.engine.snapshot();
+    const packed = Object.entries(state.items)
+      .filter(([, e]) => e.status === "packed" && !e.fixed)
+      .map(([id, e]) => {
+        const score = this.engine.scorePlacement(id, e, state);
+        return { id, entry: e, score: score.score, mood: score.mood };
+      })
+      .sort((a, b) => a.score - b.score);
+
+    if (!packed.length) {
+      // No items placed yet — suggest placing the item that would benefit most
+      const item = this.engine.firstOutsideMovableItem();
+      if (!item) {
+        this.setToastMessage(this.i18n.ui.hintUnavailable);
+        return { ok: false, message: this.i18n.ui.hintUnavailable };
+      }
+      // Find best placement for this item
+      const placement = this.engine.findFirstValidPlacement(item.id);
+      if (!placement) {
+        this.setToastMessage(this.i18n.ui.hintUnavailable);
+        return { ok: false, message: this.i18n.ui.hintUnavailable };
+      }
+      this.drawPlacementPreview(item, placement);
+      this.refreshHoverZone(placement.slotId, true, placement.score);
+      this.playHintGuidance(item, placement);
+      const itemName = item.name || this.i18n.tItem(item.image, item.image);
+      const slot = this.findSlot(placement.slotId);
+      const zoneLabel = slot ? this.i18n.tZone(slot.zone) : "";
+      this.setToastMessage(this.i18n.ui.hintStart(itemName, zoneLabel));
+      this.hintTimer?.remove?.();
+      this.hintTimer = this.time.delayedCall(1800, () => { if (!this.dragItem) this.clearHover(); });
+      return { ok: true, itemId: item.id, slotId: placement.slotId };
+    }
+
+    // Find worst placed item + recommend a better slot
+    const worst = packed[0];
+    const sprite = this.sprites.get(worst.id);
+    if (!sprite) {
+      this.setToastMessage(this.i18n.ui.hintUnavailable);
+      return { ok: false, message: this.i18n.ui.hintUnavailable };
+    }
+
+    // Find best alternative placement for this item (different slot)
+    const altPlacement = this.findAlternativePlacement(worst.id);
+    const item = this.engine.itemDef(worst.id);
+    const itemName = item?.name || worst.id;
+
+    // Flash the problem item red
+    this.clearRemainingSpotlight();
+    const baseScale = this.displayScaleFor(item, worst.entry);
+    this.tweens.add({
+      targets: sprite,
+      scaleX: baseScale * 1.12,
+      scaleY: baseScale * 1.12,
+      duration: 180,
+      yoyo: true,
+      repeat: 2,
+      ease: "Sine.inOut",
+      onStart: () => sprite.setTint(0xff7d62),
+      onComplete: () => {
+        sprite.clearTint();
+        sprite.setScale(baseScale);
+      },
+    });
+
+    // Red ring around the problem item
+    const ring = this.add.circle(sprite.x, sprite.y - 14, 28, 0xff7d62, 0.18).setDepth(949);
+    ring.setStrokeStyle(3, 0xff7d62, 0.8);
+    this.tweens.add({
+      targets: ring,
+      alpha: 0,
+      scale: 2,
+      duration: 600,
+      ease: "Sine.out",
+      onComplete: () => ring.destroy(),
+    });
+
+    if (altPlacement && altPlacement.score > worst.score + 5) {
+      // Show green preview on recommended slot
+      this.drawPlacementPreview(item, altPlacement);
+      this.refreshHoverZone(altPlacement.slotId, true, altPlacement.score);
+      this.playPlacementPulse(altPlacement.slotId, altPlacement.x, altPlacement.y);
+      const slot = this.findSlot(altPlacement.slotId);
+      const zoneLabel = slot ? this.i18n.tZone(slot.zone) : "";
+      this.setToastMessage(this.i18n.ui.hintMoveTo(itemName, zoneLabel, altPlacement.score));
+      this.hintTimer?.remove?.();
+      this.hintTimer = this.time.delayedCall(2500, () => { if (!this.dragItem) this.clearHover(); });
+      return { ok: true, itemId: worst.id, recommendSlotId: altPlacement.slotId, score: worst.score, altScore: altPlacement.score };
+    }
+
+    this.setToastMessage(this.i18n.ui.hintFix(itemName, worst.score));
+    this.events.emit("miss", { message: this.i18n.ui.hintFix(itemName, worst.score) });
+    return { ok: true, itemId: worst.id, score: worst.score };
+  }
+
+  findAlternativePlacement(itemId) {
+    const current = this.engine.state.items[itemId];
+    if (!current || current.status !== "packed") return null;
+
+    let best = null;
+    let bestScore = -1;
+    const currentPlacement = { slotId: current.slotId, col: current.col, row: current.row, layer: current.layer };
+
+    for (const slot of this.level.slots) {
+      // Skip current slot
+      if (slot.id === current.slotId) continue;
+      const { cols, rows } = this.engine.slotGrid(slot);
+      const { w, h } = this.engine.itemSize(itemId);
+      const maxCol = cols - w;
+      const maxRow = rows - h;
+      if (maxCol < 0 || maxRow < 0) continue;
+
+      for (let row = 0; row <= maxRow; row += 1) {
+        for (let col = 0; col <= maxCol; col += 1) {
+          const placement = { slotId: slot.id, col, row, layer: 0 };
+          const evaluation = this.engine.evaluatePlacement(itemId, placement);
+          if (!evaluation.valid) continue;
+          const score = evaluation.score ?? 0;
+          if (score > bestScore) {
+            bestScore = score;
+            const anchor = this.engine.placementAnchor({ ...placement, itemId });
+            best = {
+              slotId: slot.id,
+              zoneId: slot.zone,
+              col,
+              row,
+              layer: 0,
+              x: anchor.x,
+              y: anchor.y,
+              width: w,
+              height: h,
+              valid: true,
+              score,
+              mood: evaluation.mood,
+              inside: true,
+            };
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  performUndo() {
+    const result = this.engine.undo();
+    if (!result.ok) {
+      this.setToastMessage(this.i18n.ui.undoNone);
+      return { ok: false };
+    }
+    const sprite = this.sprites.get(result.itemId);
+    if (sprite) {
+      const item = sprite.getData("item");
+      const display = this.displayPointFor(item, result.entry);
+      const targetScale = this.displayScaleFor(item, result.entry);
+      sprite.setData("home", result.entry);
+      sprite.setTint(0xfff3c0);
+      this.tweens.add({
+        targets: sprite,
+        x: display.x,
+        y: display.y,
+        scaleX: targetScale,
+        scaleY: targetScale,
+        duration: 220,
+        ease: "Sine.out",
+        onComplete: () => {
+          sprite.clearTint();
+          this.sortItems();
+        },
+      });
+    }
+    this.setToastMessage(this.i18n.ui.undoOk);
+    this.events.emit("hud", { placed: this.engine.validate().packed, total: this.engine.validate().total });
+    return { ok: true };
+  }
+
+  performSkip() {
+    this.engine.skipLevel();
+    const validation = this.engine.validate();
+    this.winSent = true;
+    this.completionPolishStarted = true;
+    this.playCompletionPolish(1);
+    this.time.delayedCall(600, () => {
+      const reward = Math.floor((this.level.reward || 50) * 0.5);
+      window.dispatchEvent(new CustomEvent("game-success", { detail: { score: 50, gold: reward, stars: 1, mistakes: 0, harmony: validation.totalScore || 0 } }));
+      this.game.events.emit("game-success", { score: 50, gold: reward, stars: 1, mistakes: 0, harmony: validation.totalScore || 0 });
+    });
+    return { ok: true };
+  }
+
+  showBestSpot() {
+    const hint = this.engine.bestHintForNext();
+    if (!hint) {
+      this.setToastMessage(this.i18n.ui.hintUnavailable);
+      return { ok: false, message: this.i18n.ui.hintUnavailable };
+    }
+    const item = this.level.items.find((entry) => entry.id === hint.itemId);
+    if (!item) {
+      this.setToastMessage(this.i18n.ui.hintUnavailable);
+      return { ok: false, message: this.i18n.ui.hintUnavailable };
+    }
+    this.drawPlacementPreview(item, hint);
+    this.refreshHoverZone(hint.slotId, true, hint.score);
+    this.playPlacementPulse(hint.slotId, hint.x, hint.y);
+
+    // Highlight source item
+    const sprite = this.sprites.get(hint.itemId);
+    if (sprite) {
+      const baseScale = sprite.scaleX;
+      this.tweens.add({
+        targets: sprite,
+        scaleX: baseScale * 1.1,
+        scaleY: baseScale * 1.1,
+        duration: 200,
+        yoyo: true,
+        repeat: 2,
+        ease: "Sine.inOut",
+        onStart: () => sprite.setTint(0x67edb8),
+        onComplete: () => { sprite.clearTint(); sprite.setScale(baseScale); },
+      });
+    }
+    const itemName = item.name || this.i18n.tItem(item.image, item.image);
+    const slot = this.findSlot(hint.slotId);
+    const zoneLabel = slot ? this.i18n.tZone(slot.zone) : "";
+    this.setToastMessage(this.i18n.ui.bestSpotGuide(itemName, zoneLabel, hint.score));
+    this.hintTimer?.remove?.();
+    this.hintTimer = this.time.delayedCall(2500, () => { if (!this.dragItem) this.clearHover(); });
+    return { ok: true, itemId: hint.itemId, slotId: hint.slotId, score: hint.score };
+  }
+
+  clearRemainingSpotlight() {
+    if (!this.remainingSpotlightId) return;
+    const sprite = this.sprites.get(this.remainingSpotlightId);
+    if (sprite) {
+      this.tweens.killTweensOf(sprite);
+      const item = sprite.getData("item");
+      const home = sprite.getData("home");
+      const baseScale = this.displayScaleFor(item, home);
+      sprite.clearTint().setAlpha(1).setAngle(0).setScale(baseScale);
+      if (home?.status === "outside") {
+        const display = this.displayPointFor(item, home);
+        sprite.setPosition(display.x, display.y);
+      }
+    }
+    this.remainingSpotlightId = null;
+  }
+
+  updateRemainingSpotlight(validation) {
+    const movable = this.level.items.filter((item) => !item.fixed);
+    const remaining = movable.filter((item) => this.engine.state.items[item.id]?.status !== "packed");
+    const remainingId = validation.complete || remaining.length !== 1 ? null : remaining[0].id;
+
+    if (this.remainingSpotlightId && this.remainingSpotlightId !== remainingId) {
+      this.clearRemainingSpotlight();
+    }
+    if (!remainingId || this.remainingSpotlightId === remainingId) return;
+
+    const sprite = this.sprites.get(remainingId);
+    if (!sprite) return;
+    const item = sprite.getData("item");
+    const home = sprite.getData("home");
+    const baseScale = this.displayScaleFor(item, home);
+    this.remainingSpotlightId = remainingId;
+    sprite.setTint(0xffefad);
+    this.tweens.add({
+      targets: sprite,
+      scaleX: baseScale * 1.08,
+      scaleY: baseScale * 1.08,
+      y: sprite.y - 8,
+      duration: 620,
+      ease: "Sine.inOut",
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
   sortItems() {
     for (const child of this.itemLayer.getChildren()) {
       if (child === this.previewSprite) {
@@ -812,6 +1998,13 @@ export class StorageScene extends Phaser.Scene {
       }
       const home = child.getData("home");
       const item = child.getData("item");
+      const targetScale = this.displayScaleFor(item, home);
+      if (child !== this.previewSprite && child.getData("item")?.id !== this.remainingSpotlightId) {
+        child.clearTint();
+      }
+      if (Math.abs(child.scaleX - targetScale) > 0.001 || Math.abs(child.scaleY - targetScale) > 0.001) {
+        child.setScale(targetScale);
+      }
       if (home?.status === "packed" && home?.depth != null) {
         child.setDepth(home.depth);
         continue;
@@ -824,9 +2017,11 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
-  playCompletionPolish() {
+  playCompletionPolish(stars = 1) {
     if (this.completionPolishStarted) return;
     this.completionPolishStarted = true;
+    this.cameras.main.zoomTo(1.025, 220, "Sine.easeOut");
+    this.time.delayedCall(260, () => this.cameras.main.zoomTo(1, 220, "Sine.easeInOut"));
     this.cameras.main.flash(180, 255, 246, 210, false);
     const glow = this.add.graphics().setDepth(540);
     glow.fillGradientStyle(0xffffff, 0xfff4ba, 0xffffff, 0xffe9a5, 0, 0.38, 0, 0.18);
@@ -840,24 +2035,110 @@ export class StorageScene extends Phaser.Scene {
       ease: "Sine.inOut",
       onComplete: () => glow.destroy(),
     });
+    this.time.delayedCall(220, () => this.cameras.main.flash(120, 255, 251, 228, false));
+    const sweep = this.add.rectangle(-140, 642, 180, 980, 0xffffff, 0.14).setDepth(545);
+    sweep.setAngle(-18);
+    this.tweens.add({
+      targets: sweep,
+      x: 900,
+      alpha: { from: 0, to: 0.18 },
+      duration: 620,
+      ease: "Sine.inOut",
+      onComplete: () => sweep.destroy(),
+    });
     for (const sprite of this.sprites.values()) {
       const home = sprite.getData("home");
       if (home?.status !== "packed") continue;
       this.tweens.add({
         targets: sprite,
-        y: sprite.y - 3,
-        duration: 120,
+        y: sprite.y - 5,
+        duration: 150,
         yoyo: true,
         ease: "Sine.inOut",
       });
+      this.tweens.add({
+        targets: sprite,
+        scaleX: sprite.scaleX * 1.03,
+        scaleY: sprite.scaleY * 1.03,
+        duration: 150,
+        yoyo: true,
+        ease: "Quad.out",
+      });
     }
-    this.setToastMessage(this.level.copy?.successToast || this.i18n.ui.snapOk);
+
+    // Star reveal animation
+    const starLayer = this.add.layer().setDepth(560);
+    const starTexts = [];
+    for (let i = 0; i < 3; i += 1) {
+      const earned = i < stars;
+      const starX = 375 + (i - 1) * 64;
+      const starY = 260;
+      const star = this.add.text(starX, starY, "★", {
+        fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+        fontSize: 52,
+        color: earned ? "#ffd166" : "#d4c8b8",
+        stroke: earned ? "#c8960c" : "#b0a090",
+        strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(561).setAlpha(0).setScale(0.3);
+      starLayer.add(star);
+      starTexts.push({ star, earned, delay: 350 + i * 200 });
+    }
+
+    starTexts.forEach(({ star, earned, delay }) => {
+      this.tweens.add({
+        targets: star,
+        alpha: 1,
+        scale: earned ? 1.15 : 0.85,
+        duration: 280,
+        delay,
+        ease: "Back.out(2)",
+        onComplete: () => {
+          if (earned) {
+            this.tweens.add({
+              targets: star,
+              scale: 1,
+              duration: 120,
+              ease: "Sine.out",
+            });
+          }
+        },
+      });
+    });
+
+    // Celebration particles for 3-star
+    if (stars >= 3) {
+      this.time.delayedCall(800, () => {
+        for (let i = 0; i < 14; i += 1) {
+          const confetti = this.add.circle(
+            200 + Math.random() * 350,
+            180 + Math.random() * 60,
+            3 + Math.random() * 4,
+            [0xffd166, 0xff6b6b, 0x67edb8, 0x89c4ff, 0xffb347][Math.floor(Math.random() * 5)],
+            0.9,
+          ).setDepth(562);
+          this.tweens.add({
+            targets: confetti,
+            y: confetti.y + 200 + Math.random() * 300,
+            x: confetti.x + (Math.random() - 0.5) * 260,
+            alpha: 0,
+            angle: Math.random() * 720,
+            duration: 900 + Math.random() * 600,
+            delay: Math.random() * 200,
+            ease: "Sine.in",
+            onComplete: () => confetti.destroy(),
+          });
+        }
+      });
+    }
+
+    this.setToastMessage(stars >= 3 ? this.i18n.ui.successPerfect : this.i18n.ui.successTag);
   }
 
   renderState(state, validation) {
     this.updateChrome({
       placed: validation.packed,
       total: validation.total,
+      harmonyScore: validation.totalScore,
     });
     this.events.emit("hud", { placed: validation.packed, total: validation.total });
     for (const [itemId, entry] of Object.entries(state.items)) {
@@ -871,13 +2152,35 @@ export class StorageScene extends Phaser.Scene {
       sprite.setData("home", entry);
     }
     this.sortItems();
+    this.updateRemainingSpotlight(validation);
+    // If all items placed but target not met, tell the player
+    if (validation.allPlaced && !validation.targetMet && !validation.complete && !this.winSent) {
+      this.setToastMessage(this.i18n.ui.rearrangeHint(this.level.harmony?.target || 300, validation.totalScore || 0));
+    }
     if (validation.complete && !this.winSent) {
+      this.clearRemainingSpotlight();
       this.winSent = true;
-      this.playCompletionPolish();
+      // Star rating based on harmony thresholds
+      const h = this.level.harmony || { target: 300, gold: 380, perfect: 440 };
+      const score = validation.totalScore || 0;
+      let stars = 1;
+      if (score >= h.perfect) stars = 3;
+      else if (score >= h.gold) stars = 2;
+      this.playCompletionPolish(stars);
+      // Kill-style callout on completion
+      this.time.delayedCall(400, () => {
+        if (stars >= 3) {
+          this.playCallout(this.i18n.ui.calloutFlawless, "fire");
+        } else if (stars >= 2) {
+          this.playCallout(this.i18n.ui.calloutPerfectEnd, "gold");
+        }
+      });
       this.time.delayedCall(780, () => {
         const reward = this.level.reward || 50;
-        window.dispatchEvent(new CustomEvent("game-success", { detail: { score: 100, gold: reward } }));
-        this.game.events.emit("game-success", { score: 100, gold: reward });
+        const starBonus = (stars - 1) * Math.floor(reward * 0.5);
+        const totalGold = reward + starBonus;
+        window.dispatchEvent(new CustomEvent("game-success", { detail: { score: 100, gold: totalGold, stars, mistakes: this.mistakeCount, harmony: score } }));
+        this.game.events.emit("game-success", { score: 100, gold: totalGold, stars, mistakes: this.mistakeCount, harmony: score });
       });
     }
   }
@@ -889,11 +2192,3 @@ export class StorageScene extends Phaser.Scene {
     }, null, 2);
   }
 }
-
-
-
-
-
-
-
-

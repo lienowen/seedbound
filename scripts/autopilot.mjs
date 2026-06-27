@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const planPath = join(root, "product-plan.json");
@@ -19,7 +19,7 @@ function currentPhase() {
 }
 
 function priority(task) {
-  const statusBonus = task.status === "next" ? 100 : 0;
+  const statusBonus = task.status === "next" ? 100 : task.status === "todo" ? 20 : 0;
   return statusBonus + task.impact * 3 - task.effort;
 }
 
@@ -30,16 +30,24 @@ function selectSprint(limit = 3) {
     .slice(0, limit);
 }
 
+function latestMTime(paths) {
+  return Math.max(...paths.map((path) => statSync(path).mtimeMs));
+}
+
 function buildProject() {
   try {
     const output = join(root, "dist", "index.html");
     if (!existsSync(output)) {
       return { ok: false, detail: "No production build found. Run npm run build." };
     }
-    const sourceTime = Math.max(
-      statSync(join(root, "src", "App.jsx")).mtimeMs,
-      statSync(join(root, "src", "styles.css")).mtimeMs,
-    );
+    const sourceTime = latestMTime([
+      join(root, "src", "FridgePhaserGame.jsx"),
+      join(root, "src", "fridge-phaser.css"),
+      join(root, "src", "game", "StorageScene.js"),
+      join(root, "src", "game", "StorageEngine.js"),
+      join(root, "src", "levels", "fridgePhaserLevel.js"),
+      join(root, "src", "i18n", "locale.js"),
+    ]);
     const buildTime = statSync(output).mtimeMs;
     return buildTime >= sourceTime
       ? { ok: true, detail: "Production build exists and is current." }
@@ -68,7 +76,7 @@ function completeTask(id) {
 function sprintMarkdown(tasks, build) {
   const phase = currentPhase();
   const lines = [
-    "# Pocket Planet Next Sprint",
+    "# Seedbound Next Sprint",
     "",
     `Generated: ${new Date().toISOString()}`,
     `Current phase: **${phase.id}**`,
@@ -77,7 +85,7 @@ function sprintMarkdown(tasks, build) {
     "",
     "## Product Rule",
     "",
-    "Do not begin retention, growth, or monetization work until the current phase gate is measured and passed.",
+    "Every change must improve first-session clarity, placement feel, or portal safety before anything else.",
     "",
     "## Selected Work",
     "",
@@ -96,20 +104,34 @@ function sprintMarkdown(tasks, build) {
 
   lines.push("## Validation Metrics");
   lines.push("");
-  lines.push("- First meaningful interaction within 10 seconds.");
-  lines.push("- Detail-scene open rate above 45%.");
-  lines.push("- Detail-scene completion above 60%.");
-  lines.push("- Immediate retry or second-region exploration above 35%.");
-  lines.push("- No paid acquisition until at least five external playtests are recorded.");
+  lines.push("- First correct placement within 10 seconds on level 1.");
+  lines.push("- No iframe/portal route break when language or level changes.");
+  lines.push("- Hint spend and reward earn both persist correctly.");
+  lines.push("- `npm run build` passes.");
+  lines.push("- `npm run validate:fridge` passes.");
   lines.push("");
   lines.push("## Commands");
   lines.push("");
   lines.push("```powershell");
+  lines.push("npm run build");
+  lines.push("npm run validate:fridge");
   lines.push("npm run autopilot");
   lines.push("npm run autopilot:status");
-  lines.push("npm run autopilot:complete -- forest-detail");
+  lines.push("npm run autopilot:complete -- coin-sink-hint");
   lines.push("```");
   return `${lines.join("\n")}\n`;
+}
+
+function writeSprintFile(markdown) {
+  try {
+    writeFileSync(sprintPath, markdown);
+    return { ok: true, detail: `Generated ${sprintPath}` };
+  } catch (error) {
+    return {
+      ok: false,
+      detail: `Could not update NEXT-SPRINT.md automatically: ${error.message}`,
+    };
+  }
 }
 
 if (args.has("--complete")) {
@@ -122,7 +144,7 @@ if (args.has("--complete")) {
 
 const build = buildProject();
 const sprint = selectSprint();
-writeFileSync(sprintPath, sprintMarkdown(sprint, build));
+const sprintWrite = writeSprintFile(sprintMarkdown(sprint, build));
 
 if (args.has("--status")) {
   const tasks = allTasks();
@@ -132,9 +154,10 @@ if (args.has("--status")) {
     remaining: tasks.filter((task) => task.status !== "done").length,
     next: sprint.map((task) => task.id),
     build: build.ok,
+    sprintWrite,
   }, null, 2));
 } else {
-  console.log(`Generated ${sprintPath}`);
+  console.log(sprintWrite.detail);
   console.log(`Next: ${sprint.map((task) => task.id).join(", ")}`);
   if (!build.ok) process.exitCode = 1;
 }

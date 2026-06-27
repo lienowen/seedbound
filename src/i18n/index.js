@@ -2,7 +2,7 @@ import { CAMPAIGN_I18N } from "./campaign.js";
 import { ITEM_NAMES, REASONS, UI } from "./ui.js";
 
 export function createI18n(locale) {
-  const lang = UI[locale] ? locale : "pt";
+  const lang = UI[locale] ? locale : "en";
   const ui = UI[lang];
   const reasons = REASONS[lang];
   const itemNames = ITEM_NAMES[lang];
@@ -17,6 +17,11 @@ export function createI18n(locale) {
     },
     tItem(nameKey, fallback = "") {
       return itemNames[nameKey] || fallback || nameKey;
+    },
+    tZone(zoneKey, fallback = "") {
+      if (!zoneKey) return fallback;
+      const titleKey = `zone${zoneKey.slice(0, 1).toUpperCase()}${zoneKey.slice(1)}Title`;
+      return ui[titleKey] || fallback || zoneKey;
     },
   };
 }

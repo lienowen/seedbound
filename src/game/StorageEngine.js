@@ -16,6 +16,7 @@ export class StorageEngine {
       ? this.initialState()
       : this.normalizeState(this.restore()) || this.initialState();
     this.listeners = new Set();
+    this.history = []; // [{ itemId, previousEntry }] for undo
   }
 
   initialState() {
@@ -23,6 +24,7 @@ export class StorageEngine {
       levelId: this.level.id || "level-1",
       revision: this.level.revision || 1,
       complete: false,
+      chainBonus: 0,
       items: Object.fromEntries(this.level.items.map((item) => {
         const slot = item.slot ? this.slotById(item.slot) : null;
         const packed = slot
@@ -104,8 +106,12 @@ export class StorageEngine {
   itemPlacementNudge(itemId, placement = null, mode = "packed") {
     const item = this.itemDef(itemId);
     const slot = placement?.slotId ? this.slotById(placement.slotId) : null;
+    const slotKey = slot?.id || null;
+    const slotModeKey = slotKey ? `${slotKey}:${mode}` : null;
     const zoneKey = slot?.zone ? `${slot.zone}:${mode}` : null;
-    const nudge = item?.nudge?.[zoneKey]
+    const nudge = item?.nudge?.[slotModeKey]
+      || item?.nudge?.[slotKey]
+      || item?.nudge?.[zoneKey]
       || item?.nudge?.[slot?.zone]
       || item?.nudge?.[mode]
       || item?.nudge
@@ -147,6 +153,147 @@ export class StorageEngine {
 
   canUseSlot(item, slot) {
     return item.tags.some((tag) => slot.allow.includes(tag));
+  }
+
+  // ---- Harmony scoring: items can go anywhere, but get scored ----
+  _COLD_ZONES = new Set(["chill", "drawer"]);
+
+  scorePlacement(itemId, placement, candidate = this.state) {
+    const item = this.itemDef(itemId);
+    const slot = this.slotById(placement.slotId);
+    if (!item || !slot) return { score: 0, mood: "bad", reasons: [] };
+
+    const prefs = item.prefs || {};
+    let score = 50; // neutral baseline
+    const reasons = [];
+
+    // 1. Tag match bonus: item tags matching slot allow
+    if (this.canUseSlot(item, slot)) {
+      score += 25;
+      reasons.push("tagMatch");
+    }
+
+    // 2. Zone preference
+    if (prefs.zone && slot.zone === prefs.zone) {
+      score += 20;
+      reasons.push("prefZone");
+    } else if (prefs.zone && slot.zone !== prefs.zone) {
+      score -= 10;
+      reasons.push("wrongZone");
+    }
+
+    // 3. Temperature: needsCold items suffer in warm zones
+    if (prefs.needsCold && !this._COLD_ZONES.has(slot.zone)) {
+      score -= 25;
+      reasons.push("needsCold");
+    } else if (prefs.needsCold && this._COLD_ZONES.has(slot.zone)) {
+      score += 10;
+      reasons.push("coldMatch");
+    }
+
+    // 4. Visibility: likesVisible items prefer upper shelves / door
+    if (prefs.likesVisible && (slot.zone === "shelf" || slot.zone === "door")) {
+      score += 10;
+      reasons.push("visible");
+    }
+
+    // 5. Neighbor preferences
+    const packedById = this.packedItemsById(candidate);
+    const occupancy = this.buildOccupancy(candidate, itemId);
+    const { w, h } = this.itemSize(itemId);
+    const neighborIds = new Set();
+
+    // Check adjacent cells for neighbors
+    const checkCols = [];
+    const checkRows = [];
+    for (let dc = -1; dc <= w; dc += 1) checkCols.push(placement.col + dc);
+    for (let dr = -1; dr <= h; dr += 1) checkRows.push(placement.row + dr);
+    for (const nc of checkCols) {
+      for (const nr of checkRows) {
+        // Skip our own cells
+        if (nc >= placement.col && nc < placement.col + w && nr >= placement.row && nr < placement.row + h) continue;
+        const nid = occupancy.get(`${slot.id}:${placement.layer || 0}:${nc}:${nr}`);
+        if (nid) neighborIds.add(nid);
+      }
+    }
+
+    for (const nid of neighborIds) {
+      const nKey = this.itemDef(nid)?.image || nid;
+      if (prefs.likesNeighbors?.includes(nKey)) {
+        score += 12;
+        reasons.push(`likes_${nKey}`);
+      }
+      if (prefs.hatesNeighbors?.includes(nKey)) {
+        score -= 20;
+        reasons.push(`hates_${nKey}`);
+      }
+    }
+
+    const clamped = Math.max(0, Math.min(100, score));
+    let mood = "ok";
+    if (clamped >= 70) mood = "happy";
+    else if (clamped >= 40) mood = "ok";
+    else mood = "sad";
+
+    return { score: clamped, mood, reasons };
+  }
+
+  // ---- Chain Reaction: placed item triggers neighbor happiness cascade ----
+  computeChainReaction(itemId, placement, candidate = this.state) {
+    const chain = []; // [{ itemId, level, bonus }]
+    const visited = new Set([itemId]);
+    let totalBonus = 0;
+    const maxLevel = 3;
+    const PROXIMITY = 240; // pixels — covers adjacent door shelves
+
+    // Resolve the "base key" of an item (strip _1, _fixed etc. suffix)
+    const baseKey = (id) => {
+      const item = this.itemDef(id);
+      return item?.image || id;
+    };
+
+    // Find all packed items physically near a given item
+    const getNearby = (centerId) => {
+      const centerEntry = candidate.items[centerId];
+      if (!centerEntry || centerEntry.status !== "packed") return [];
+
+      return Object.entries(candidate.items)
+        .filter(([nid, nentry]) => {
+          if (visited.has(nid)) return false;
+          if (nentry.status !== "packed") return false;
+          const dist = Math.hypot((nentry.x ?? 0) - (centerEntry.x ?? 0), (nentry.y ?? 0) - (centerEntry.y ?? 0));
+          return dist > 0 && dist < PROXIMITY;
+        })
+        .map(([nid]) => nid);
+    };
+
+    // BFS
+    let frontier = [itemId];
+    for (let level = 1; level <= maxLevel; level += 1) {
+      const nextFrontier = [];
+      for (const centerId of frontier) {
+        const centerKey = baseKey(centerId);
+        const nearby = getNearby(centerId);
+        for (const nid of nearby) {
+          if (visited.has(nid)) continue;
+          const neighborItem = this.itemDef(nid);
+          const neighborPrefs = neighborItem?.prefs || {};
+          // Match against base key (image name), not suffixed ID
+          const likesList = (neighborPrefs.likesNeighbors || []).map((k) => baseKey(k));
+          if (likesList.includes(centerKey)) {
+            visited.add(nid);
+            const bonus = 10 + level * 5;
+            totalBonus += bonus;
+            chain.push({ itemId: nid, level, bonus, likedItemId: centerId });
+            nextFrontier.push(nid);
+          }
+        }
+      }
+      frontier = nextFrontier;
+      if (!frontier.length) break;
+    }
+
+    return { chain, totalBonus };
   }
 
   placementRejectReason(item, slot) {
@@ -298,11 +445,10 @@ export class StorageEngine {
     const item = this.itemDef(itemId);
     const slot = this.slotById(placement.slotId);
     if (!item || !slot) {
-      return { valid: false, reason: "reject.generic", conflicts: [] };
+      return { valid: false, reason: "reject.generic", conflicts: [], score: 0, mood: "bad" };
     }
-    if (!this.canUseSlot(item, slot)) {
-      return { valid: false, reason: this.placementRejectReason(item, slot), conflicts: [] };
-    }
+    // Tag-matching is now soft — score it, but never block placement
+    const harmony = this.scorePlacement(itemId, placement, candidate);
 
     const { cols, rows, stackLayers } = this.slotGrid(slot);
     const { w, h } = this.itemSize(itemId);
@@ -310,10 +456,10 @@ export class StorageEngine {
     const row = placement.row ?? 0;
     const layer = placement.layer ?? 0;
     if (col < 0 || row < 0 || col + w > cols || row + h > rows) {
-      return { valid: false, reason: "reject.grid.overflow", conflicts: [] };
+      return { valid: false, reason: "reject.grid.overflow", conflicts: [], score: harmony.score, mood: harmony.mood };
     }
     if (layer < 0 || layer >= stackLayers) {
-      return { valid: false, reason: "reject.height.overflow", conflicts: [] };
+      return { valid: false, reason: "reject.height.overflow", conflicts: [], score: harmony.score, mood: harmony.mood };
     }
 
     const occupancy = this.buildOccupancy(candidate, itemId);
@@ -329,6 +475,8 @@ export class StorageEngine {
         valid: false,
         reason: "reject.slot.full",
         conflicts: uniqueConflicts(conflicts),
+        score: harmony.score,
+        mood: harmony.mood,
       };
     }
 
@@ -338,6 +486,8 @@ export class StorageEngine {
         valid: false,
         reason: support.reason,
         conflicts: support.supportIds,
+        score: harmony.score,
+        mood: harmony.mood,
       };
     }
 
@@ -346,6 +496,8 @@ export class StorageEngine {
       reason: "",
       conflicts: [],
       support,
+      score: harmony.score,
+      mood: harmony.mood,
     };
   }
 
@@ -385,32 +537,47 @@ export class StorageEngine {
     const item = this.itemDef(itemId);
     if (!item) return null;
 
+    // Quick preview: find the best slot the pointer is inside.
+    // Skip occupied slots — only show previews for actually-placeable positions.
+    let bestQuick = null;
+    let bestQuickScore = -1;
     for (const slot of this.level.slots) {
-      if (!this.pointInsideSlot(slot, x, y, 10) || this.canUseSlot(item, slot)) continue;
+      if (!this.pointInsideSlot(slot, x, y, 10)) continue;
       const { w, h } = this.itemSize(itemId);
       const snapped = this.placementFromPoint(itemId, slot, x, y);
-      const anchor = this.placementAnchor({ slotId: slot.id, ...snapped, itemId });
-      return {
-        slotId: slot.id,
-        zoneId: slot.zone,
-        col: snapped.col,
-        row: snapped.row,
-        layer: snapped.layer,
-        x: anchor.x,
-        y: anchor.y,
-        width: w,
-        height: h,
-        distance: this.placementDistance(itemId, { slotId: slot.id, ...snapped }, x, y),
-        valid: false,
-        reason: this.placementRejectReason(item, slot),
-        conflicts: [],
-        inside: true,
-      };
+      const evaluation = this.evaluatePlacement(itemId, { slotId: slot.id, ...snapped });
+      const harmony = evaluation.score ?? 50;
+      // Prefer valid placements; among those, prefer higher scores
+      const rank = (evaluation.valid ? 1000 : 0) + harmony;
+      if (rank > bestQuickScore) {
+        bestQuickScore = rank;
+        const anchor = this.placementAnchor({ slotId: slot.id, ...snapped, itemId });
+        bestQuick = {
+          slotId: slot.id,
+          zoneId: slot.zone,
+          col: snapped.col,
+          row: snapped.row,
+          layer: snapped.layer,
+          x: anchor.x,
+          y: anchor.y,
+          width: w,
+          height: h,
+          distance: this.placementDistance(itemId, { slotId: slot.id, ...snapped }, x, y),
+          valid: evaluation.valid,
+          alwaysPlaceable: true,
+          reason: evaluation.reason,
+          conflicts: evaluation.conflicts,
+          support: evaluation.support || anchor.support,
+          score: harmony,
+          mood: evaluation.mood,
+          inside: true,
+        };
+      }
     }
+    if (bestQuick) return bestQuick;
 
     const candidates = [];
     for (const slot of this.level.slots) {
-      if (!this.canUseSlot(item, slot)) continue;
       const { cols, rows, stackLayers } = this.slotGrid(slot);
       const { w, h } = this.itemSize(itemId);
       const maxCol = cols - w;
@@ -433,9 +600,12 @@ export class StorageEngine {
           height: h,
           distance: this.placementDistance(itemId, { slotId: slot.id, ...snapped }, x, y),
           valid: evaluation.valid,
+          alwaysPlaceable: true,
           reason: evaluation.reason,
           conflicts: evaluation.conflicts,
           support: evaluation.support || anchor.support,
+          score: evaluation.score,
+          mood: evaluation.mood,
           inside: true,
         });
       }
@@ -460,9 +630,12 @@ export class StorageEngine {
               height: h,
               distance,
               valid: evaluation.valid,
+              alwaysPlaceable: true,
               reason: evaluation.reason,
               conflicts: evaluation.conflicts,
               support: evaluation.support || anchor.support,
+              score: evaluation.score,
+              mood: evaluation.mood,
               inside: false,
             });
           }
@@ -473,6 +646,7 @@ export class StorageEngine {
     candidates.sort((a, b) => {
       if (!!a.inside !== !!b.inside) return a.inside ? -1 : 1;
       if (a.valid !== b.valid) return a.valid ? -1 : 1;
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
       if (a.distance !== b.distance) return a.distance - b.distance;
       if ((a.layer || 0) !== (b.layer || 0)) return (a.layer || 0) - (b.layer || 0);
       return 0;
@@ -481,11 +655,79 @@ export class StorageEngine {
     return candidates[0] || null;
   }
 
+  movableItems() {
+    return this.level.items.filter((item) => !item.fixed);
+  }
+
+  firstOutsideMovableItem() {
+    return this.movableItems().find((item) => this.state.items[item.id]?.status !== "packed") || null;
+  }
+
+  findFirstValidPlacement(itemId, candidate = this.state) {
+    const item = this.itemDef(itemId);
+    if (!item) return null;
+
+    let best = null;
+    let bestScore = -1;
+
+    for (const slot of this.level.slots) {
+      const { cols, rows, stackLayers } = this.slotGrid(slot);
+      const { w, h } = this.itemSize(itemId);
+      const maxCol = cols - w;
+      const maxRow = rows - h;
+      if (maxCol < 0 || maxRow < 0) continue;
+
+      for (let layer = 0; layer < stackLayers; layer += 1) {
+        for (let row = 0; row <= maxRow; row += 1) {
+          for (let col = 0; col <= maxCol; col += 1) {
+            const placement = { slotId: slot.id, col, row, layer };
+            const evaluation = this.evaluatePlacement(itemId, placement, candidate);
+            if (!evaluation.valid) continue;
+            const score = evaluation.score ?? 0;
+            if (score > bestScore) {
+              bestScore = score;
+              const anchor = this.placementAnchor({ ...placement, itemId }, candidate);
+              best = {
+                itemId,
+                slotId: slot.id,
+                zoneId: slot.zone,
+                col,
+                row,
+                layer,
+                x: anchor.x,
+                y: anchor.y,
+                width: w,
+                height: h,
+                valid: true,
+                reason: "",
+                conflicts: [],
+                support: evaluation.support || anchor.support,
+                score,
+                mood: evaluation.mood,
+                inside: true,
+              };
+            }
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  findHintPlacement() {
+    for (const item of this.movableItems()) {
+      if (this.state.items[item.id]?.status === "packed") continue;
+      const placement = this.findFirstValidPlacement(item.id);
+      if (placement) return placement;
+    }
+    return null;
+  }
+
   placeItem(itemId, placement) {
     const target = typeof placement === "string" ? { slotId: placement, col: 0, row: 0, layer: 0 } : placement;
     const evaluation = this.evaluatePlacement(itemId, target);
     if (!evaluation.valid) {
-      return { ok: false, reason: evaluation.reason, conflicts: evaluation.conflicts.map((id) => [itemId, id]) };
+      return { ok: false, reason: evaluation.reason, conflicts: evaluation.conflicts.map((id) => [itemId, id]), score: evaluation.score, mood: evaluation.mood };
     }
 
     const next = this.snapshot();
@@ -494,11 +736,78 @@ export class StorageEngine {
       fixed: !!next.items[itemId]?.fixed,
     };
     const result = this.validate(next);
-    if (!result.validPlacement) return { ok: false, reason: result.reason, conflicts: result.conflicts };
-    this.state = { ...next, complete: result.complete };
+    if (!result.validPlacement) return { ok: false, reason: result.reason, conflicts: result.conflicts, score: evaluation.score, mood: evaluation.mood };
+    // Compute chain reaction on the would-be state before committing
+    const chainResult = this.computeChainReaction(itemId, target, next);
+    // Push undo history (before committing)
+    const previousEntry = this.state.items[itemId];
+    this.history.push({ itemId, previousEntry: clone(previousEntry) });
+    this.state = { ...next, complete: result.complete, chainBonus: (this.state.chainBonus || 0) + chainResult.totalBonus };
     this.persist();
     this.emit();
-    return { ok: true, state: this.snapshot(), validation: result };
+    return { ok: true, state: this.snapshot(), validation: result, score: evaluation.score, mood: evaluation.mood, chain: chainResult.chain, chainBonus: chainResult.totalBonus };
+  }
+
+  undo() {
+    if (!this.history.length) return { ok: false, reason: "Nothing to undo" };
+    const last = this.history.pop();
+    const entry = last.previousEntry;
+    const next = this.snapshot();
+    next.items[last.itemId] = clone(entry);
+    next.complete = false;
+    this.state = next;
+    this.persist();
+    this.emit();
+    return { ok: true, itemId: last.itemId, entry };
+  }
+
+  skipLevel() {
+    // Auto-place all remaining movable items to their best slots (1-star pass)
+    const next = this.snapshot();
+    for (const item of this.movableItems()) {
+      if (next.items[item.id]?.status === "packed") continue;
+      const placement = this.findFirstValidPlacement(item.id, next);
+      if (!placement) continue;
+      next.items[item.id] = {
+        ...this.buildPackedEntry(item.id, placement, next),
+        fixed: false,
+      };
+    }
+    this.state = { ...next, complete: true, chainBonus: 0 };
+    this.history = [];
+    this.persist();
+    this.emit();
+    return { ok: true, state: this.snapshot() };
+  }
+
+  bestHintForNext() {
+    // Find the best tray item + its optimal placement
+    let best = null;
+    let bestScore = -1;
+    for (const item of this.movableItems()) {
+      if (this.state.items[item.id]?.status === "packed") continue;
+      const placement = this.findFirstValidPlacement(item.id);
+      if (!placement || (placement.score ?? 0) <= bestScore) continue;
+      bestScore = placement.score ?? 0;
+      const anchor = this.placementAnchor({ ...placement, itemId: item.id });
+      best = {
+        itemId: item.id,
+        slotId: placement.slotId,
+        zoneId: placement.zoneId,
+        col: placement.col,
+        row: placement.row,
+        layer: placement.layer,
+        x: anchor.x,
+        y: anchor.y,
+        width: placement.width,
+        height: placement.height,
+        valid: true,
+        score: bestScore,
+        mood: placement.mood || "happy",
+        inside: true,
+      };
+    }
+    return best;
   }
 
   moveOutside(itemId, x, y) {
@@ -537,9 +846,13 @@ export class StorageEngine {
   }
 
   validate(candidate = this.state) {
+    const movable = this.level.items.filter((item) => !item.fixed);
+    const movableIds = new Set(movable.map((m) => m.id));
     const packed = Object.values(candidate.items).filter((entry) => entry.status === "packed");
     const conflicts = [];
     let illegalReason = "";
+    let totalScore = 0;
+    let scoredCount = 0;
 
     for (const entry of packed) {
       const evaluation = this.evaluatePlacement(entry.itemId, entry, candidate);
@@ -549,19 +862,38 @@ export class StorageEngine {
           conflicts.push([entry.itemId, conflictId]);
         }
       }
+      // Only count movable items toward harmony score
+      if (evaluation.score != null && movableIds.has(entry.itemId)) {
+        totalScore += evaluation.score;
+        scoredCount += 1;
+      }
     }
 
-    const movable = this.level.items.filter((item) => !item.fixed);
+    // Add accumulated chain bonuses
+    const chainTotal = candidate.chainBonus || 0;
+    totalScore += chainTotal;
+
     const packedMovable = movable.filter((item) => candidate.items[item.id]?.status === "packed");
     const validPlacement = conflicts.length === 0 && !illegalReason;
+    const avgScore = scoredCount > 0 ? Math.round(totalScore / Math.max(1, scoredCount)) : 0;
+    const allPlaced = packedMovable.length === movable.length;
+    const target = this.level.harmony?.target ?? 300;
+    // Complete = all items placed AND harmony score meets the target
+    const complete = allPlaced && validPlacement && totalScore >= target;
 
     return {
       validPlacement,
-      complete: validPlacement && packedMovable.length === movable.length,
+      complete,
       packed: packedMovable.length,
       total: movable.length,
       conflicts,
-      reason: validPlacement ? "" : illegalReason || "reject.layer.full",
+      reason: validPlacement ? (allPlaced && totalScore < target ? "reject.score.low" : "") : (illegalReason || "reject.layer.full"),
+      harmonyScore: avgScore,
+      totalScore,
+      scoredCount,
+      allPlaced,
+      targetMet: totalScore >= target,
+      chainBonus: chainTotal,
     };
   }
 
