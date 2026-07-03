@@ -1382,6 +1382,123 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
+  // ---- WISH BUBBLE: makes each item's hidden preference legible on pickup ----
+  describeWish(item) {
+    const prefs = item.prefs || {};
+    const w = this.i18n.ui;
+    if (prefs.likesNeighbors && prefs.likesNeighbors.length) {
+      const friend = prefs.likesNeighbors.find((k) => this.textures.exists(k)) || prefs.likesNeighbors[0];
+      return { kind: "likes", text: w.wishLikes, friendKey: friend };
+    }
+    if (prefs.needsCold) return { kind: "cold", text: w.wishCold };
+    if (prefs.zone && w.wishZone?.[prefs.zone]) return { kind: "zone", text: w.wishZone[prefs.zone] };
+    if (prefs.likesVisible) return { kind: "visible", text: w.wishVisible };
+    return null;
+  }
+
+  buildWishIcon(kind) {
+    const g = this.add.graphics();
+    if (kind === "cold") {
+      g.lineStyle(3, 0x5fa8d3, 1);
+      const r = 12;
+      for (let i = 0; i < 3; i += 1) {
+        const a = (Math.PI / 3) * i;
+        g.beginPath();
+        g.moveTo(-Math.cos(a) * r, -Math.sin(a) * r);
+        g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        g.strokePath();
+      }
+    } else if (kind === "likes") {
+      const s = 12;
+      g.fillStyle(0xff6b8a, 1);
+      g.fillCircle(-s * 0.42, -s * 0.18, s * 0.55);
+      g.fillCircle(s * 0.42, -s * 0.18, s * 0.55);
+      g.fillTriangle(-s * 0.92, s * 0.02, s * 0.92, s * 0.02, 0, s);
+    }
+    return g;
+  }
+
+  showWishBubble(obj, item) {
+    this.hideWishBubble();
+    const wish = this.describeWish(item);
+    if (!wish) return;
+
+    const container = this.add.container(0, 0).setDepth(990);
+    const content = this.add.container(0, 0);
+    container.add(content);
+
+    const iconSize = 28;
+    const thumbSize = 36;
+    const gap = 9;
+    let cursor = 0;
+
+    if (wish.kind === "cold" || wish.kind === "likes") {
+      const icon = this.buildWishIcon(wish.kind);
+      icon.setPosition(cursor + iconSize / 2, 0);
+      content.add(icon);
+      cursor += iconSize + gap;
+    }
+
+    const label = this.add.text(cursor, 0, wish.text, {
+      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+      fontSize: 23,
+      color: "#5b2c1d",
+      fontStyle: "bold",
+    }).setOrigin(0, 0.5);
+    content.add(label);
+    const hasThumb = wish.kind === "likes" && wish.friendKey && this.textures.exists(wish.friendKey);
+    cursor += label.width + (hasThumb ? gap : 0);
+
+    if (hasThumb) {
+      const thumb = this.add.image(cursor + thumbSize / 2, 0, wish.friendKey);
+      const scale = thumbSize / Math.max(thumb.width || 1, thumb.height || 1);
+      thumb.setScale(scale);
+      content.add(thumb);
+      cursor += thumbSize;
+    }
+
+    const totalW = cursor;
+    content.setX(-totalW / 2);
+
+    const padX = 20;
+    const halfH = 28;
+    const bg = this.add.graphics();
+    bg.fillStyle(0xfff8e6, 0.98);
+    bg.lineStyle(3, 0xffffff, 0.92);
+    bg.fillRoundedRect(-totalW / 2 - padX, -halfH, totalW + padX * 2, halfH * 2, 16);
+    bg.strokeRoundedRect(-totalW / 2 - padX, -halfH, totalW + padX * 2, halfH * 2, 16);
+    bg.fillStyle(0xfff8e6, 0.98);
+    bg.fillTriangle(-10, halfH - 2, 10, halfH - 2, 0, halfH + 12);
+    container.addAt(bg, 0);
+
+    this.wishBubble = container;
+    this.wishBubbleOffset = 82;
+    container.setPosition(obj.x, obj.y - this.wishBubbleOffset);
+    container.setScale(0.6);
+    container.setAlpha(0);
+    this.tweens.add({ targets: container, scale: 1, alpha: 1, duration: 190, ease: "Back.out(2)" });
+  }
+
+  updateWishBubble(obj) {
+    if (!this.wishBubble) return;
+    this.wishBubble.setPosition(obj.x, obj.y - (this.wishBubbleOffset || 82));
+  }
+
+  hideWishBubble() {
+    if (!this.wishBubble) return;
+    const bubble = this.wishBubble;
+    this.wishBubble = null;
+    this.tweens.killTweensOf(bubble);
+    this.tweens.add({
+      targets: bubble,
+      alpha: 0,
+      scale: 0.7,
+      duration: 130,
+      ease: "Sine.in",
+      onComplete: () => bubble.destroy(),
+    });
+  }
+
   onDragStart(obj) {
     this.hintTimer?.remove?.();
     this.hintTimer = null;
@@ -1390,6 +1507,8 @@ export class StorageScene extends Phaser.Scene {
     this.dragItem = obj;
     obj.setDepth(980);
     this.tweens.add({ targets: obj, scale: obj.scale * 1.06, duration: 90, ease: "Sine.out" });
+    const item = obj.getData("item");
+    if (item) this.showWishBubble(obj, item);
   }
 
   onDrag(pointer, obj, x, y) {
@@ -1402,6 +1521,7 @@ export class StorageScene extends Phaser.Scene {
     this.hoverPlacement = preview;
     this.drawPlacementPreview(item, preview);
     this.refreshHoverZone(preview?.slotId || null, !!preview?.valid, preview?.score ?? 50);
+    this.updateWishBubble(obj, preview);
   }
 
   onDragEnd(obj) {
@@ -1409,6 +1529,7 @@ export class StorageScene extends Phaser.Scene {
     if (!item) return;
     const preview = this.hoverPlacement;
     this.clearHover();
+    this.hideWishBubble();
     if (!preview) return this.returnHome(obj);
 
     // Only hard-reject for grid overflow / occupied space
