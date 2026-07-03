@@ -1,6 +1,8 @@
 export const UI = {
   pt: {
     dragHint: "Arraste para a prateleira certa.",
+    coachTitle: "Arraste o item para o ponto que brilha",
+    coachReleased: "Solte para encaixar!",
     goalDefault: "Organize tudo no lugar certo.",
     newPhase: "Nova fase.",
     snapOk: "Pah! Encaixou.",
@@ -75,6 +77,8 @@ export const UI = {
   },
   en: {
     dragHint: "Drag items to the right spot.",
+    coachTitle: "Drag the item to the glowing spot",
+    coachReleased: "Let go to place it!",
     goalDefault: "Put everything in the right place.",
     newPhase: "New level.",
     snapOk: "Snap!",
@@ -149,6 +153,8 @@ export const UI = {
   },
   cn: {
     dragHint: "把物品拖到合适的位置。",
+    coachTitle: "把食材拖到发光的位置",
+    coachReleased: "松手放下！",
     goalDefault: "把所有东西放到正确位置。",
     newPhase: "新关卡。",
     snapOk: "卡进去了！",

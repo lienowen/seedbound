@@ -136,6 +136,153 @@ export class StorageScene extends Phaser.Scene {
     this.input.on("dragstart", (_, obj) => this.onDragStart(obj));
     this.input.on("drag", (pointer, obj, dragX, dragY) => this.onDrag(pointer, obj, dragX, dragY));
     this.input.on("dragend", (_, obj) => this.onDragEnd(obj));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardownOnboarding());
+    this.time.delayedCall(600, () => this.maybeStartOnboarding());
+  }
+
+  // ---- FIRST-TIME COACHING ----
+  hasOnboarded() {
+    try {
+      return localStorage.getItem("seedbound_onboarded_v1") === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  markOnboarded() {
+    try {
+      localStorage.setItem("seedbound_onboarded_v1", "1");
+    } catch {
+      /* storage blocked; coaching just won't persist */
+    }
+  }
+
+  maybeStartOnboarding() {
+    if (this.editMode || this.onboardingActive) return;
+    if (this.hasOnboarded()) return;
+    if (this.engine.validate().complete) return;
+    const hint = this.engine.bestHintForNext();
+    if (!hint) return;
+    const sprite = this.sprites.get(hint.itemId);
+    if (!sprite) return;
+    this.startOnboarding(sprite, hint);
+  }
+
+  startOnboarding(sprite, hint) {
+    this.onboardingActive = true;
+    this.onboardingUserGrabbed = false;
+    const sx = sprite.x;
+    const sy = sprite.y;
+    const tx = hint.x;
+    const ty = hint.y;
+
+    const layer = this.add.layer().setDepth(955);
+
+    // Pulsing target ring at the ideal slot.
+    const targetRing = this.add.circle(tx, ty, 42, 0x67edb8, 0.12).setStrokeStyle(4, 0x67edb8, 0.9);
+    layer.add(targetRing);
+    this.tweens.add({
+      targets: targetRing,
+      scale: { from: 0.82, to: 1.16 },
+      alpha: { from: 0.95, to: 0.35 },
+      duration: 780,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.inOut",
+    });
+
+    // Looping "touch" indicator: an outer ring + a solid contact dot travelling
+    // from the item to its ideal spot, so players see exactly what to do.
+    const touch = this.add.container(sx, sy);
+    const touchRing = this.add.circle(0, 0, 26, 0xffffff, 0).setStrokeStyle(4, 0xffffff, 0.95);
+    const touchDot = this.add.circle(0, 0, 15, 0xffffff, 0.92);
+    touch.add([touchRing, touchDot]);
+    layer.add(touch);
+
+    // Contact "press" pulse on the ring.
+    this.tweens.add({
+      targets: touchRing,
+      scale: { from: 0.7, to: 1.35 },
+      alpha: { from: 0.9, to: 0 },
+      duration: 900,
+      repeat: -1,
+      ease: "Sine.out",
+    });
+    // Travel from source to target on a gentle loop.
+    const travel = this.tweens.add({
+      targets: touch,
+      x: { from: sx, to: tx },
+      y: { from: sy, to: ty },
+      duration: 950,
+      hold: 380,
+      repeatDelay: 650,
+      repeat: -1,
+      ease: "Sine.inOut",
+    });
+
+    // Center instruction card that fades once the player grabs anything.
+    const cardW = 440;
+    const cardH = 64;
+    const cardX = 375 - cardW / 2;
+    const cardY = 470;
+    const banner = this.add.graphics();
+    banner.fillStyle(0x5b2c1d, 0.94);
+    banner.lineStyle(3, 0xffffff, 0.85);
+    banner.fillRoundedRect(cardX, cardY, cardW, cardH, 18);
+    banner.strokeRoundedRect(cardX, cardY, cardW, cardH, 18);
+    const bannerText = this.add.text(375, cardY + cardH / 2, this.i18n.ui.coachTitle, {
+      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+      fontSize: 20,
+      color: "#ffffff",
+      fontStyle: "bold",
+      align: "center",
+      wordWrap: { width: cardW - 36 },
+    }).setOrigin(0.5);
+    layer.add(banner);
+    layer.add(bannerText);
+    banner.setAlpha(0);
+    bannerText.setAlpha(0);
+    this.tweens.add({ targets: [banner, bannerText], alpha: 1, duration: 260, ease: "Sine.out" });
+
+    this.onboarding = { layer, targetRing, touch, banner, bannerText, travel };
+  }
+
+  onboardingUserGrabbed_() {
+    if (!this.onboardingActive || !this.onboarding) return;
+    this.onboardingUserGrabbed = true;
+    const { touch, travel, banner, bannerText } = this.onboarding;
+    // Hide the demo hand once the player takes over.
+    travel?.remove?.();
+    this.tweens.killTweensOf(touch);
+    if (touch) this.tweens.add({ targets: touch, alpha: 0, duration: 180, ease: "Sine.in" });
+    bannerText?.setText(this.i18n.ui.coachReleased);
+    // Keep banner + target ring visible to reinforce where to drop.
+    if (banner && bannerText) {
+      this.tweens.add({ targets: [banner, bannerText], alpha: { from: 1, to: 0.9 }, duration: 160 });
+    }
+  }
+
+  finishOnboarding() {
+    if (!this.onboardingActive) return;
+    this.onboardingActive = false;
+    this.markOnboarded();
+    this.teardownOnboarding();
+  }
+
+  teardownOnboarding() {
+    if (!this.onboarding) return;
+    const { layer, targetRing, touch, banner, bannerText, travel } = this.onboarding;
+    travel?.remove?.();
+    const targets = [targetRing, touch, banner, bannerText].filter(Boolean);
+    this.tweens.killTweensOf(targets);
+    this.tweens.add({
+      targets,
+      alpha: 0,
+      duration: 240,
+      ease: "Sine.in",
+      onComplete: () => layer?.destroy(),
+    });
+    this.onboarding = null;
   }
 
   buildStage() {
@@ -1187,6 +1334,7 @@ export class StorageScene extends Phaser.Scene {
     this.hintTimer?.remove?.();
     this.hintTimer = null;
     this.clearHintFx();
+    if (this.onboardingActive) this.onboardingUserGrabbed_();
     this.dragItem = obj;
     obj.setDepth(980);
     this.tweens.add({ targets: obj, scale: obj.scale * 1.06, duration: 90, ease: "Sine.out" });
@@ -1291,6 +1439,7 @@ export class StorageScene extends Phaser.Scene {
       this.setToastMessage(this.i18n.ui.snapOk);
     }
     this.events.emit("snap", { item: item.id, slot: preview.slotId, combo: this.comboCount, score, mood });
+    if (this.onboardingActive) this.finishOnboarding();
 
     // Fire chain reaction animation
     if (result.chain && result.chain.length) {
