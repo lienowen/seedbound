@@ -1,10 +1,13 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Phaser from "phaser";
 import { StorageScene } from "./game/StorageScene.js";
 import { createUiSounds } from "./game/playFeedback.js";
 import { FRIDGE_BR_CAMPAIGN, MAKEUP_LEVEL } from "./levels/fridgePhaserLevel.js";
 import { createI18n, localizeCampaign, localizeLevel } from "./i18n/index.js";
 import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progressStorageKey, switchLocaleHref, writeLocalePreference } from "./i18n/locale.js";
+import { MetaLayer } from "./components/MetaLayer.jsx";
+import { readMeta, writeMeta, discoverItem, bumpStreak, skinById } from "./meta/metaProgress.js";
+import "./meta.css";
 
 const HINT_COST = 25;
 const LOW_COINS_HINT = HINT_COST - 1;
@@ -60,6 +63,12 @@ export function FridgePhaserGame() {
   const [bootVariant, setBootVariant] = useState("initial");
   const [lastReward, setLastReward] = useState(0);
   const [lastStars, setLastStars] = useState(0);
+  const [meta, setMeta] = useState(() => readMeta());
+  const [discovery, setDiscovery] = useState(null);
+  const [autoOpenDaily, setAutoOpenDaily] = useState(true);
+  const metaRef = useRef(meta);
+  metaRef.current = meta;
+  const discoveryTimerRef = useRef(null);
   const placedRef = useRef(0);
   const currentIndexRef = useRef(0);
   const progressRef = useRef(progress);
@@ -114,6 +123,27 @@ export function FridgePhaserGame() {
       if (theme !== "makeup") writeProgress(locale, next);
       return next;
     });
+  }
+
+  function handleMetaChange(nextMeta) {
+    setMeta(nextMeta);
+    writeMeta(nextMeta);
+  }
+
+  function addCoins(delta) {
+    updateProgress((prev) => ({ coins: prev.coins + delta }));
+  }
+
+  function spendCoins(amount) {
+    if (progressRef.current.coins < amount) return false;
+    updateProgress((prev) => ({ coins: prev.coins - amount }));
+    return true;
+  }
+
+  function showDiscovery(itemId) {
+    setDiscovery(itemId);
+    if (discoveryTimerRef.current) clearTimeout(discoveryTimerRef.current);
+    discoveryTimerRef.current = setTimeout(() => setDiscovery(null), 2600);
   }
 
   function nudge(dx, dy) {
@@ -276,7 +306,7 @@ export function FridgePhaserGame() {
       parent: mount.current,
       width: 750,
       height: 1334,
-      backgroundColor: level.theme.background || "#ffecc8",
+      backgroundColor: (theme !== "makeup" && skinById(metaRef.current.shop.equipped).background) || level.theme.background || "#ffecc8",
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
       render: { antialias: true, roundPixels: false },
       audio: { noAudio: true },
@@ -292,9 +322,18 @@ export function FridgePhaserGame() {
       if (scene?.scene?.isActive()) {
         sceneRef.current = scene;
         scene.events.on("hud", setHud);
-        scene.events.on("snap", () => {
+        scene.events.on("snap", (payload) => {
           soundRef.current?.snap();
           setMessage(i18n.ui.snapOk);
+          const discoverId = payload?.image || payload?.item;
+          if (theme !== "makeup" && discoverId) {
+            const { meta: nextMeta, isNew } = discoverItem(metaRef.current, discoverId);
+            if (isNew) {
+              handleMetaChange(nextMeta);
+              soundRef.current?.fanfare?.();
+              showDiscovery(payload.item);
+            }
+          }
         });
         scene.events.on("miss", (event) => {
           soundRef.current?.miss();
@@ -318,6 +357,7 @@ export function FridgePhaserGame() {
           setHud({ placed: validation.packed, total: validation.total });
         }
         scene.updateChrome?.(buildUiState(level));
+        if (theme !== "makeup") scene.applySkin?.(skinById(metaRef.current.shop.equipped).background);
         hasMountedOnceRef.current = true;
         setBooting(false);
         if (editMode) {
@@ -351,6 +391,9 @@ export function FridgePhaserGame() {
           coins: prev.coins + detail.gold,
           unlocked: Math.max(prev.unlocked, Math.min(campaign.length, currentIndexRef.current + 2)),
         }));
+        const cleanRun = (detail.mistakes || 0) === 0 && (detail.stars || 0) >= 2;
+        const { meta: nextMeta } = bumpStreak(metaRef.current, cleanRun);
+        handleMetaChange(nextMeta);
       }
     });
 
@@ -420,6 +463,11 @@ export function FridgePhaserGame() {
   useEffect(() => {
     sceneRef.current?.updateChrome?.(buildUiState(level, progress));
   }, [progress.coins, progress.unlocked, progress.current, hud.placed, hud.total, level]);
+
+  useEffect(() => {
+    if (theme === "makeup") return;
+    sceneRef.current?.applySkin?.(skinById(meta.shop.equipped).background);
+  }, [meta.shop.equipped, theme]);
 
   function changeLocale(nextLocale, event) {
     event.preventDefault();
@@ -500,6 +548,18 @@ export function FridgePhaserGame() {
               <span>{SKIP_COST}</span>
             </button>
           </div>
+          <MetaLayer
+            i18n={i18n}
+            locale={locale}
+            coins={progress.coins}
+            meta={meta}
+            onMetaChange={handleMetaChange}
+            onAddCoins={addCoins}
+            onSpendCoins={spendCoins}
+            discovery={discovery}
+            autoOpenDaily={autoOpenDaily}
+            onDailyAutoHandled={() => setAutoOpenDaily(false)}
+          />
         </>
       )}
       <div className="fridge-game-mount" ref={mount} />

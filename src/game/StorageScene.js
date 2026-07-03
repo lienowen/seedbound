@@ -269,6 +269,12 @@ export class StorageScene extends Phaser.Scene {
     this.teardownOnboarding();
   }
 
+  applySkin(background) {
+    if (!background) return;
+    this.skinBackground = background;
+    this.cameras?.main?.setBackgroundColor(background);
+  }
+
   teardownOnboarding() {
     if (!this.onboarding) return;
     const { layer, targetRing, touch, banner, bannerText, travel } = this.onboarding;
@@ -1438,7 +1444,7 @@ export class StorageScene extends Phaser.Scene {
     } else {
       this.setToastMessage(this.i18n.ui.snapOk);
     }
-    this.events.emit("snap", { item: item.id, slot: preview.slotId, combo: this.comboCount, score, mood });
+    this.events.emit("snap", { item: item.id, image: item.image, slot: preview.slotId, combo: this.comboCount, score, mood });
     if (this.onboardingActive) this.finishOnboarding();
 
     // Fire chain reaction animation
