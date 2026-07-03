@@ -126,6 +126,10 @@ export class StorageScene extends Phaser.Scene {
     const payload = { ...this.entryData, ...data };
     this.editMode = !!payload.editMode;
     this.level = structuredClone(payload.level || STORAGE_LEVEL);
+    // Top-down packing prototype renders items centered in a grid with real
+    // rotation, instead of the fridge's front-view baseline system.
+    this.topDown = !!this.level.topDown;
+    this.dragRot = 0;
     this.chromeData = structuredClone(payload.uiState || {});
     this.i18n = createI18n(this.chromeData.locale || "pt");
     this.engine = new StorageEngine(this.level, { forceFresh: !!payload.forceFresh });
@@ -340,9 +344,19 @@ export class StorageScene extends Phaser.Scene {
   buildStage() {
     const g = this.add.graphics();
     if (this.level.assets?.back) {
-      this.add.image(375, 667, this.level.assets.back.key)
-        .setDisplaySize(this.level.stage.width, this.level.stage.height)
-        .setDepth(0);
+      const back = this.level.assets.back;
+      if (back.contain) {
+        // Preserve the square aspect of a top-down illustration (e.g. the
+        // picnic basket) instead of stretching it to the portrait stage.
+        const size = back.size || this.level.stage.width;
+        this.add.image(375, back.y ?? 667, back.key)
+          .setDisplaySize(size, size)
+          .setDepth(0);
+      } else {
+        this.add.image(375, 667, back.key)
+          .setDisplaySize(this.level.stage.width, this.level.stage.height)
+          .setDepth(0);
+      }
     }
     for (const shape of this.level.stage.shapes) this.drawShape(g, shape);
     g.setDepth(0);
@@ -1179,11 +1193,55 @@ export class StorageScene extends Phaser.Scene {
   }
 
   displayPointFor(item, entry) {
+    if (this.topDown) return this.topDownPoint(item, entry);
     const offset = this.visualOffsetFor(item, entry);
     return {
       x: entry.x + offset.x,
       y: entry.y + offset.y,
     };
+  }
+
+  // ---- TOP-DOWN PACKING RENDER HELPERS ----
+  topDownAngle(entry) {
+    return ((entry?.rot || 0) % 4) * 90;
+  }
+
+  // Center of a packed item's footprint rectangle within the slot grid.
+  topDownPoint(item, entry) {
+    if (entry?.status !== "packed" || !entry.slotId) {
+      return { x: entry.x, y: entry.y };
+    }
+    const slot = this.findSlot(entry.slotId);
+    if (!slot) return { x: entry.x, y: entry.y };
+    const cols = slot.cols || 1;
+    const rows = slot.rows || 1;
+    const cellW = slot.w / cols;
+    const cellH = slot.h / rows;
+    const left = slot.x - slot.w / 2;
+    const top = slot.y - slot.h / 2;
+    const { w, h } = this.engine.itemSize(item.id, entry.rot || 0);
+    return {
+      x: left + (entry.col + w / 2) * cellW,
+      y: top + (entry.row + h / 2) * cellH,
+    };
+  }
+
+  // Uniform scale so the item's long axis maps to its footprint length. The art
+  // is square with the object filling its long axis, so scaling by the longest
+  // footprint dimension keeps rotation visually consistent.
+  topDownScale(item, entry) {
+    const base = item.size || [1, 1];
+    const longCells = Math.max(base[0] || 1, base[1] || 1);
+    const tex = this.textures.get(item.image)?.getSourceImage?.();
+    const texSize = Math.max(tex?.width || 0, tex?.height || 0) || 1024;
+    let cell;
+    if (entry?.status === "packed" && entry.slotId) {
+      const slot = this.findSlot(entry.slotId);
+      cell = slot ? Math.min(slot.w / (slot.cols || 1), slot.h / (slot.rows || 1)) : 120;
+    } else {
+      cell = 66; // compact tray display
+    }
+    return Number(((longCells * cell * 0.94) / texSize).toFixed(4));
   }
 
   logicalDragPoint(item, x, y, entry) {

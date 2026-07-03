@@ -1,4 +1,4 @@
-﻿import { ITEM_RENDER_PROFILES } from "./itemRenderProfiles.js";
+import { ITEM_RENDER_PROFILES } from "./itemRenderProfiles.js";
 
 const FRIDGE_STAGE = {
   width: 750,
@@ -42,6 +42,39 @@ const FRIDGE_ASSETS = {
   back: { key: "fridge-board", file: "fridge-board.webp" },
   front: { key: "fridge-door-front", file: "fridge-door-front.webp", depth: 430 },
 };
+
+// ---- PACKING PROTOTYPE: top-down picnic basket ------------------------------
+// A single large 4x4 grid inside a square basket illustration. The basket art
+// is drawn with `contain` so it keeps its square aspect instead of being
+// stretched to the tall portrait stage.
+const PICNIC_ASSETS = {
+  back: { key: "picnic-basket", file: "picnic-basket.png", contain: true, size: 700, y: 628 },
+};
+
+const PICNIC_STAGE = {
+  width: 750,
+  height: 1334,
+  shapes: [],
+};
+
+// One big grid slot centered on the basket interior. 4 cols x 4 rows of
+// 124px cells => 496x496, sitting inside the woven rim.
+const PICNIC_SLOTS = [
+  {
+    id: "basket",
+    zone: "basket",
+    allow: ["pack"],
+    x: 375,
+    y: 628,
+    w: 496,
+    h: 496,
+    cols: 4,
+    rows: 4,
+    stackLayers: 1,
+    baseline: 0.5,
+    depth: 120,
+  },
+];
 
 function renderProfile(key) {
   return ITEM_RENDER_PROFILES[key] || {
@@ -121,6 +154,18 @@ const ITEM_LIBRARY = {
   cake: { image: "cake", file: "cake.webp", name: "Bolo", tags: ["food"], size: [2, 1], scale: ITEM_SCALE.dessertWide, anchor: [renderProfile("cake").originX, renderProfile("cake").originY], surface: renderProfile("cake"), bounds: { w: 106, h: 86 }, nudge: { drawer: { x: 4 } }, prefs: { zone: "shelf", likesVisible: true, hatesNeighbors: ["mustard", "mealbox"] } },
   greenSoda: { image: "green-soda", file: "green-soda.webp", name: "Guarana", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("green-soda").originX, renderProfile("green-soda").originY], surface: renderProfile("green-soda"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 10, y: -1 } }, prefs: { zone: "door", needsCold: false, likesNeighbors: ["red-soda", "juice"] } },
   redSoda: { image: "red-soda", file: "red-soda.webp", name: "Refri", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("red-soda").originX, renderProfile("red-soda").originY], surface: renderProfile("red-soda"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 10, y: -1 } }, prefs: { zone: "door", needsCold: false, likesNeighbors: ["green-soda", "juice"] } },
+
+  // ---- PACKING PROTOTYPE ITEMS (top-down, big + rotatable) --------------
+  // These are authored HORIZONTALLY (art lies left-right), so base sizes are
+  // wide. Non-square items opt into rotation via `rotatable: true`. They render
+  // with a center anchor in the top-down grid mode and carry no zone prefs —
+  // the win condition is pure spatial packing.
+  packWatermelon: { image: "pack-watermelon", file: "pack-watermelon.png", name: "Melancia", tags: ["pack"], size: [2, 2], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packBaguette: { image: "pack-baguette", file: "pack-baguette.png", name: "Baguete", tags: ["pack"], size: [3, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packBottle: { image: "pack-bottle", file: "pack-bottle.png", name: "Suco", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packCheese: { image: "pack-cheese", file: "pack-cheese.png", name: "Queijo", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packSandwich: { image: "pack-sandwich", file: "pack-sandwich.png", name: "Sanduiche", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packJam: { image: "pack-jam", file: "pack-jam.png", name: "Geleia", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
 };
 
 const TRAY_POSITIONS = [
@@ -215,7 +260,66 @@ function buildFridgeLevel({
   };
 }
 
+function buildPicnicLevel() {
+  const trayItems = [
+    { key: "packWatermelon" },
+    { key: "packBaguette" },
+    { key: "packBottle" },
+    { key: "packCheese" },
+    { key: "packSandwich" },
+    { key: "packJam" },
+  ];
+  const row1 = [148, 300, 452, 604];
+  const row2 = [224, 376, 528];
+  return {
+    id: "picnic-pack-1",
+    revision: 1,
+    phase: 1,
+    reward: 120,
+    topDown: true,
+    winMode: "packing",
+    harmony: { target: 300, gold: 420, perfect: 520 },
+    copy: {
+      intro: "Pack the basket! Tap an item to rotate it, then drag it in.",
+      goal: "Fit every treat inside the picnic basket.",
+      difficulty: "Prototype",
+      successTag: "CESTA PERFEITA",
+      successTitle: "All packed!",
+      successBody: "Everything fits — ready for the picnic.",
+      nextLabel: "Next",
+      retryLabel: "Retry",
+    },
+    theme: {
+      key: "picnic",
+      title: "Picnic Packing",
+      subtitle: "Tap to rotate · drag to pack",
+      background: "#eaf4d8",
+    },
+    assets: structuredClone(PICNIC_ASSETS),
+    tuning: {
+      magnetPreviewDistance: 150,
+      snapDistance: 96,
+      snapDuration: 240,
+    },
+    stage: structuredClone(PICNIC_STAGE),
+    fronts: [],
+    slots: structuredClone(PICNIC_SLOTS),
+    items: trayItems.map((item, index) => {
+      const inFirstRow = index < row1.length;
+      const trayX = inFirstRow ? row1[index] : row2[index - row1.length];
+      const trayY = inFirstRow ? 1070 : 1180;
+      return buildItem(item.key, {
+        id: item.id || `${item.key}_${index + 1}`,
+        trayX,
+        trayY,
+        ...item.overrides,
+      });
+    }),
+  };
+}
+
 export const FRIDGE_BR_CAMPAIGN = [
+  buildPicnicLevel(),
   // ====== Level 1: Ad Showcase — "looks lived-in, needs your touch" ======
   buildFridgeLevel({
     id: "fridge-br-1",
