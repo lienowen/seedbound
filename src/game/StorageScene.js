@@ -522,35 +522,38 @@ export class StorageScene extends Phaser.Scene {
     if (placed > previousPlaced) this.pulseChromeText(this.progressPill?.text);
     if (coins !== previousCoins) this.pulseChromeText(this.coinPill?.text);
 
-    // Harmony bar
-    const harmony = patch.harmonyScore ?? this.chromeData?.harmonyScore ?? 0;
-    const target = this.level.harmony?.target ?? 300;
-    this.drawHarmonyBar(harmony, target);
+    // Happiness meter: how many foods are currently happy vs. the goal.
+    const happyCount = patch.happyCount ?? this.chromeData?.happyCount ?? 0;
+    const happyGoal = patch.happyGoal ?? this.chromeData?.happyGoal ?? 0;
+    this.drawHappyBar(happyCount, happyGoal);
   }
 
-  drawHarmonyBar(score, target) {
+  drawHappyBar(count, goal) {
     this.harmonyBarBg?.clear();
     this.harmonyBarFill?.clear();
-    if (!score && score !== 0) {
+    if (!goal) {
       this.harmonyLabel?.setText("");
       return;
     }
     const barW = 176;
     const barH = 10;
-    const labelW = 84;
+    const labelW = 96;
     const groupW = barW + 10 + labelW;
     const barX = 375 - groupW / 2;
     const barY = (this.goalCardBottom ?? 214) + 16;
-    const pct = Math.min(1, score / Math.max(1, target));
-    const color = pct >= 1 ? 0x67edb8 : pct >= 0.7 ? 0xffd166 : 0xff7d62;
+    const pct = Math.min(1, count / Math.max(1, goal));
+    const color = pct >= 1 ? 0x67edb8 : pct >= 0.6 ? 0xffd166 : 0xff9f7d;
 
     this.harmonyBarBg.fillStyle(0xe8dcc8, 0.6);
     this.harmonyBarBg.fillRoundedRect(barX, barY, barW, barH, 5);
-    this.harmonyBarFill.fillStyle(color, 0.9);
+    this.harmonyBarFill.fillStyle(color, 0.95);
     this.harmonyBarFill.fillRoundedRect(barX, barY, Math.max(5, barW * pct), barH, 5);
     this.harmonyLabel?.setOrigin(0, 0.5);
     this.harmonyLabel?.setPosition(barX + barW + 10, barY + barH / 2);
-    this.harmonyLabel?.setText(`${score}/${target}`);
+    this.harmonyLabel?.setText(this.i18n.ui.happyMeter(count, goal));
+    // Pulse the meter when the count rises so the player feels the progress.
+    if (count > (this._lastHappyCount ?? 0)) this.pulseChromeText(this.harmonyLabel);
+    this._lastHappyCount = count;
   }
 
   pulseChromeText(node) {
@@ -2074,100 +2077,66 @@ export class StorageScene extends Phaser.Scene {
   }
 
   showHint() {
-    // New hint: find the lowest-scoring PLACED item and highlight it
+    // Reworked hint: instead of solving the puzzle, REVEAL one unsatisfied
+    // item's wish and gently spotlight that item. The player still has to
+    // reason out WHERE it should go.
     const state = this.engine.snapshot();
-    const packed = Object.entries(state.items)
+
+    // 1) Prefer an unhappy PLACED item; 2) else a not-yet-placed item.
+    const placedRanked = Object.entries(state.items)
       .filter(([, e]) => e.status === "packed" && !e.fixed)
-      .map(([id, e]) => {
-        const score = this.engine.scorePlacement(id, e, state);
-        return { id, entry: e, score: score.score, mood: score.mood };
-      })
+      .map(([id, e]) => ({ id, entry: e, score: this.engine.scorePlacement(id, e, state).score }))
+      .filter((r) => r.score < StorageEngine.HAPPY_THRESHOLD)
       .sort((a, b) => a.score - b.score);
 
-    if (!packed.length) {
-      // No items placed yet — suggest placing the item that would benefit most
-      const item = this.engine.firstOutsideMovableItem();
-      if (!item) {
-        this.setToastMessage(this.i18n.ui.hintUnavailable);
-        return { ok: false, message: this.i18n.ui.hintUnavailable };
-      }
-      // Find best placement for this item
-      const placement = this.engine.findFirstValidPlacement(item.id);
-      if (!placement) {
-        this.setToastMessage(this.i18n.ui.hintUnavailable);
-        return { ok: false, message: this.i18n.ui.hintUnavailable };
-      }
-      this.drawPlacementPreview(item, placement);
-      this.refreshHoverZone(placement.slotId, true, placement.score);
-      this.playHintGuidance(item, placement);
-      const itemName = item.name || this.i18n.tItem(item.image, item.image);
-      const slot = this.findSlot(placement.slotId);
-      const zoneLabel = slot ? this.i18n.tZone(slot.zone) : "";
-      this.setToastMessage(this.i18n.ui.hintStart(itemName, zoneLabel));
-      this.hintTimer?.remove?.();
-      this.hintTimer = this.time.delayedCall(1800, () => { if (!this.dragItem) this.clearHover(); });
-      return { ok: true, itemId: item.id, slotId: placement.slotId };
+    let targetId = placedRanked[0]?.id || null;
+    if (!targetId) {
+      const outside = this.engine.firstOutsideMovableItem();
+      targetId = outside?.id || null;
     }
-
-    // Find worst placed item + recommend a better slot
-    const worst = packed[0];
-    const sprite = this.sprites.get(worst.id);
-    if (!sprite) {
+    if (!targetId) {
       this.setToastMessage(this.i18n.ui.hintUnavailable);
       return { ok: false, message: this.i18n.ui.hintUnavailable };
     }
 
-    // Find best alternative placement for this item (different slot)
-    const altPlacement = this.findAlternativePlacement(worst.id);
-    const item = this.engine.itemDef(worst.id);
-    const itemName = item?.name || worst.id;
+    const item = this.engine.itemDef(targetId);
+    const itemName = item?.name || this.i18n.tItem(item?.image, targetId);
+    const sprite = this.sprites.get(targetId);
 
-    // Flash the problem item red
-    this.clearRemainingSpotlight();
-    const baseScale = this.displayScaleFor(item, worst.entry);
-    this.tweens.add({
-      targets: sprite,
-      scaleX: baseScale * 1.12,
-      scaleY: baseScale * 1.12,
-      duration: 180,
-      yoyo: true,
-      repeat: 2,
-      ease: "Sine.inOut",
-      onStart: () => sprite.setTint(0xff7d62),
-      onComplete: () => {
-        sprite.clearTint();
-        sprite.setScale(baseScale);
-      },
-    });
+    // Build the wish description (reuse the pickup wish logic).
+    const wish = this.describeWish(item);
+    let wishText = wish?.text || this.i18n.ui.wishVisible;
+    if (wish?.kind === "likes" && wish.friendKey) {
+      wishText = `${wish.text} (${this.i18n.tItem(wish.friendKey, wish.friendKey)})`;
+    }
+    this.setToastMessage(`${itemName}: ${wishText}`);
 
-    // Red ring around the problem item
-    const ring = this.add.circle(sprite.x, sprite.y - 14, 28, 0xff7d62, 0.18).setDepth(949);
-    ring.setStrokeStyle(3, 0xff7d62, 0.8);
-    this.tweens.add({
-      targets: ring,
-      alpha: 0,
-      scale: 2,
-      duration: 600,
-      ease: "Sine.out",
-      onComplete: () => ring.destroy(),
-    });
-
-    if (altPlacement && altPlacement.score > worst.score + 5) {
-      // Show green preview on recommended slot
-      this.drawPlacementPreview(item, altPlacement);
-      this.refreshHoverZone(altPlacement.slotId, true, altPlacement.score);
-      this.playPlacementPulse(altPlacement.slotId, altPlacement.x, altPlacement.y);
-      const slot = this.findSlot(altPlacement.slotId);
-      const zoneLabel = slot ? this.i18n.tZone(slot.zone) : "";
-      this.setToastMessage(this.i18n.ui.hintMoveTo(itemName, zoneLabel, altPlacement.score));
+    // Gentle golden pulse on the item so the player knows who is talking —
+    // but we do NOT show where it should go.
+    if (sprite) {
+      this.clearRemainingSpotlight();
+      const baseScale = this.displayScaleFor(item, sprite.getData("home"));
+      this.tweens.add({
+        targets: sprite,
+        scaleX: baseScale * 1.12,
+        scaleY: baseScale * 1.12,
+        duration: 200,
+        yoyo: true,
+        repeat: 1,
+        ease: "Sine.inOut",
+        onStart: () => sprite.setTint(0xffe08a),
+        onComplete: () => { sprite.clearTint(); sprite.setScale(baseScale); },
+      });
+      const ring = this.add.circle(sprite.x, sprite.y - 14, 26, 0xffd166, 0.16).setDepth(949);
+      ring.setStrokeStyle(3, 0xffd166, 0.85);
+      this.tweens.add({ targets: ring, alpha: 0, scale: 1.9, duration: 620, ease: "Sine.out", onComplete: () => ring.destroy() });
+      // Show the item's wish bubble briefly.
+      this.showWishBubble(sprite, item);
       this.hintTimer?.remove?.();
-      this.hintTimer = this.time.delayedCall(2500, () => { if (!this.dragItem) this.clearHover(); });
-      return { ok: true, itemId: worst.id, recommendSlotId: altPlacement.slotId, score: worst.score, altScore: altPlacement.score };
+      this.hintTimer = this.time.delayedCall(2200, () => { if (this.dragItem !== sprite) this.hideWishBubble(); });
     }
 
-    this.setToastMessage(this.i18n.ui.hintFix(itemName, worst.score));
-    this.events.emit("miss", { message: this.i18n.ui.hintFix(itemName, worst.score) });
-    return { ok: true, itemId: worst.id, score: worst.score };
+    return { ok: true, itemId: targetId, revealedWish: true };
   }
 
   findAlternativePlacement(itemId) {
@@ -2377,6 +2346,83 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
+  // ---- MOOD BADGES: persistent face on each placed item so the player can
+  // SEE the consequence of every placement (happy / neutral / sad). ----
+  buildMoodFace(mood) {
+    const c = this.add.container(0, 0);
+    const bgColor = mood === "happy" ? 0x67edb8 : mood === "sad" ? 0xff9f8a : 0xffd166;
+    const disc = this.add.circle(0, 0, 15, bgColor, 1).setStrokeStyle(3, 0xffffff, 0.95);
+    c.add(disc);
+    const ink = 0x4a2c1d;
+    if (mood === "happy") {
+      c.add(this.add.circle(-5, -3, 2.2, ink));
+      c.add(this.add.circle(5, -3, 2.2, ink));
+      const smile = this.add.graphics();
+      smile.lineStyle(2.4, ink, 1);
+      smile.beginPath();
+      smile.arc(0, 1, 6, 0.15 * Math.PI, 0.85 * Math.PI, false);
+      smile.strokePath();
+      c.add(smile);
+    } else if (mood === "sad") {
+      c.add(this.add.circle(-5, -2, 2.2, ink));
+      c.add(this.add.circle(5, -2, 2.2, ink));
+      const frown = this.add.graphics();
+      frown.lineStyle(2.4, ink, 1);
+      frown.beginPath();
+      frown.arc(0, 8, 6, 1.15 * Math.PI, 1.85 * Math.PI, false);
+      frown.strokePath();
+      c.add(frown);
+    } else {
+      c.add(this.add.circle(-5, -2, 2.2, ink));
+      c.add(this.add.circle(5, -2, 2.2, ink));
+      const line = this.add.graphics();
+      line.lineStyle(2.4, ink, 1);
+      line.beginPath();
+      line.moveTo(-5, 5);
+      line.lineTo(5, 5);
+      line.strokePath();
+      c.add(line);
+    }
+    return c;
+  }
+
+  updateMoodBadges(moods) {
+    if (!this.moodBadges) this.moodBadges = new Map();
+    const seen = new Set();
+
+    for (const [itemId, mood] of Object.entries(moods)) {
+      const sprite = this.sprites.get(itemId);
+      if (!sprite) continue;
+      // Don't badge the item currently being dragged (its wish bubble shows instead).
+      if (this.dragItem === sprite) continue;
+      const entry = sprite.getData("home");
+      // Only show badges for items actually placed inside the fridge.
+      if (!entry || entry.status !== "packed") continue;
+      seen.add(itemId);
+
+      let record = this.moodBadges.get(itemId);
+      if (!record || record.mood !== mood) {
+        record?.container.destroy();
+        const container = this.buildMoodFace(mood).setDepth(970);
+        this.moodBadges.set(itemId, { container, mood });
+        record = this.moodBadges.get(itemId);
+        // Pop in when the mood is (re)assigned.
+        container.setScale(0);
+        this.tweens.add({ targets: container, scale: 1, duration: 220, ease: "Back.out(2.4)" });
+      }
+      const b = sprite.getBounds();
+      record.container.setPosition(b.right - 6, b.top + 8);
+    }
+
+    // Remove badges for items no longer placed.
+    for (const [itemId, record] of this.moodBadges) {
+      if (!seen.has(itemId)) {
+        record.container.destroy();
+        this.moodBadges.delete(itemId);
+      }
+    }
+  }
+
   playCompletionPolish(stars = 1) {
     if (this.completionPolishStarted) return;
     this.completionPolishStarted = true;
@@ -2524,7 +2570,10 @@ export class StorageScene extends Phaser.Scene {
       placed: validation.packed,
       total: validation.total,
       harmonyScore: validation.totalScore,
+      happyCount: validation.happyCount,
+      happyGoal: validation.happyGoal,
     });
+    this.updateMoodBadges(validation.moods || {});
     this.events.emit("hud", { placed: validation.packed, total: validation.total });
     for (const [itemId, entry] of Object.entries(state.items)) {
       const sprite = this.sprites.get(itemId);
@@ -2539,18 +2588,21 @@ export class StorageScene extends Phaser.Scene {
     this.sortItems();
     this.updateRemainingSpotlight(validation);
     // If all items placed but target not met, tell the player
-    if (validation.allPlaced && !validation.targetMet && !validation.complete && !this.winSent) {
-      this.setToastMessage(this.i18n.ui.rearrangeHint(this.level.harmony?.target || 300, validation.totalScore || 0));
+    if (validation.allPlaced && !validation.goalMet && !validation.complete && !this.winSent) {
+      this.setToastMessage(this.i18n.ui.happyRearrange(validation.happyCount || 0, validation.happyGoal || 0));
     }
     if (validation.complete && !this.winSent) {
       this.clearRemainingSpotlight();
       this.winSent = true;
-      // Star rating based on harmony thresholds
-      const h = this.level.harmony || { target: 300, gold: 380, perfect: 440 };
-      const score = validation.totalScore || 0;
+      // Star rating based on how many foods are happy:
+      // 1★ = reached the goal, 2★ = beat it, 3★ = every food is happy.
+      const happy = validation.happyCount || 0;
+      const goal = validation.happyGoal || 0;
+      const all = validation.happyTotal || 0;
       let stars = 1;
-      if (score >= h.perfect) stars = 3;
-      else if (score >= h.gold) stars = 2;
+      if (happy >= all) stars = 3;
+      else if (happy >= goal + 1) stars = 2;
+      const score = validation.totalScore || 0;
       this.playCompletionPolish(stars);
       // Kill-style callout on completion
       this.time.delayedCall(400, () => {

@@ -845,6 +845,16 @@ export class StorageEngine {
     this.emit();
   }
 
+  // Per-item happiness: an item is "happy" when its placement scores high enough.
+  static HAPPY_THRESHOLD = 70;
+
+  happyGoalFor(total) {
+    // Reachable but never trivial: you must satisfy most items, yet limited good
+    // spots mean pleasing EVERYONE (3 stars) requires real optimization.
+    if (this.level.harmony?.happyGoal != null) return this.level.harmony.happyGoal;
+    return Math.max(2, Math.round(total * 0.6));
+  }
+
   validate(candidate = this.state) {
     const movable = this.level.items.filter((item) => !item.fixed);
     const movableIds = new Set(movable.map((m) => m.id));
@@ -853,6 +863,8 @@ export class StorageEngine {
     let illegalReason = "";
     let totalScore = 0;
     let scoredCount = 0;
+    let happyCount = 0;
+    const moods = {}; // itemId -> "happy" | "ok" | "sad" (for live face badges)
 
     for (const entry of packed) {
       const evaluation = this.evaluatePlacement(entry.itemId, entry, candidate);
@@ -862,14 +874,19 @@ export class StorageEngine {
           conflicts.push([entry.itemId, conflictId]);
         }
       }
-      // Only count movable items toward harmony score
+      // Only count movable items toward harmony/happiness
       if (evaluation.score != null && movableIds.has(entry.itemId)) {
         totalScore += evaluation.score;
         scoredCount += 1;
+        const score = evaluation.score;
+        const mood = score >= StorageEngine.HAPPY_THRESHOLD ? "happy" : score >= 40 ? "ok" : "sad";
+        moods[entry.itemId] = mood;
+        // A happy item must also be legally placed (no conflict/overflow).
+        if (evaluation.valid && mood === "happy") happyCount += 1;
       }
     }
 
-    // Add accumulated chain bonuses
+    // Add accumulated chain bonuses (kept for scoring/analytics only)
     const chainTotal = candidate.chainBonus || 0;
     totalScore += chainTotal;
 
@@ -877,9 +894,11 @@ export class StorageEngine {
     const validPlacement = conflicts.length === 0 && !illegalReason;
     const avgScore = scoredCount > 0 ? Math.round(totalScore / Math.max(1, scoredCount)) : 0;
     const allPlaced = packedMovable.length === movable.length;
-    const target = this.level.harmony?.target ?? 300;
-    // Complete = all items placed AND harmony score meets the target
-    const complete = allPlaced && validPlacement && totalScore >= target;
+    const happyTotal = movable.length;
+    const happyGoal = this.happyGoalFor(happyTotal);
+    const goalMet = happyCount >= happyGoal;
+    // Complete = everything placed legally AND enough items are happy.
+    const complete = allPlaced && validPlacement && goalMet;
 
     return {
       validPlacement,
@@ -887,12 +906,18 @@ export class StorageEngine {
       packed: packedMovable.length,
       total: movable.length,
       conflicts,
-      reason: validPlacement ? (allPlaced && totalScore < target ? "reject.score.low" : "") : (illegalReason || "reject.layer.full"),
+      reason: validPlacement ? (allPlaced && !goalMet ? "reject.happy.low" : "") : (illegalReason || "reject.layer.full"),
       harmonyScore: avgScore,
       totalScore,
       scoredCount,
       allPlaced,
-      targetMet: totalScore >= target,
+      // Happiness model
+      happyCount,
+      happyGoal,
+      happyTotal,
+      moods,
+      goalMet,
+      targetMet: goalMet,
       chainBonus: chainTotal,
     };
   }

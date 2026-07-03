@@ -89,15 +89,17 @@ export function FridgePhaserGame() {
   }, [locale]);
 
   function buildUiState(nextLevel = level, nextProgress = progress) {
+    const movableTotal = nextLevel.items.filter((item) => !item.fixed).length;
+    const happyGoal = nextLevel.harmony?.happyGoal ?? Math.max(2, Math.round(movableTotal * 0.6));
     return {
       locale,
       phase: nextLevel.phase || 1,
       coins: nextProgress.coins || 0,
       placed: hud.placed,
-      total: nextLevel.items.filter((item) => !item.fixed).length,
+      total: movableTotal,
       title: nextLevel.theme.title,
       subtitle: nextLevel.theme.subtitle,
-      goal: nextLevel.copy?.goal || nextLevel.goal || i18n.ui.goalDefault,
+      goal: i18n.ui.happyGoalText(happyGoal, movableTotal),
       toast: nextLevel.copy?.intro || i18n.ui.dragHint,
       currentIndex,
       unlockedCount,
