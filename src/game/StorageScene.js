@@ -952,6 +952,20 @@ export class StorageScene extends Phaser.Scene {
       if (!item.fixed) {
         sprite.setInteractive({ draggable: true, pixelPerfect: false });
         this.input.setDraggable(sprite);
+        // Tap-to-rotate for rotatable packing items (top-down mode). A tap is a
+        // pointerup with negligible movement; a drag moves & places instead.
+        if (this.topDown && this.engine.canRotate(item.id)) {
+          sprite.on("pointerdown", (p) => {
+            sprite.setData("downAt", { x: p.worldX, y: p.worldY });
+          });
+          sprite.on("pointerup", (p) => {
+            const down = sprite.getData("downAt");
+            if (!down) return;
+            const moved = Math.hypot(p.worldX - down.x, p.worldY - down.y);
+            sprite.setData("downAt", null);
+            if (moved <= 10) this.rotateItemInPlace(sprite);
+          });
+        }
       }
     }
     if (this.level.items.length) {
@@ -1253,6 +1267,7 @@ export class StorageScene extends Phaser.Scene {
   }
 
   displayScaleFor(item, entry) {
+    if (this.topDown) return this.topDownScale(item, entry);
     if (entry?.status === "outside") {
       return Number((item.scale * 1.08).toFixed(3));
     }
@@ -1328,6 +1343,15 @@ export class StorageScene extends Phaser.Scene {
 
     const layerLift = Math.max(0, preview.layer || 0) * 10;
     const drawY = rect.y - layerLift;
+    if (this.topDown) {
+      // Clean grid-footprint highlight — no fridge baseline/footprint chrome.
+      this.previewGraphic.fillStyle(palette.fill, palette.fillAlpha + 0.06);
+      this.previewGraphic.lineStyle(palette.lineWidth, palette.line, palette.lineAlpha);
+      this.previewGraphic.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, rect.r);
+      this.previewGraphic.strokeRoundedRect(rect.x, rect.y, rect.w, rect.h, rect.r);
+      this.previewText.setVisible(false);
+      return;
+    }
     const footprint = this.previewFootprint(item, preview);
     this.previewGraphic.fillStyle(palette.fill, palette.fillAlpha);
     this.previewGraphic.lineStyle(palette.lineWidth, palette.line, palette.lineAlpha);
@@ -1560,16 +1584,52 @@ export class StorageScene extends Phaser.Scene {
     });
   }
 
+  // Rotate a packing item 90 degrees. In the tray it just spins visually and
+  // remembers the orientation for the next drag. If already packed, it tries the
+  // rotated placement in-place and reverts (with a shake) if it no longer fits.
+  rotateItemInPlace(sprite) {
+    const item = sprite.getData("item");
+    if (!item || !this.engine.canRotate(item.id)) return;
+    const home = sprite.getData("home");
+    const nextRot = this.engine.normalizeRot((home?.rot || 0) + 1);
+
+    if (home?.status === "packed" && home.slotId) {
+      const placement = { slotId: home.slotId, col: home.col, row: home.row, layer: home.layer, rot: nextRot };
+      const evalr = this.engine.evaluatePlacement(item.id, placement);
+      if (!evalr.valid) {
+        this.tweens.add({ targets: sprite, angle: sprite.angle + 8, duration: 70, yoyo: true, ease: "Sine.inOut" });
+        this.setToastMessage(this.i18n.ui.rotateNoFit || "No room to rotate");
+        return;
+      }
+      const result = this.engine.placeItem(item.id, placement);
+      if (result.ok) {
+        const entry = result.state.items[item.id];
+        sprite.setData("home", entry);
+        this.tweens.add({ targets: sprite, angle: this.topDownAngle(entry), duration: 150, ease: "Back.out(1.6)" });
+        this.renderState(result.state, this.engine.validate());
+      }
+    } else {
+      // Tray item: remember pending rotation and spin visually.
+      const entry = { ...(home || {}), rot: nextRot };
+      sprite.setData("home", entry);
+      this.tweens.add({ targets: sprite, angle: this.topDownAngle(entry), duration: 150, ease: "Back.out(1.6)" });
+    }
+  }
+
   onDragStart(obj) {
     this.hintTimer?.remove?.();
     this.hintTimer = null;
     this.clearHintFx();
     if (this.onboardingActive) this.onboardingUserGrabbed_();
     this.dragItem = obj;
+    this.dragMoved = true;
     obj.setDepth(980);
+    // Carry the current orientation into the drag so rotation persists.
+    this.dragRot = this.topDown ? (obj.getData("home")?.rot || 0) : 0;
+    if (this.topDown) obj.setAngle(this.topDownAngle({ rot: this.dragRot }));
     this.tweens.add({ targets: obj, scale: obj.scale * 1.06, duration: 90, ease: "Sine.out" });
     const item = obj.getData("item");
-    if (item) this.showWishBubble(obj, item);
+    if (item && !this.topDown) this.showWishBubble(obj, item);
   }
 
   onDrag(pointer, obj, x, y) {
@@ -1578,11 +1638,11 @@ export class StorageScene extends Phaser.Scene {
     if (!item) return;
     const home = obj.getData("home");
     const previewPoint = this.logicalDragPoint(item, pointer.worldX, pointer.worldY, home);
-    const preview = this.engine.previewMove(item.id, previewPoint.x, previewPoint.y, this.level.tuning.magnetPreviewDistance);
+    const preview = this.engine.previewMove(item.id, previewPoint.x, previewPoint.y, this.level.tuning.magnetPreviewDistance, this.dragRot || 0);
     this.hoverPlacement = preview;
     this.drawPlacementPreview(item, preview);
     this.refreshHoverZone(preview?.slotId || null, !!preview?.valid, preview?.score ?? 50);
-    this.updateWishBubble(obj, preview);
+    if (!this.topDown) this.updateWishBubble(obj, preview);
   }
 
   onDragEnd(obj) {
@@ -2098,10 +2158,15 @@ export class StorageScene extends Phaser.Scene {
       : home;
     const display = this.displayPointFor(item, trayHome);
     const targetScale = this.displayScaleFor(item, trayHome);
+    // In packing mode keep the player's chosen orientation on the tray item.
+    const keepRot = this.topDown ? (home?.rot || 0) : 0;
     if (trayHome.status !== "packed") {
       this.engine.moveOutside(item.id, trayHome.x, trayHome.y);
     }
-    obj.setData("home", this.engine.snapshot().items[item.id] || trayHome);
+    const restored = this.engine.snapshot().items[item.id] || trayHome;
+    if (this.topDown && restored.status !== "packed") restored.rot = keepRot;
+    obj.setData("home", restored);
+    if (this.topDown) obj.setAngle(this.topDownAngle(restored));
     this.playMissFeedback(obj.x, obj.y);
     this.tweens.add({
       targets: obj,
@@ -2651,6 +2716,10 @@ export class StorageScene extends Phaser.Scene {
       if (Math.abs(sprite.x - display.x) > 0.5 || Math.abs(sprite.y - display.y) > 0.5) {
         sprite.setPosition(display.x, display.y);
       }
+      if (this.topDown) {
+        sprite.setAngle(this.topDownAngle(entry));
+        sprite.setScale(this.displayScaleFor(item, entry));
+      }
       sprite.setData("home", entry);
     }
     this.sortItems();
@@ -2668,7 +2737,10 @@ export class StorageScene extends Phaser.Scene {
       const goal = validation.happyGoal || 0;
       const all = validation.happyTotal || 0;
       let stars = 1;
-      if (happy >= all) stars = 3;
+      if (this.topDown) {
+        // Packing mode: fitting everything in legally is already a perfect win.
+        stars = 3;
+      } else if (happy >= all) stars = 3;
       else if (happy >= goal + 1) stars = 2;
       const score = validation.totalScore || 0;
       this.playCompletionPolish(stars);

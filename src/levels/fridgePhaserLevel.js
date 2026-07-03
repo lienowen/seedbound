@@ -318,8 +318,11 @@ function buildPicnicLevel() {
   };
 }
 
+// Standalone packing prototype, reachable via ?theme=pack (kept out of the
+// main fridge campaign so progression is unaffected).
+export const PICNIC_LEVEL = buildPicnicLevel();
+
 export const FRIDGE_BR_CAMPAIGN = [
-  buildPicnicLevel(),
   // ====== Level 1: Ad Showcase — "looks lived-in, needs your touch" ======
   buildFridgeLevel({
     id: "fridge-br-1",

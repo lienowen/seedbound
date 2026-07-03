@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Phaser from "phaser";
 import { StorageScene } from "./game/StorageScene.js";
 import { createUiSounds } from "./game/playFeedback.js";
-import { FRIDGE_BR_CAMPAIGN, MAKEUP_LEVEL } from "./levels/fridgePhaserLevel.js";
+import { FRIDGE_BR_CAMPAIGN, MAKEUP_LEVEL, PICNIC_LEVEL } from "./levels/fridgePhaserLevel.js";
 import { createI18n, localizeCampaign, localizeLevel } from "./i18n/index.js";
 import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progressStorageKey, switchLocaleHref, writeLocalePreference } from "./i18n/locale.js";
 import { MetaLayer } from "./components/MetaLayer.jsx";
@@ -50,8 +50,11 @@ export function FridgePhaserGame() {
   const campaign = useMemo(() => localizeCampaign(FRIDGE_BR_CAMPAIGN, locale), [locale]);
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const editMode = params.get("edit") === "true";
-  const theme = params.get("theme") === "makeup" ? "makeup" : "fridge";
-  const [progress, setProgress] = useState(() => (theme === "makeup" ? { unlocked: 1, coins: 0, current: 0 } : readProgress(locale)));
+  const themeParam = params.get("theme");
+  const theme = themeParam === "makeup" ? "makeup" : themeParam === "pack" ? "pack" : "fridge";
+  // Standalone single-level modes (no campaign progression / economy UI).
+  const standalone = theme !== "fridge";
+  const [progress, setProgress] = useState(() => (standalone ? { unlocked: 1, coins: 0, current: 0 } : readProgress(locale)));
   const [hud, setHud] = useState({ placed: 0, total: 4 });
   const [message, setMessage] = useState(i18n.ui.dragHint);
   const [complete, setComplete] = useState(false);
@@ -74,11 +77,12 @@ export function FridgePhaserGame() {
   const progressRef = useRef(progress);
   const hasMountedOnceRef = useRef(false);
 
-  const currentIndex = theme === "makeup" ? 0 : Math.min(progress.current, campaign.length - 1);
+  const currentIndex = standalone ? 0 : Math.min(progress.current, campaign.length - 1);
   currentIndexRef.current = currentIndex;
   progressRef.current = progress;
   const level = useMemo(() => {
     if (theme === "makeup") return localizeLevel(MAKEUP_LEVEL, locale);
+    if (theme === "pack") return localizeLevel(PICNIC_LEVEL, locale);
     return campaign[currentIndex];
   }, [theme, locale, campaign, currentIndex]);
   const isLastLevel = currentIndex >= campaign.length - 1;
@@ -109,7 +113,7 @@ export function FridgePhaserGame() {
       toast: nextLevel.copy?.intro || i18n.ui.dragHint,
       currentIndex,
       unlockedCount,
-      showCampaignControls: !editMode && theme !== "makeup",
+      showCampaignControls: !editMode && !standalone,
       phases: campaign.map((entry) => ({
         id: entry.id,
         phase: entry.phase,
@@ -128,7 +132,7 @@ export function FridgePhaserGame() {
       next.unlocked = Math.max(1, Math.min(campaign.length, next.unlocked));
       next.current = Math.max(0, Math.min(next.unlocked - 1, next.current));
       next.coins = Math.max(0, next.coins);
-      if (theme !== "makeup") writeProgress(locale, next);
+      if (!standalone) writeProgress(locale, next);
       return next;
     });
   }
@@ -177,7 +181,7 @@ export function FridgePhaserGame() {
   }
 
   function goNextLevel() {
-    if (theme === "makeup") return;
+    if (standalone) return;
     const nextIndex = Math.min(currentIndex + 1, campaign.length - 1);
     soundRef.current?.phase();
     pendingFreshRef.current = true;
@@ -189,7 +193,7 @@ export function FridgePhaserGame() {
   }
 
   function jumpToLevel(index) {
-    if (theme === "makeup") return;
+    if (standalone) return;
     const unlocked = Math.min(progressRef.current.unlocked, campaign.length);
     if (index > unlocked - 1) return;
     soundRef.current?.phase();
@@ -201,7 +205,7 @@ export function FridgePhaserGame() {
   }
 
   function resetCampaign() {
-    if (theme === "makeup") return;
+    if (standalone) return;
     soundRef.current?.miss();
     for (const entry of FRIDGE_BR_CAMPAIGN) localStorage.removeItem(`seedbound.storage.${entry.id}`);
     updateProgress({ unlocked: 1, coins: 125, current: 0 });
@@ -214,7 +218,7 @@ export function FridgePhaserGame() {
   }
 
   function useHint() {
-    if (theme === "makeup" || complete) return;
+    if (standalone || complete) return;
     if (progress.coins < HINT_COST) {
       setMessage(i18n.ui.hintNoCoins(HINT_COST));
       return;
@@ -234,7 +238,7 @@ export function FridgePhaserGame() {
   const SKIP_COST = 50;
 
   function useUndo() {
-    if (theme === "makeup" || complete) return;
+    if (standalone || complete) return;
     if (progress.coins < UNDO_COST) {
       setMessage(i18n.ui.hintNoCoins(UNDO_COST));
       return;
@@ -250,7 +254,7 @@ export function FridgePhaserGame() {
   }
 
   function useBestSpot() {
-    if (theme === "makeup" || complete) return;
+    if (standalone || complete) return;
     if (progress.coins < BEST_COST) {
       setMessage(i18n.ui.hintNoCoins(BEST_COST));
       return;
@@ -266,7 +270,7 @@ export function FridgePhaserGame() {
   }
 
   function useSkip() {
-    if (theme === "makeup" || complete) return;
+    if (standalone || complete) return;
     if (progress.coins < SKIP_COST) {
       setMessage(i18n.ui.hintNoCoins(SKIP_COST));
       return;
@@ -314,7 +318,7 @@ export function FridgePhaserGame() {
       parent: mount.current,
       width: 750,
       height: 1334,
-      backgroundColor: (theme !== "makeup" && skinById(metaRef.current.shop.equipped).background) || level.theme.background || "#ffecc8",
+      backgroundColor: (!standalone && skinById(metaRef.current.shop.equipped).background) || level.theme.background || "#ffecc8",
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
       render: { antialias: true, roundPixels: false },
       audio: { noAudio: true },
@@ -334,7 +338,7 @@ export function FridgePhaserGame() {
           soundRef.current?.snap();
           setMessage(i18n.ui.snapOk);
           const discoverId = payload?.image || payload?.item;
-          if (theme !== "makeup" && discoverId) {
+          if (!standalone && discoverId) {
             const { meta: nextMeta, isNew } = discoverItem(metaRef.current, discoverId);
             if (isNew) {
               handleMetaChange(nextMeta);
@@ -365,7 +369,7 @@ export function FridgePhaserGame() {
           setHud({ placed: validation.packed, total: validation.total });
         }
         scene.updateChrome?.(buildUiState(level));
-        if (theme !== "makeup") scene.applySkin?.(skinById(metaRef.current.shop.equipped));
+        if (!standalone) scene.applySkin?.(skinById(metaRef.current.shop.equipped));
         hasMountedOnceRef.current = true;
         setBooting(false);
         if (editMode) {
@@ -394,7 +398,7 @@ export function FridgePhaserGame() {
       } else {
         setMessage(`${i18n.ui.successCoins(detail.gold)} ${starText}`);
       }
-      if (theme !== "makeup") {
+      if (!standalone) {
         updateProgress((prev) => ({
           coins: prev.coins + detail.gold,
           unlocked: Math.max(prev.unlocked, Math.min(campaign.length, currentIndexRef.current + 2)),
@@ -473,16 +477,16 @@ export function FridgePhaserGame() {
   }, [progress.coins, progress.unlocked, progress.current, hud.placed, hud.total, level]);
 
   useEffect(() => {
-    if (theme === "makeup") return;
+    if (standalone) return;
     sceneRef.current?.applySkin?.(skinById(meta.shop.equipped));
-  }, [meta.shop.equipped, theme]);
+  }, [meta.shop.equipped, theme, standalone]);
 
   function changeLocale(nextLocale, event) {
     event.preventDefault();
     if (!localeSwitcherEnabled) return;
     if (nextLocale === locale) return;
     writeLocalePreference(nextLocale);
-    if (theme !== "makeup") writeProgress(nextLocale, progressRef.current);
+    if (!standalone) writeProgress(nextLocale, progressRef.current);
     const url = new URL(window.location.href);
     url.searchParams.set("lang", nextLocale);
     window.history.replaceState({}, "", `${url.pathname}${url.search}`);
@@ -493,7 +497,7 @@ export function FridgePhaserGame() {
   const search = window.location.search;
   return (
     <main className="fridge-shell">
-      {!editMode && theme !== "makeup" && (
+      {!editMode && !standalone && (
         <>
           {localeSwitcherEnabled && <nav className="fridge-lang-switch" aria-label="Language">
             <a className={locale === "pt" ? "active" : ""} href={switchLocaleHref("pt", search)} onClick={(event) => changeLocale("pt", event)}>{i18n.ui.langPt}</a>
