@@ -246,19 +246,42 @@ function buildFridgeLevel({
   };
 }
 
-// Auto-arrange loose tray items in centered rows below the container.
-function packTrayLayout(count, { y = 1060, rowGap = 116, perRow = 4, spanX = [150, 600] } = {}) {
-  const positions = [];
-  const rows = Math.ceil(count / perRow);
-  for (let r = 0; r < rows; r++) {
-    const inRow = Math.min(perRow, count - r * perRow);
-    const [x0, x1] = spanX;
-    const step = inRow > 1 ? (x1 - x0) / (inRow - 1) : 0;
-    const startX = inRow > 1 ? x0 : (x0 + x1) / 2;
-    for (let c = 0; c < inRow; c++) {
-      positions.push({ x: Math.round(startX + step * c), y: y + r * rowGap });
+// Width-aware tray layout: each loose item reserves horizontal room based on
+// its footprint (long items like baguettes are wide), items flow left-to-right
+// and wrap into new centered rows so nothing ever overlaps in the tray. The
+// tray cell (~62px) mirrors the scene's compact tray display scale.
+function packTrayLayout(items, { y = 1070, rowGap = 128, maxWidth = 660, cellPx = 62, gap = 30, center = 375 } = {}) {
+  const widths = items.map((it) => {
+    const def = ITEM_LIBRARY[it.key] || {};
+    const s = def.size || [1, 1];
+    const longCells = Math.max(s[0] || 1, s[1] || 1);
+    return Math.max(cellPx, longCells * cellPx);
+  });
+  // Greedy wrap into rows that stay within maxWidth.
+  const rows = [];
+  let cur = [];
+  let curW = 0;
+  items.forEach((_, i) => {
+    const w = widths[i];
+    const add = cur.length ? gap + w : w;
+    if (cur.length && curW + add > maxWidth) {
+      rows.push({ idx: cur, w: curW });
+      cur = [];
+      curW = 0;
     }
-  }
+    curW += cur.length ? gap + w : w;
+    cur.push(i);
+  });
+  if (cur.length) rows.push({ idx: cur, w: curW });
+  // Center each row and space items by their reserved width.
+  const positions = new Array(items.length);
+  rows.forEach((row, r) => {
+    let x = center - row.w / 2;
+    row.idx.forEach((i) => {
+      positions[i] = { x: Math.round(x + widths[i] / 2), y: y + r * rowGap };
+      x += widths[i] + gap;
+    });
+  });
   return positions;
 }
 
@@ -267,7 +290,7 @@ function packTrayLayout(count, { y = 1060, rowGap = 116, perRow = 4, spanX = [15
 // the grid cell count for a clean perfect-fit puzzle).
 function buildPackingLevel(config) {
   const { id, theme, copy, container, grid, items, harmony, tray } = config;
-  const trayPos = packTrayLayout(items.length, tray);
+  const trayPos = packTrayLayout(items, tray);
   return {
     id,
     revision: 1,
@@ -316,8 +339,8 @@ function buildPackingLevel(config) {
 // + sandwich 1x1(1) + jam 1x1(1) = 16. Long items must rotate to interlock.
 export const PICNIC_LEVEL = buildPackingLevel({
   id: "picnic-pack-1",
-  container: { key: "picnic-basket", file: "picnic-basket.png", size: 700, y: 628 },
-  grid: { x: 375, y: 628, w: 496, h: 496, cols: 4, rows: 4 },
+  container: { key: "picnic-basket", file: "picnic-basket.png", size: 720, y: 628 },
+  grid: { x: 375, y: 628, w: 500, h: 500, cols: 4, rows: 4 },
   theme: { key: "picnic", title: "Picnic Packing", subtitle: "Tap to rotate · drag to pack", background: "#eaf4d8" },
   copy: {
     intro: "Pack the basket! Tap an item to rotate it, then drag it in.",

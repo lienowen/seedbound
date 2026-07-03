@@ -1768,7 +1768,19 @@ export class StorageScene extends Phaser.Scene {
       },
     });
 
-    if (mood === "happy") {
+    if (this.topDown) {
+      // Packing mode: show goal-focused progress instead of fridge combo copy.
+      const snap = this.engine.snapshot();
+      const remaining = Object.values(snap.items).filter((i) => i.status !== "packed").length;
+      if (remaining === 0) {
+        this.setToastMessage(this.i18n.ui.packAllIn || "Everything fits!");
+      } else if (remaining === 1) {
+        this.setToastMessage(this.i18n.ui.packOneLeft || "1 more to go!");
+      } else {
+        this.setToastMessage((this.i18n.ui.packLeft && this.i18n.ui.packLeft(remaining)) || `${remaining} left`);
+      }
+      if (this.comboCount >= 3) this.playCallout(this.i18n.ui.calloutGreat, "gold");
+    } else if (mood === "happy") {
       if (this.comboCount >= 7) {
         this.playCallout(this.i18n.ui.calloutUnstoppable, "fire");
         this.setToastMessage(this.i18n.ui.comboFire(this.comboCount));

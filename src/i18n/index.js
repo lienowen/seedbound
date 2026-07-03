@@ -27,10 +27,16 @@ export function createI18n(locale) {
 }
 
 export function localizeLevel(level, locale) {
-  if (!level || locale === "pt") return level;
+  if (!level) return level;
+  const isPacking = level.winMode === "packing";
+  // pt copy is authored inline; only skip localization for non-packing pt levels.
+  if (locale === "pt" && !isPacking) return level;
   const overlay = CAMPAIGN_I18N[locale]?.[level.id];
   const i18n = createI18n(locale);
   const localized = structuredClone(level);
+  // Packing levels use packing-flavored success copy instead of the fridge copy.
+  const successTag = isPacking ? i18n.ui.packSuccessTag : i18n.ui.successTag;
+  const successBody = isPacking ? i18n.ui.packSuccessBody : i18n.ui.successBody;
 
   if (overlay) {
     localized.theme = {
@@ -43,18 +49,18 @@ export function localizeLevel(level, locale) {
       intro: overlay.intro ?? localized.copy?.intro,
       goal: overlay.goal ?? localized.copy?.goal,
       difficulty: overlay.difficulty ?? localized.copy?.difficulty,
-      successTag: i18n.ui.successTag,
+      successTag,
       successTitle: i18n.ui.successTitle,
-      successBody: i18n.ui.successBody,
+      successBody,
       nextLabel: i18n.ui.nextLabel,
       retryLabel: i18n.ui.retryLabel,
     };
   } else {
     localized.copy = {
       ...localized.copy,
-      successTag: i18n.ui.successTag,
+      successTag,
       successTitle: i18n.ui.successTitle,
-      successBody: i18n.ui.successBody,
+      successBody,
       nextLabel: i18n.ui.nextLabel,
       retryLabel: i18n.ui.retryLabel,
     };
