@@ -522,13 +522,13 @@ export class StorageScene extends Phaser.Scene {
     if (placed > previousPlaced) this.pulseChromeText(this.progressPill?.text);
     if (coins !== previousCoins) this.pulseChromeText(this.coinPill?.text);
 
-    // Happiness meter: how many foods are currently happy vs. the goal.
-    const happyCount = patch.happyCount ?? this.chromeData?.happyCount ?? 0;
-    const happyGoal = patch.happyGoal ?? this.chromeData?.happyGoal ?? 0;
-    this.drawHappyBar(happyCount, happyGoal);
+    // Settle meter: how many constrained items are fully satisfied ("locked in").
+    const settledCount = patch.settledCount ?? this.chromeData?.settledCount ?? 0;
+    const constrainedTotal = patch.constrainedTotal ?? this.chromeData?.constrainedTotal ?? 0;
+    this.drawSettleBar(settledCount, constrainedTotal);
   }
 
-  drawHappyBar(count, goal) {
+  drawSettleBar(count, goal) {
     this.harmonyBarBg?.clear();
     this.harmonyBarFill?.clear();
     if (!goal) {
@@ -550,10 +550,10 @@ export class StorageScene extends Phaser.Scene {
     this.harmonyBarFill.fillRoundedRect(barX, barY, Math.max(5, barW * pct), barH, 5);
     this.harmonyLabel?.setOrigin(0, 0.5);
     this.harmonyLabel?.setPosition(barX + barW + 10, barY + barH / 2);
-    this.harmonyLabel?.setText(this.i18n.ui.happyMeter(count, goal));
+    this.harmonyLabel?.setText(this.i18n.ui.settleMeter(count, goal));
     // Pulse the meter when the count rises so the player feels the progress.
-    if (count > (this._lastHappyCount ?? 0)) this.pulseChromeText(this.harmonyLabel);
-    this._lastHappyCount = count;
+    if (count > (this._lastSettledCount ?? 0)) this.pulseChromeText(this.harmonyLabel);
+    this._lastSettledCount = count;
   }
 
   pulseChromeText(node) {
@@ -2346,81 +2346,90 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
-  // ---- MOOD BADGES: persistent face on each placed item so the player can
-  // SEE the consequence of every placement (happy / neutral / sad). ----
-  buildMoodFace(mood) {
+  // ---- STATUS BADGES + SETTLING (anti-fatigue core) ----------------------
+  // "settled" items (all hard constraints satisfied) get a small, calm check and
+  // then go quiet. "violated" items get a bright alert so the eye is drawn ONLY
+  // to what still needs solving. As the board is solved, on-screen demands on
+  // attention shrink — cognitive load goes DOWN even as the puzzle stays hard.
+  buildStatusBadge(status) {
     const c = this.add.container(0, 0);
-    const bgColor = mood === "happy" ? 0x67edb8 : mood === "sad" ? 0xff9f8a : 0xffd166;
-    const disc = this.add.circle(0, 0, 15, bgColor, 1).setStrokeStyle(3, 0xffffff, 0.95);
-    c.add(disc);
-    const ink = 0x4a2c1d;
-    if (mood === "happy") {
-      c.add(this.add.circle(-5, -3, 2.2, ink));
-      c.add(this.add.circle(5, -3, 2.2, ink));
-      const smile = this.add.graphics();
-      smile.lineStyle(2.4, ink, 1);
-      smile.beginPath();
-      smile.arc(0, 1, 6, 0.15 * Math.PI, 0.85 * Math.PI, false);
-      smile.strokePath();
-      c.add(smile);
-    } else if (mood === "sad") {
-      c.add(this.add.circle(-5, -2, 2.2, ink));
-      c.add(this.add.circle(5, -2, 2.2, ink));
-      const frown = this.add.graphics();
-      frown.lineStyle(2.4, ink, 1);
-      frown.beginPath();
-      frown.arc(0, 8, 6, 1.15 * Math.PI, 1.85 * Math.PI, false);
-      frown.strokePath();
-      c.add(frown);
+    if (status === "settled") {
+      // Low-salience: soft green disc with a checkmark. Calm, "locked in".
+      const disc = this.add.circle(0, 0, 13, 0x67edb8, 1).setStrokeStyle(3, 0xffffff, 0.95);
+      c.add(disc);
+      const check = this.add.graphics();
+      check.lineStyle(2.8, 0x1f5c42, 1);
+      check.beginPath();
+      check.moveTo(-5, 0);
+      check.lineTo(-1.5, 4);
+      check.lineTo(6, -5);
+      check.strokePath();
+      c.add(check);
     } else {
-      c.add(this.add.circle(-5, -2, 2.2, ink));
-      c.add(this.add.circle(5, -2, 2.2, ink));
-      const line = this.add.graphics();
-      line.lineStyle(2.4, ink, 1);
-      line.beginPath();
-      line.moveTo(-5, 5);
-      line.lineTo(5, 5);
-      line.strokePath();
-      c.add(line);
+      // High-salience: amber disc with an exclamation. "Still needs attention".
+      const disc = this.add.circle(0, 0, 15, 0xffb347, 1).setStrokeStyle(3, 0xffffff, 0.98);
+      c.add(disc);
+      const ink = 0x6b3410;
+      c.add(this.add.rectangle(0, -3, 3.2, 8, ink).setOrigin(0.5));
+      c.add(this.add.circle(0, 6, 2, ink));
     }
     return c;
   }
 
-  updateMoodBadges(moods) {
-    if (!this.moodBadges) this.moodBadges = new Map();
+  updateStatusBadges(itemStatus) {
+    if (!this.statusBadges) this.statusBadges = new Map();
     const seen = new Set();
 
-    for (const [itemId, mood] of Object.entries(moods)) {
+    for (const [itemId, info] of Object.entries(itemStatus)) {
+      // Easygoing items (no hard rules) never nag the player.
+      if (info.easygoing) continue;
+      if (info.status === "pending") continue;
       const sprite = this.sprites.get(itemId);
       if (!sprite) continue;
-      // Don't badge the item currently being dragged (its wish bubble shows instead).
       if (this.dragItem === sprite) continue;
       const entry = sprite.getData("home");
-      // Only show badges for items actually placed inside the fridge.
       if (!entry || entry.status !== "packed") continue;
       seen.add(itemId);
 
-      let record = this.moodBadges.get(itemId);
-      if (!record || record.mood !== mood) {
+      const status = info.status; // "settled" | "violated"
+      let record = this.statusBadges.get(itemId);
+      if (!record || record.status !== status) {
+        const wasViolated = record && record.status === "violated";
         record?.container.destroy();
-        const container = this.buildMoodFace(mood).setDepth(970);
-        this.moodBadges.set(itemId, { container, mood });
-        record = this.moodBadges.get(itemId);
-        // Pop in when the mood is (re)assigned.
+        const container = this.buildStatusBadge(status).setDepth(970);
+        this.statusBadges.set(itemId, { container, status });
+        record = this.statusBadges.get(itemId);
         container.setScale(0);
         this.tweens.add({ targets: container, scale: 1, duration: 220, ease: "Back.out(2.4)" });
+        // The satisfying "settle" moment: item just became fully satisfied.
+        if (status === "settled" && (wasViolated || !record.settledOnce)) {
+          record.settledOnce = true;
+          this.playSettleEffect(sprite);
+        }
       }
       const b = sprite.getBounds();
       record.container.setPosition(b.right - 6, b.top + 8);
     }
 
-    // Remove badges for items no longer placed.
-    for (const [itemId, record] of this.moodBadges) {
+    for (const [itemId, record] of this.statusBadges) {
       if (!seen.has(itemId)) {
         record.container.destroy();
-        this.moodBadges.delete(itemId);
+        this.statusBadges.delete(itemId);
       }
     }
+  }
+
+  // A brief, gentle "click into place" flourish when an item settles — a soft
+  // green ring pulse and a tiny bounce. Deliberately quiet (this is a calming
+  // moment, not a fireworks moment) so repeated settles never become noisy.
+  playSettleEffect(sprite) {
+    const ring = this.add.circle(sprite.x, sprite.y - 10, 22, 0x67edb8, 0.16).setDepth(948);
+    ring.setStrokeStyle(3, 0x67edb8, 0.7);
+    this.tweens.add({ targets: ring, alpha: 0, scale: 1.7, duration: 460, ease: "Sine.out", onComplete: () => ring.destroy() });
+    const base = sprite.scale;
+    this.tweens.add({ targets: sprite, scale: base * 1.08, duration: 110, yoyo: true, ease: "Sine.inOut", onComplete: () => sprite.setScale(base) });
+    // Hide any lingering wish bubble for this item — its wish is fulfilled.
+    if (this.wishBubble && this.dragItem !== sprite) this.hideWishBubble();
   }
 
   playCompletionPolish(stars = 1) {
@@ -2570,10 +2579,11 @@ export class StorageScene extends Phaser.Scene {
       placed: validation.packed,
       total: validation.total,
       harmonyScore: validation.totalScore,
-      happyCount: validation.happyCount,
-      happyGoal: validation.happyGoal,
+      // Constraint model: settled = fully satisfied constrained items.
+      settledCount: validation.settledCount,
+      constrainedTotal: validation.constrainedTotal,
     });
-    this.updateMoodBadges(validation.moods || {});
+    this.updateStatusBadges(validation.itemStatus || {});
     this.events.emit("hud", { placed: validation.packed, total: validation.total });
     for (const [itemId, entry] of Object.entries(state.items)) {
       const sprite = this.sprites.get(itemId);
@@ -2587,9 +2597,9 @@ export class StorageScene extends Phaser.Scene {
     }
     this.sortItems();
     this.updateRemainingSpotlight(validation);
-    // If all items placed but target not met, tell the player
-    if (validation.allPlaced && !validation.goalMet && !validation.complete && !this.winSent) {
-      this.setToastMessage(this.i18n.ui.happyRearrange(validation.happyCount || 0, validation.happyGoal || 0));
+    // If all items placed but some constraints unmet, nudge the player.
+    if (validation.allPlaced && !validation.allSettled && !validation.complete && !this.winSent) {
+      this.setToastMessage(this.i18n.ui.constraintRearrange(validation.settledCount || 0, validation.constrainedTotal || 0));
     }
     if (validation.complete && !this.winSent) {
       this.clearRemainingSpotlight();

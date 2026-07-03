@@ -89,8 +89,14 @@ export function FridgePhaserGame() {
   }, [locale]);
 
   function buildUiState(nextLevel = level, nextProgress = progress) {
-    const movableTotal = nextLevel.items.filter((item) => !item.fixed).length;
-    const happyGoal = nextLevel.harmony?.happyGoal ?? Math.max(2, Math.round(movableTotal * 0.6));
+    const movable = nextLevel.items.filter((item) => !item.fixed);
+    const movableTotal = movable.length;
+    // Count "picky" items — those with hard rules the player must satisfy.
+    const hasRule = (it) => {
+      const p = it.prefs || {};
+      return !!(p.needsCold || p.zone || p.likesNeighbors?.length || p.hatesNeighbors?.length || p.likesVisible);
+    };
+    const pickyTotal = movable.filter(hasRule).length;
     return {
       locale,
       phase: nextLevel.phase || 1,
@@ -99,7 +105,7 @@ export function FridgePhaserGame() {
       total: movableTotal,
       title: nextLevel.theme.title,
       subtitle: nextLevel.theme.subtitle,
-      goal: i18n.ui.happyGoalText(happyGoal, movableTotal),
+      goal: pickyTotal > 0 ? i18n.ui.constraintGoalText(pickyTotal) : i18n.ui.goalDefault,
       toast: nextLevel.copy?.intro || i18n.ui.dragHint,
       currentIndex,
       unlockedCount,

@@ -238,6 +238,120 @@ export class StorageEngine {
     return { score: clamped, mood, reasons };
   }
 
+  // ---- CONSTRAINT MODEL (prototype) --------------------------------------
+  // Turns an item's soft prefs into DISCRETE, binary rules. Each rule is either
+  // satisfied or violated — no 0-100 fuzziness. This is what makes the puzzle
+  // feel deductive (you can *reason* the answer) instead of a slider you keep
+  // nudging. An item with prefs but no hard rules is "easygoing" (place anywhere).
+  itemConstraints(item) {
+    const prefs = item?.prefs || {};
+    const list = [];
+    const coldZone = prefs.zone ? this._COLD_ZONES.has(prefs.zone) : false;
+    // Temperature is a hard "WHERE" rule.
+    if (prefs.needsCold) list.push({ type: "cold" });
+    // Zone is hard too — but it yields to temperature when they contradict
+    // (a cold item belongs in a cold zone, even if its "nice-to-have" zone is warm).
+    if (prefs.zone && (!prefs.needsCold || coldZone)) list.push({ type: "zone", zone: prefs.zone });
+    // Exclusion ("don't sit next to X") is a hard rule.
+    if (prefs.hatesNeighbors?.length) list.push({ type: "hates", keys: prefs.hatesNeighbors });
+    // Visibility is hard, but only when it doesn't fight the cold requirement.
+    if (prefs.likesVisible && !prefs.needsCold) list.push({ type: "visible" });
+    // NOTE: likesNeighbors (adjacency) is intentionally NOT a hard constraint.
+    // Positioning items next to each other is the high-effort, fiddly part; making
+    // it a win gate is what caused fatigue AND over-constrained levels into being
+    // unsolvable. It stays a SOFT bonus that feeds happiness/stars, not the gate.
+    return list;
+  }
+
+  hasConstraints(item) {
+    return this.itemConstraints(item).length > 0;
+  }
+
+  // Compute the set of adjacent neighbor item-ids for a placement, using the
+  // exact same adjacency rule as scorePlacement so results stay consistent.
+  neighborIdsFor(itemId, placement, candidate = this.state) {
+    const slot = this.slotById(placement.slotId);
+    if (!slot) return new Set();
+    const occupancy = this.buildOccupancy(candidate, itemId);
+    const { w, h } = this.itemSize(itemId);
+    const ids = new Set();
+    for (let dc = -1; dc <= w; dc += 1) {
+      for (let dr = -1; dr <= h; dr += 1) {
+        const nc = placement.col + dc;
+        const nr = placement.row + dr;
+        if (nc >= placement.col && nc < placement.col + w && nr >= placement.row && nr < placement.row + h) continue;
+        const nid = occupancy.get(`${slot.id}:${placement.layer || 0}:${nc}:${nr}`);
+        if (nid) ids.add(nid);
+      }
+    }
+    return ids;
+  }
+
+  // Evaluate every hard constraint for an item at a placement. Returns discrete
+  // per-rule results plus allSatisfied (used for "settling"/locking).
+  evaluateConstraints(itemId, placement, candidate = this.state) {
+    const item = this.itemDef(itemId);
+    const slot = this.slotById(placement?.slotId);
+    const constraints = this.itemConstraints(item);
+    if (!item || !slot || !constraints.length) {
+      return { constraints: [], results: [], allSatisfied: true, easygoing: !constraints.length };
+    }
+
+    const neighborKeys = new Set();
+    for (const nid of this.neighborIdsFor(itemId, placement, candidate)) {
+      neighborKeys.add(this.itemDef(nid)?.image || nid);
+    }
+
+    const results = constraints.map((c) => {
+      let satisfied = false;
+      if (c.type === "cold") satisfied = this._COLD_ZONES.has(slot.zone);
+      else if (c.type === "zone") satisfied = slot.zone === c.zone;
+      else if (c.type === "visible") satisfied = slot.zone === "shelf" || slot.zone === "door";
+      else if (c.type === "likes") satisfied = c.keys.some((k) => neighborKeys.has(k));
+      else if (c.type === "hates") satisfied = !c.keys.some((k) => neighborKeys.has(k));
+      return { ...c, satisfied };
+    });
+
+    return {
+      constraints,
+      results,
+      allSatisfied: results.every((r) => r.satisfied),
+      easygoing: false,
+    };
+  }
+
+  // Whole-board constraint report: per-item status and settled counts.
+  // status: "pending" (not placed) | "violated" | "settled".
+  constraintReport(candidate = this.state) {
+    const movable = this.movableItems();
+    const itemStatus = {};
+    let settledCount = 0;
+    let constrainedTotal = 0; // items that actually have hard rules
+
+    for (const item of movable) {
+      const hasRules = this.hasConstraints(item);
+      if (hasRules) constrainedTotal += 1;
+      const entry = candidate.items[item.id];
+      if (!entry || entry.status !== "packed") {
+        itemStatus[item.id] = { status: "pending", easygoing: !hasRules, results: [] };
+        continue;
+      }
+      const evalc = this.evaluateConstraints(item.id, entry, candidate);
+      // Placement legality also matters (no overlap/overflow).
+      const legal = this.evaluatePlacement(item.id, entry, candidate).valid;
+      const settled = legal && evalc.allSatisfied;
+      if (settled && hasRules) settledCount += 1;
+      itemStatus[item.id] = {
+        status: settled ? "settled" : "violated",
+        easygoing: !hasRules,
+        results: evalc.results,
+        legal,
+      };
+    }
+
+    return { itemStatus, settledCount, constrainedTotal, total: movable.length };
+  }
+
   // ---- Chain Reaction: placed item triggers neighbor happiness cascade ----
   computeChainReaction(itemId, placement, candidate = this.state) {
     const chain = []; // [{ itemId, level, bonus }]
@@ -897,8 +1011,15 @@ export class StorageEngine {
     const happyTotal = movable.length;
     const happyGoal = this.happyGoalFor(happyTotal);
     const goalMet = happyCount >= happyGoal;
-    // Complete = everything placed legally AND enough items are happy.
-    const complete = allPlaced && validPlacement && goalMet;
+
+    // CONSTRAINT MODEL (prototype): the real win condition. Every item with hard
+    // rules must have ALL of them satisfied. Easygoing items don't gate the win.
+    const report = this.constraintReport(candidate);
+    const allSettled = report.constrainedTotal > 0
+      ? report.settledCount >= report.constrainedTotal
+      : goalMet; // fall back to happiness if a level defines no hard rules
+    // Complete = everything placed legally AND every constrained item is settled.
+    const complete = allPlaced && validPlacement && allSettled;
 
     return {
       validPlacement,
@@ -906,19 +1027,24 @@ export class StorageEngine {
       packed: packedMovable.length,
       total: movable.length,
       conflicts,
-      reason: validPlacement ? (allPlaced && !goalMet ? "reject.happy.low" : "") : (illegalReason || "reject.layer.full"),
+      reason: validPlacement ? (allPlaced && !allSettled ? "reject.constraint.unmet" : "") : (illegalReason || "reject.layer.full"),
       harmonyScore: avgScore,
       totalScore,
       scoredCount,
       allPlaced,
-      // Happiness model
+      // Happiness model (legacy, kept for coins/analytics)
       happyCount,
       happyGoal,
       happyTotal,
       moods,
       goalMet,
-      targetMet: goalMet,
+      targetMet: allSettled,
       chainBonus: chainTotal,
+      // Constraint model (prototype)
+      itemStatus: report.itemStatus,
+      settledCount: report.settledCount,
+      constrainedTotal: report.constrainedTotal,
+      allSettled,
     };
   }
 
