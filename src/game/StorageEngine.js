@@ -94,13 +94,28 @@ export class StorageEngine {
     };
   }
 
-  itemSize(itemId) {
+  // itemSize returns the grid footprint. When an item is rotated 90 or 270
+  // degrees (odd rot), width and height swap. rot is 0..3 (each step = 90deg);
+  // only its parity affects the footprint.
+  itemSize(itemId, rot = 0) {
     const item = this.itemDef(itemId);
     const [w = 1, h = 1] = item?.size || [1, 1];
-    return {
-      w: Math.max(1, Math.round(w)),
-      h: Math.max(1, Math.round(h)),
-    };
+    const bw = Math.max(1, Math.round(w));
+    const bh = Math.max(1, Math.round(h));
+    return (Math.round(rot) % 2 !== 0) ? { w: bh, h: bw } : { w: bw, h: bh };
+  }
+
+  // An item is rotatable only if it opts in AND is non-square (rotation changes
+  // its footprint — rotating a 1x1 or 2x2 would be pointless).
+  canRotate(itemId) {
+    const item = this.itemDef(itemId);
+    if (!item?.rotatable) return false;
+    const [w = 1, h = 1] = item.size || [1, 1];
+    return Math.round(w) !== Math.round(h);
+  }
+
+  normalizeRot(rot = 0) {
+    return ((Math.round(rot) % 4) + 4) % 4;
   }
 
   itemPlacementNudge(itemId, placement = null, mode = "packed") {
@@ -200,7 +215,7 @@ export class StorageEngine {
     // 5. Neighbor preferences
     const packedById = this.packedItemsById(candidate);
     const occupancy = this.buildOccupancy(candidate, itemId);
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, placement.rot);
     const neighborIds = new Set();
 
     // Check adjacent cells for neighbors
@@ -273,7 +288,7 @@ export class StorageEngine {
     const slot = this.slotById(placement.slotId);
     if (!slot) return new Set();
     const occupancy = this.buildOccupancy(candidate, itemId);
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, placement.rot);
     const ids = new Set();
     for (let dc = -1; dc <= w; dc += 1) {
       for (let dr = -1; dr <= h; dr += 1) {
@@ -458,7 +473,7 @@ export class StorageEngine {
       if (entry.status !== "packed" || entry.itemId === ignoreItemId) continue;
       const slot = this.slotById(entry.slotId);
       if (!slot) continue;
-      const { w, h } = this.itemSize(entry.itemId);
+      const { w, h } = this.itemSize(entry.itemId, entry.rot);
       for (let row = entry.row; row < entry.row + h; row += 1) {
         for (let col = entry.col; col < entry.col + w; col += 1) {
           occupancy.set(`${slot.id}:${entry.layer || 0}:${col}:${row}`, entry.itemId);
@@ -471,7 +486,7 @@ export class StorageEngine {
   supportSurfaceForPlacement(itemId, placement, candidate = this.state) {
     const slot = this.slotById(placement.slotId);
     if (!slot) return { supported: false, reason: "reject.slot.missing", supportIds: [] };
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, placement.rot);
     const layer = placement.layer ?? 0;
     const baselineY = this.slotBaseline(slot, placement.row ?? 0, h);
     if (layer === 0) {
@@ -524,7 +539,7 @@ export class StorageEngine {
 
   placementAnchor(placement, candidate = this.state) {
     const slot = this.slotById(placement.slotId);
-    const { w, h } = this.itemSize(placement.itemId);
+    const { w, h } = this.itemSize(placement.itemId, placement.rot);
     const support = this.supportSurfaceForPlacement(placement.itemId, placement, candidate);
     const fallbackY = this.slotBaseline(slot, placement.row ?? 0, h);
     const nudge = this.itemPlacementNudge(placement.itemId, placement, "packed");
@@ -546,6 +561,7 @@ export class StorageEngine {
       col: placement.col ?? 0,
       row: placement.row ?? 0,
       layer: placement.layer ?? 0,
+      rot: this.normalizeRot(placement.rot),
       x: anchor.x,
       y: anchor.y,
       depth: anchor.depth,
@@ -565,7 +581,7 @@ export class StorageEngine {
     const harmony = this.scorePlacement(itemId, placement, candidate);
 
     const { cols, rows, stackLayers } = this.slotGrid(slot);
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, placement.rot);
     const col = placement.col ?? 0;
     const row = placement.row ?? 0;
     const layer = placement.layer ?? 0;
@@ -620,10 +636,10 @@ export class StorageEngine {
     return Math.hypot(x - anchor.x, y - anchor.y);
   }
 
-  placementFromPoint(itemId, slot, x, y) {
+  placementFromPoint(itemId, slot, x, y, rot = 0) {
     const { cols, rows, stackLayers } = this.slotGrid(slot);
     const { cellW, cellH } = this.slotCellSize(slot);
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, rot);
     const left = this.slotLeft(slot);
     const top = this.slotTop(slot);
     const localX = x - left;
@@ -636,6 +652,7 @@ export class StorageEngine {
       col: Math.max(0, Math.min(cols - w, rawCol)),
       row: Math.max(0, Math.min(rows - h, rawRow)),
       layer: Math.max(0, Math.min(stackLayers - 1, rawLayer)),
+      rot: this.normalizeRot(rot),
     };
   }
 
@@ -647,7 +664,7 @@ export class StorageEngine {
     return x >= left && x <= right && y >= top && y <= bottom;
   }
 
-  previewMove(itemId, x, y, maxDistance = 96) {
+  previewMove(itemId, x, y, maxDistance = 96, rot = 0) {
     const item = this.itemDef(itemId);
     if (!item) return null;
 
@@ -657,8 +674,8 @@ export class StorageEngine {
     let bestQuickScore = -1;
     for (const slot of this.level.slots) {
       if (!this.pointInsideSlot(slot, x, y, 10)) continue;
-      const { w, h } = this.itemSize(itemId);
-      const snapped = this.placementFromPoint(itemId, slot, x, y);
+      const { w, h } = this.itemSize(itemId, rot);
+      const snapped = this.placementFromPoint(itemId, slot, x, y, rot);
       const evaluation = this.evaluatePlacement(itemId, { slotId: slot.id, ...snapped });
       const harmony = evaluation.score ?? 50;
       // Prefer valid placements; among those, prefer higher scores
@@ -672,6 +689,7 @@ export class StorageEngine {
           col: snapped.col,
           row: snapped.row,
           layer: snapped.layer,
+          rot: snapped.rot,
           x: anchor.x,
           y: anchor.y,
           width: w,
@@ -693,13 +711,13 @@ export class StorageEngine {
     const candidates = [];
     for (const slot of this.level.slots) {
       const { cols, rows, stackLayers } = this.slotGrid(slot);
-      const { w, h } = this.itemSize(itemId);
+      const { w, h } = this.itemSize(itemId, rot);
       const maxCol = cols - w;
       const maxRow = rows - h;
       if (maxCol < 0 || maxRow < 0) continue;
 
       if (this.pointInsideSlot(slot, x, y, 10)) {
-        const snapped = this.placementFromPoint(itemId, slot, x, y);
+        const snapped = this.placementFromPoint(itemId, slot, x, y, rot);
         const evaluation = this.evaluatePlacement(itemId, { slotId: slot.id, ...snapped });
         const anchor = this.placementAnchor({ slotId: slot.id, ...snapped, itemId });
         candidates.push({
@@ -708,6 +726,7 @@ export class StorageEngine {
           col: snapped.col,
           row: snapped.row,
           layer: snapped.layer,
+          rot: snapped.rot,
           x: anchor.x,
           y: anchor.y,
           width: w,
@@ -727,7 +746,7 @@ export class StorageEngine {
       for (let layer = 0; layer < stackLayers; layer += 1) {
         for (let row = 0; row <= maxRow; row += 1) {
           for (let col = 0; col <= maxCol; col += 1) {
-            const placement = { slotId: slot.id, col, row, layer };
+            const placement = { slotId: slot.id, col, row, layer, rot };
             const distance = this.placementDistance(itemId, placement, x, y);
             if (distance > maxDistance) continue;
             const evaluation = this.evaluatePlacement(itemId, placement);
@@ -738,6 +757,7 @@ export class StorageEngine {
               col,
               row,
               layer,
+              rot: this.normalizeRot(rot),
               x: anchor.x,
               y: anchor.y,
               width: w,
@@ -784,42 +804,48 @@ export class StorageEngine {
     let best = null;
     let bestScore = -1;
 
-    for (const slot of this.level.slots) {
-      const { cols, rows, stackLayers } = this.slotGrid(slot);
-      const { w, h } = this.itemSize(itemId);
-      const maxCol = cols - w;
-      const maxRow = rows - h;
-      if (maxCol < 0 || maxRow < 0) continue;
+    // Try each allowed orientation (both 0 and 90deg for rotatable items).
+    const rotations = this.canRotate(itemId) ? [0, 1] : [0];
 
-      for (let layer = 0; layer < stackLayers; layer += 1) {
-        for (let row = 0; row <= maxRow; row += 1) {
-          for (let col = 0; col <= maxCol; col += 1) {
-            const placement = { slotId: slot.id, col, row, layer };
-            const evaluation = this.evaluatePlacement(itemId, placement, candidate);
-            if (!evaluation.valid) continue;
-            const score = evaluation.score ?? 0;
-            if (score > bestScore) {
-              bestScore = score;
-              const anchor = this.placementAnchor({ ...placement, itemId }, candidate);
-              best = {
-                itemId,
-                slotId: slot.id,
-                zoneId: slot.zone,
-                col,
-                row,
-                layer,
-                x: anchor.x,
-                y: anchor.y,
-                width: w,
-                height: h,
-                valid: true,
-                reason: "",
-                conflicts: [],
-                support: evaluation.support || anchor.support,
-                score,
-                mood: evaluation.mood,
-                inside: true,
-              };
+    for (const rot of rotations) {
+      for (const slot of this.level.slots) {
+        const { cols, rows, stackLayers } = this.slotGrid(slot);
+        const { w, h } = this.itemSize(itemId, rot);
+        const maxCol = cols - w;
+        const maxRow = rows - h;
+        if (maxCol < 0 || maxRow < 0) continue;
+
+        for (let layer = 0; layer < stackLayers; layer += 1) {
+          for (let row = 0; row <= maxRow; row += 1) {
+            for (let col = 0; col <= maxCol; col += 1) {
+              const placement = { slotId: slot.id, col, row, layer, rot };
+              const evaluation = this.evaluatePlacement(itemId, placement, candidate);
+              if (!evaluation.valid) continue;
+              const score = evaluation.score ?? 0;
+              if (score > bestScore) {
+                bestScore = score;
+                const anchor = this.placementAnchor({ ...placement, itemId }, candidate);
+                best = {
+                  itemId,
+                  slotId: slot.id,
+                  zoneId: slot.zone,
+                  col,
+                  row,
+                  layer,
+                  rot: this.normalizeRot(rot),
+                  x: anchor.x,
+                  y: anchor.y,
+                  width: w,
+                  height: h,
+                  valid: true,
+                  reason: "",
+                  conflicts: [],
+                  support: evaluation.support || anchor.support,
+                  score,
+                  mood: evaluation.mood,
+                  inside: true,
+                };
+              }
             }
           }
         }
@@ -1015,9 +1041,13 @@ export class StorageEngine {
     // CONSTRAINT MODEL (prototype): the real win condition. Every item with hard
     // rules must have ALL of them satisfied. Easygoing items don't gate the win.
     const report = this.constraintReport(candidate);
-    const allSettled = report.constrainedTotal > 0
-      ? report.settledCount >= report.constrainedTotal
-      : goalMet; // fall back to happiness if a level defines no hard rules
+    // PACKING MODE: pure spatial puzzle — fitting everything in legally IS the win,
+    // no zone/happiness requirement (used by the picnic-basket prototype).
+    const allSettled = this.level.winMode === "packing"
+      ? true
+      : (report.constrainedTotal > 0
+        ? report.settledCount >= report.constrainedTotal
+        : goalMet); // fall back to happiness if a level defines no hard rules
     // Complete = everything placed legally AND every constrained item is settled.
     const complete = allPlaced && validPlacement && allSettled;
 
