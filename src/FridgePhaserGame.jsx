@@ -357,7 +357,7 @@ export function FridgePhaserGame() {
           setHud({ placed: validation.packed, total: validation.total });
         }
         scene.updateChrome?.(buildUiState(level));
-        if (theme !== "makeup") scene.applySkin?.(skinById(metaRef.current.shop.equipped).background);
+        if (theme !== "makeup") scene.applySkin?.(skinById(metaRef.current.shop.equipped));
         hasMountedOnceRef.current = true;
         setBooting(false);
         if (editMode) {
@@ -466,7 +466,7 @@ export function FridgePhaserGame() {
 
   useEffect(() => {
     if (theme === "makeup") return;
-    sceneRef.current?.applySkin?.(skinById(meta.shop.equipped).background);
+    sceneRef.current?.applySkin?.(skinById(meta.shop.equipped));
   }, [meta.shop.equipped, theme]);
 
   function changeLocale(nextLocale, event) {

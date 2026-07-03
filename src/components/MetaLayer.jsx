@@ -128,8 +128,13 @@ function ShopPanel({ ui, locale, meta, coins, onBuy, onEquip, onClose }) {
             const affordable = coins >= skin.price;
             return (
               <div key={skin.id} className={`meta-skin${equipped ? " equipped" : ""}`}>
-                <div className="meta-skin-swatch" style={{ background: skin.background }}>
-                  <span className="meta-skin-dot" style={{ background: skin.swatch }} />
+                <div
+                  className="meta-skin-swatch"
+                  style={skin.pattern
+                    ? { backgroundColor: skin.background, backgroundImage: `url(${skin.pattern})`, backgroundSize: "cover", backgroundPosition: "center" }
+                    : { background: skin.background }}
+                >
+                  {!skin.pattern && <span className="meta-skin-dot" style={{ background: skin.swatch }} />}
                 </div>
                 <strong>{names[skin.id] || skin.id}</strong>
                 {equipped ? (

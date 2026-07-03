@@ -8,6 +8,12 @@ const PREVIEW_COLORS = {
   good: { fill: 0x67edb8, line: 0xeafff7, fillAlpha: 0.12, lineAlpha: 0.88, lineWidth: 3 },
   bad: { fill: 0xff7d62, line: 0xffefe7, fillAlpha: 0.14, lineAlpha: 0.82, lineWidth: 3 },
 };
+// Inner-wall regions where the shop skin "liner" wallpaper is tiled. Tuned to
+// the realistic fridge board: the main cabinet (shelves/drawers) and the door.
+const SKIN_LINER_REGIONS = [
+  { x: 150, y: 372, w: 342, h: 620 }, // main cabinet back wall
+  { x: 528, y: 360, w: 176, h: 680 }, // door shelf column
+];
 const ITEM_PLACEHOLDER_COLORS = {
   milk: 0xf5f8ff,
   eggs: 0xfff6dd,
@@ -269,10 +275,50 @@ export class StorageScene extends Phaser.Scene {
     this.teardownOnboarding();
   }
 
-  applySkin(background) {
-    if (!background) return;
-    this.skinBackground = background;
-    this.cameras?.main?.setBackgroundColor(background);
+  applySkin(skin) {
+    // Back-compat: a bare color string still just recolors the camera.
+    const background = typeof skin === "string" ? skin : skin?.background;
+    const pattern = typeof skin === "string" ? null : skin?.pattern;
+    if (background) {
+      this.skinBackground = background;
+      this.cameras?.main?.setBackgroundColor(background);
+    }
+    this.applySkinPattern(pattern, background);
+  }
+
+  applySkinPattern(patternUrl) {
+    // Decorative "liner" wallpaper drawn on the fridge's inner walls: above the
+    // realistic back board (depth 0) but below shelves/items (depth 100). MULTIPLY
+    // blend lets the board's baked shading show through so it reads as one surface.
+    const clearLiners = () => {
+      if (this.skinLiners) for (const img of this.skinLiners) img.destroy();
+      this.skinLiners = [];
+    };
+    const place = (key) => {
+      clearLiners();
+      this.skinLiners = SKIN_LINER_REGIONS.map((r) => {
+        const img = this.add.image(r.x + r.w / 2, r.y + r.h / 2, key)
+          .setDisplaySize(r.w, r.h)
+          .setDepth(1)
+          .setAlpha(0.5)
+          .setBlendMode(Phaser.BlendModes.MULTIPLY);
+        return img;
+      });
+    };
+    if (!patternUrl) {
+      clearLiners();
+      return;
+    }
+    const key = `skin:${patternUrl}`;
+    if (this.textures.exists(key)) {
+      place(key);
+      return;
+    }
+    this.load.image(key, patternUrl);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      if (this.textures.exists(key)) place(key);
+    });
+    this.load.start();
   }
 
   teardownOnboarding() {

@@ -73,13 +73,15 @@ export const CATALOG_TEXT = {
 
 // ---- Fridge skins (shop) ----------------------------------------------------
 // Each skin recolors the scene background. `price` 0 == owned by default.
+const SKIN_BASE = `${import.meta.env.BASE_URL}assets/skins/`;
+
 export const FRIDGE_SKINS = [
-  { id: "cream", price: 0, background: "#ffecc8", swatch: "#ffecc8" },
-  { id: "mint", price: 150, background: "#dff3ea", swatch: "#8fe0c2" },
-  { id: "sky", price: 250, background: "#e2eefb", swatch: "#8fc0f0" },
-  { id: "peach", price: 350, background: "#ffe6df", swatch: "#ffb59e" },
-  { id: "lavender", price: 500, background: "#ece4fb", swatch: "#c3aef0" },
-  { id: "midnight", price: 800, background: "#dfe4f0", swatch: "#5b6b8c" },
+  { id: "cream", price: 0, background: "#ffecc8", swatch: "#ffecc8", pattern: `${SKIN_BASE}cream.png` },
+  { id: "mint", price: 150, background: "#dff3ea", swatch: "#8fe0c2", pattern: `${SKIN_BASE}mint.png` },
+  { id: "sky", price: 250, background: "#e2eefb", swatch: "#8fc0f0", pattern: `${SKIN_BASE}sky.png` },
+  { id: "peach", price: 350, background: "#ffe6df", swatch: "#ffb59e", pattern: `${SKIN_BASE}peach.png` },
+  { id: "lavender", price: 500, background: "#ece4fb", swatch: "#c3aef0", pattern: `${SKIN_BASE}lavender.png` },
+  { id: "midnight", price: 800, background: "#dfe4f0", swatch: "#5b6b8c", pattern: `${SKIN_BASE}midnight.png` },
 ];
 
 export const SKIN_TEXT = {
