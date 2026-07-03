@@ -261,16 +261,21 @@ function buildFridgeLevel({
 }
 
 function buildPicnicLevel() {
+  // 4x4 grid = 16 cells. Footprints total exactly 16, so it's a perfect-fill
+  // puzzle that requires rotating the long items to interlock:
+  // watermelon 2x2(4) + baguette 3x1(3) + baguette 3x1(3) + bottle 2x1(2)
+  // + cheese 2x1(2) + sandwich 1x1(1) + jam 1x1(1) = 16.
   const trayItems = [
     { key: "packWatermelon" },
-    { key: "packBaguette" },
+    { key: "packBaguette", id: "packBaguette_a" },
+    { key: "packBaguette", id: "packBaguette_b" },
     { key: "packBottle" },
     { key: "packCheese" },
     { key: "packSandwich" },
     { key: "packJam" },
   ];
   const row1 = [148, 300, 452, 604];
-  const row2 = [224, 376, 528];
+  const row2 = [186, 338, 490, 642];
   return {
     id: "picnic-pack-1",
     revision: 1,
