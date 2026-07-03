@@ -352,6 +352,11 @@ export function FridgePhaserGame() {
           soundRef.current?.miss();
           setMessage(event.message);
         });
+        // Packing-mode tactile feedback
+        scene.events.on("pickup", () => soundRef.current?.pickup?.());
+        scene.events.on("rotate", () => soundRef.current?.rotate?.());
+        scene.events.on("blocked", () => soundRef.current?.blocked?.());
+        scene.events.on("lock", () => soundRef.current?.lock?.());
         scene.events.on("callout", (type) => {
           if (type === "fanfare") {
             soundRef.current?.fanfare();

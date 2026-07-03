@@ -1597,7 +1597,9 @@ export class StorageScene extends Phaser.Scene {
       const placement = { slotId: home.slotId, col: home.col, row: home.row, layer: home.layer, rot: nextRot };
       const evalr = this.engine.evaluatePlacement(item.id, placement);
       if (!evalr.valid) {
-        this.tweens.add({ targets: sprite, angle: sprite.angle + 8, duration: 70, yoyo: true, ease: "Sine.inOut" });
+        // Blocked: quick wobble + soft "nope" so the player feels the wall.
+        this.tweens.add({ targets: sprite, angle: sprite.angle + 8, duration: 70, yoyo: true, repeat: 1, ease: "Sine.inOut" });
+        this.events.emit("blocked");
         this.setToastMessage(this.i18n.ui.rotateNoFit || "No room to rotate");
         return;
       }
@@ -1605,15 +1607,63 @@ export class StorageScene extends Phaser.Scene {
       if (result.ok) {
         const entry = result.state.items[item.id];
         sprite.setData("home", entry);
-        this.tweens.add({ targets: sprite, angle: this.topDownAngle(entry), duration: 150, ease: "Back.out(1.6)" });
+        this.spinTo(sprite, this.topDownAngle(entry), item, entry);
+        this.events.emit("rotate");
         this.renderState(result.state, this.engine.validate());
       }
     } else {
       // Tray item: remember pending rotation and spin visually.
       const entry = { ...(home || {}), rot: nextRot };
       sprite.setData("home", entry);
-      this.tweens.add({ targets: sprite, angle: this.topDownAngle(entry), duration: 150, ease: "Back.out(1.6)" });
+      this.spinTo(sprite, this.topDownAngle(entry), item, entry);
+      this.events.emit("rotate");
     }
+  }
+
+  // Bright pop-and-fade over the exact cells an item just filled, so a placement
+  // reads as "clicked into the grid". Reuses placementRect for pixel-perfect fit.
+  flashPlacedCells(entry, itemId) {
+    if (!entry?.slotId) return;
+    const size = this.engine.itemSize(itemId, entry.rot || 0);
+    const rect = this.placementRect({
+      slotId: entry.slotId,
+      col: entry.col || 0,
+      row: entry.row || 0,
+      width: size.w,
+      height: size.h,
+    });
+    if (!rect) return;
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    const g = this.add.graphics().setDepth(970);
+    g.fillStyle(0xffffff, 0.5);
+    g.lineStyle(4, 0xffffff, 0.9);
+    g.fillRoundedRect(-rect.w / 2, -rect.h / 2, rect.w, rect.h, rect.r);
+    g.strokeRoundedRect(-rect.w / 2, -rect.h / 2, rect.w, rect.h, rect.r);
+    g.setPosition(cx, cy).setScale(1.14);
+    this.tweens.add({
+      targets: g,
+      scale: 1,
+      alpha: 0,
+      duration: 340,
+      ease: "Quad.out",
+      onComplete: () => g.destroy(),
+    });
+  }
+
+  // Snappy 90-degree spin with a little squash-pop so rotation feels punchy.
+  spinTo(sprite, angle, item, entry) {
+    const base = this.displayScaleFor(item, entry);
+    this.tweens.add({ targets: sprite, angle, duration: 170, ease: "Back.out(2)" });
+    this.tweens.add({
+      targets: sprite,
+      scaleX: base * 1.12,
+      scaleY: base * 0.9,
+      duration: 85,
+      ease: "Sine.out",
+      yoyo: true,
+      onComplete: () => sprite.setScale(base),
+    });
   }
 
   onDragStart(obj) {
@@ -1627,7 +1677,8 @@ export class StorageScene extends Phaser.Scene {
     // Carry the current orientation into the drag so rotation persists.
     this.dragRot = this.topDown ? (obj.getData("home")?.rot || 0) : 0;
     if (this.topDown) obj.setAngle(this.topDownAngle({ rot: this.dragRot }));
-    this.tweens.add({ targets: obj, scale: obj.scale * 1.06, duration: 90, ease: "Sine.out" });
+    this.tweens.add({ targets: obj, scale: obj.scale * (this.topDown ? 1.1 : 1.06), duration: 90, ease: "Sine.out" });
+    if (this.topDown) this.events.emit("pickup");
     const item = obj.getData("item");
     if (item && !this.topDown) this.showWishBubble(obj, item);
   }
@@ -1686,6 +1737,12 @@ export class StorageScene extends Phaser.Scene {
     // Show mood animation
     const mood = result.mood || "ok";
     this.showItemMood(display.x, display.y, mood, score);
+
+    // Packing "clicked into place" feel: flash the exact grid cells + a thunk.
+    if (this.topDown) {
+      this.flashPlacedCells(entry, item.id);
+      this.events.emit("lock");
+    }
 
     this.playPlacementPulse(preview.slotId, display.x, display.y, score >= 70 ? this.comboCount : 0);
     this.tweens.add({
