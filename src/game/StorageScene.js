@@ -2292,33 +2292,58 @@ export class StorageScene extends Phaser.Scene {
       });
     });
 
-    // Celebration particles for 3-star
-    if (stars >= 3) {
-      this.time.delayedCall(800, () => {
-        for (let i = 0; i < 14; i += 1) {
-          const confetti = this.add.circle(
-            200 + Math.random() * 350,
-            180 + Math.random() * 60,
-            3 + Math.random() * 4,
-            [0xffd166, 0xff6b6b, 0x67edb8, 0x89c4ff, 0xffb347][Math.floor(Math.random() * 5)],
-            0.9,
-          ).setDepth(562);
-          this.tweens.add({
-            targets: confetti,
-            y: confetti.y + 200 + Math.random() * 300,
-            x: confetti.x + (Math.random() - 0.5) * 260,
-            alpha: 0,
-            angle: Math.random() * 720,
-            duration: 900 + Math.random() * 600,
-            delay: Math.random() * 200,
-            ease: "Sine.in",
-            onComplete: () => confetti.destroy(),
-          });
-        }
-      });
-    }
+    // Every win deserves a burst — intensity scales with stars so 1-star still
+    // feels celebratory and 3-star feels spectacular.
+    this.time.delayedCall(650, () => this.burstConfetti(stars));
 
     this.setToastMessage(stars >= 3 ? this.i18n.ui.successPerfect : this.i18n.ui.successTag);
+  }
+
+  // Confetti + streamer burst for level completion. Count/spread scale with stars.
+  burstConfetti(stars = 1) {
+    const palette = [0xffd166, 0xff6b6b, 0x67edb8, 0x89c4ff, 0xffb347, 0xff8fc7];
+    const count = 22 + stars * 16;
+    const layer = this.add.layer().setDepth(562);
+    // Two side cannons firing toward the center-top, plus a light top sprinkle.
+    const cannons = [
+      { x: 90, y: 470, vx: 1, spread: 0.5 },
+      { x: 660, y: 470, vx: -1, spread: 0.5 },
+    ];
+    for (let i = 0; i < count; i += 1) {
+      const cannon = cannons[i % cannons.length];
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      const isStrip = Math.random() > 0.45;
+      const startX = cannon.x + (Math.random() - 0.5) * 40;
+      const startY = cannon.y + (Math.random() - 0.5) * 40;
+      const piece = isStrip
+        ? this.add.rectangle(startX, startY, 6 + Math.random() * 5, 12 + Math.random() * 8, color, 0.95)
+        : this.add.circle(startX, startY, 3 + Math.random() * 4, color, 0.95);
+      layer.add(piece);
+      const launchX = cannon.vx * (160 + Math.random() * 260);
+      const apex = 220 + Math.random() * 160;
+      // Arc up-and-out, then fall with gravity-like ease and fade.
+      this.tweens.add({
+        targets: piece,
+        x: startX + launchX,
+        y: startY - apex,
+        angle: (Math.random() - 0.5) * 540,
+        duration: 480 + Math.random() * 220,
+        ease: "Quad.easeOut",
+        onComplete: () => {
+          this.tweens.add({
+            targets: piece,
+            y: startY - apex + 520 + Math.random() * 220,
+            x: piece.x + (Math.random() - 0.5) * 120,
+            angle: piece.angle + (Math.random() - 0.5) * 540,
+            alpha: 0,
+            duration: 900 + Math.random() * 500,
+            ease: "Quad.easeIn",
+            onComplete: () => piece.destroy(),
+          });
+        },
+      });
+    }
+    this.time.delayedCall(2600, () => layer.destroy());
   }
 
   renderState(state, validation) {
