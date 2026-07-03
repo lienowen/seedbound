@@ -644,8 +644,12 @@ export class StorageEngine {
     const top = this.slotTop(slot);
     const localX = x - left;
     const localY = y - top;
-    const rawCol = Math.floor(localX / cellW);
-    const rawRow = Math.floor(localY / cellH);
+    // The pointer tracks the item's CENTER, so map the center to the top-left
+    // cell of a w x h footprint (subtract half the footprint). For 1x1 items
+    // this is identical to the old floor() behavior; for multi-cell items it
+    // fixes an off-by-a-cell drift where pieces landed right/below the target.
+    const rawCol = Math.round(localX / cellW - w / 2);
+    const rawRow = Math.round(localY / cellH - h / 2);
     const layerBand = slot.h / stackLayers;
     const rawLayer = stackLayers - 1 - Math.floor(localY / layerBand);
     return {
