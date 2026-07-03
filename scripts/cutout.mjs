@@ -4,12 +4,7 @@ import { PNG } from "pngjs";
 // Flood-fill the edge-connected near-white background to transparent, leaving
 // interior light areas intact. Adds a soft 1px alpha feather at the boundary.
 const files = [
-  "pack-watermelon",
-  "pack-baguette",
-  "pack-bottle",
-  "pack-cheese",
-  "pack-sandwich",
-  "pack-jam",
+  "suitcase-open",
 ];
 
 const DIR = "public/assets/tidy/";

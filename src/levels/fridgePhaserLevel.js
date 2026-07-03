@@ -43,38 +43,16 @@ const FRIDGE_ASSETS = {
   front: { key: "fridge-door-front", file: "fridge-door-front.webp", depth: 430 },
 };
 
-// ---- PACKING PROTOTYPE: top-down picnic basket ------------------------------
-// A single large 4x4 grid inside a square basket illustration. The basket art
-// is drawn with `contain` so it keeps its square aspect instead of being
-// stretched to the tall portrait stage.
-const PICNIC_ASSETS = {
-  back: { key: "picnic-basket", file: "picnic-basket.png", contain: true, size: 700, y: 628 },
-};
-
-const PICNIC_STAGE = {
+// ---- TOP-DOWN PACKING LEVELS -----------------------------------------------
+// Generic packing mode: fit differently shaped items into a single grid inside
+// a container illustration (picnic basket, suitcase, ...). The container art is
+// drawn with `contain` so it keeps its aspect instead of stretching to the
+// portrait stage. Rotatable long items force spatial planning.
+const PACK_STAGE = {
   width: 750,
   height: 1334,
   shapes: [],
 };
-
-// One big grid slot centered on the basket interior. 4 cols x 4 rows of
-// 124px cells => 496x496, sitting inside the woven rim.
-const PICNIC_SLOTS = [
-  {
-    id: "basket",
-    zone: "basket",
-    allow: ["pack"],
-    x: 375,
-    y: 628,
-    w: 496,
-    h: 496,
-    cols: 4,
-    rows: 4,
-    stackLayers: 1,
-    baseline: 0.5,
-    depth: 120,
-  },
-];
 
 function renderProfile(key) {
   return ITEM_RENDER_PROFILES[key] || {
@@ -166,6 +144,14 @@ const ITEM_LIBRARY = {
   packCheese: { image: "pack-cheese", file: "pack-cheese.png", name: "Queijo", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
   packSandwich: { image: "pack-sandwich", file: "pack-sandwich.png", name: "Sanduiche", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
   packJam: { image: "pack-jam", file: "pack-jam.png", name: "Geleia", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+
+  // ---- SUITCASE PACKING ITEMS (travel theme, wide grid) ----
+  packClothes: { image: "pack-clothes", file: "pack-clothes.png", name: "Roupas", tags: ["pack"], size: [2, 2], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packTowel: { image: "pack-towel", file: "pack-towel.png", name: "Toalha", tags: ["pack"], size: [3, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packShoes: { image: "pack-shoes", file: "pack-shoes.png", name: "Tenis", tags: ["pack"], size: [2, 2], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packToiletry: { image: "pack-toiletry", file: "pack-toiletry.png", name: "Necessaire", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packCamera: { image: "pack-camera", file: "pack-camera.png", name: "Camera", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packSunglasses: { image: "pack-sunglasses", file: "pack-sunglasses.png", name: "Oculos", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
 };
 
 const TRAY_POSITIONS = [
@@ -260,12 +246,91 @@ function buildFridgeLevel({
   };
 }
 
-function buildPicnicLevel() {
-  // 4x4 grid = 16 cells. Footprints total exactly 16, so it's a perfect-fill
-  // puzzle that requires rotating the long items to interlock:
-  // watermelon 2x2(4) + baguette 3x1(3) + baguette 3x1(3) + bottle 2x1(2)
-  // + cheese 2x1(2) + sandwich 1x1(1) + jam 1x1(1) = 16.
-  const trayItems = [
+// Auto-arrange loose tray items in centered rows below the container.
+function packTrayLayout(count, { y = 1060, rowGap = 116, perRow = 4, spanX = [150, 600] } = {}) {
+  const positions = [];
+  const rows = Math.ceil(count / perRow);
+  for (let r = 0; r < rows; r++) {
+    const inRow = Math.min(perRow, count - r * perRow);
+    const [x0, x1] = spanX;
+    const step = inRow > 1 ? (x1 - x0) / (inRow - 1) : 0;
+    const startX = inRow > 1 ? x0 : (x0 + x1) / 2;
+    for (let c = 0; c < inRow; c++) {
+      positions.push({ x: Math.round(startX + step * c), y: y + r * rowGap });
+    }
+  }
+  return positions;
+}
+
+// Generic packing level factory. `container` is the back illustration, `grid`
+// is the single packing slot, `items` is the tray set (footprints should total
+// the grid cell count for a clean perfect-fit puzzle).
+function buildPackingLevel(config) {
+  const { id, theme, copy, container, grid, items, harmony, tray } = config;
+  const trayPos = packTrayLayout(items.length, tray);
+  return {
+    id,
+    revision: 1,
+    phase: 1,
+    reward: 120,
+    topDown: true,
+    winMode: "packing",
+    harmony: harmony || { target: 300, gold: 420, perfect: 520 },
+    copy,
+    theme,
+    assets: {
+      back: { key: container.key, file: container.file, contain: true, size: container.size, y: container.y },
+    },
+    tuning: { magnetPreviewDistance: 150, snapDistance: 96, snapDuration: 240 },
+    stage: structuredClone(PACK_STAGE),
+    fronts: [],
+    slots: [
+      {
+        id: "pack",
+        zone: "pack",
+        allow: ["pack"],
+        x: grid.x,
+        y: grid.y,
+        w: grid.w,
+        h: grid.h,
+        cols: grid.cols,
+        rows: grid.rows,
+        stackLayers: 1,
+        baseline: 0.5,
+        depth: 120,
+      },
+    ],
+    items: items.map((item, index) =>
+      buildItem(item.key, {
+        id: item.id || `${item.key}_${index + 1}`,
+        trayX: trayPos[index].x,
+        trayY: trayPos[index].y,
+        ...item.overrides,
+      })
+    ),
+  };
+}
+
+// --- Level: Picnic basket (4x4 = 16 cells, perfect fill) ---
+// watermelon 2x2(4) + 2x baguette 3x1(3) + bottle 2x1(2) + cheese 2x1(2)
+// + sandwich 1x1(1) + jam 1x1(1) = 16. Long items must rotate to interlock.
+export const PICNIC_LEVEL = buildPackingLevel({
+  id: "picnic-pack-1",
+  container: { key: "picnic-basket", file: "picnic-basket.png", size: 700, y: 628 },
+  grid: { x: 375, y: 628, w: 496, h: 496, cols: 4, rows: 4 },
+  theme: { key: "picnic", title: "Picnic Packing", subtitle: "Tap to rotate · drag to pack", background: "#eaf4d8" },
+  copy: {
+    intro: "Pack the basket! Tap an item to rotate it, then drag it in.",
+    goal: "Fit every treat inside the picnic basket.",
+    difficulty: "Prototype",
+    successTag: "CESTA PERFEITA",
+    successTitle: "All packed!",
+    successBody: "Everything fits — ready for the picnic.",
+    nextLabel: "Next",
+    retryLabel: "Retry",
+  },
+  tray: { y: 1064, spanX: [150, 600] },
+  items: [
     { key: "packWatermelon" },
     { key: "packBaguette", id: "packBaguette_a" },
     { key: "packBaguette", id: "packBaguette_b" },
@@ -273,59 +338,38 @@ function buildPicnicLevel() {
     { key: "packCheese" },
     { key: "packSandwich" },
     { key: "packJam" },
-  ];
-  const row1 = [148, 300, 452, 604];
-  const row2 = [186, 338, 490, 642];
-  return {
-    id: "picnic-pack-1",
-    revision: 1,
-    phase: 1,
-    reward: 120,
-    topDown: true,
-    winMode: "packing",
-    harmony: { target: 300, gold: 420, perfect: 520 },
-    copy: {
-      intro: "Pack the basket! Tap an item to rotate it, then drag it in.",
-      goal: "Fit every treat inside the picnic basket.",
-      difficulty: "Prototype",
-      successTag: "CESTA PERFEITA",
-      successTitle: "All packed!",
-      successBody: "Everything fits — ready for the picnic.",
-      nextLabel: "Next",
-      retryLabel: "Retry",
-    },
-    theme: {
-      key: "picnic",
-      title: "Picnic Packing",
-      subtitle: "Tap to rotate · drag to pack",
-      background: "#eaf4d8",
-    },
-    assets: structuredClone(PICNIC_ASSETS),
-    tuning: {
-      magnetPreviewDistance: 150,
-      snapDistance: 96,
-      snapDuration: 240,
-    },
-    stage: structuredClone(PICNIC_STAGE),
-    fronts: [],
-    slots: structuredClone(PICNIC_SLOTS),
-    items: trayItems.map((item, index) => {
-      const inFirstRow = index < row1.length;
-      const trayX = inFirstRow ? row1[index] : row2[index - row1.length];
-      const trayY = inFirstRow ? 1070 : 1180;
-      return buildItem(item.key, {
-        id: item.id || `${item.key}_${index + 1}`,
-        trayX,
-        trayY,
-        ...item.overrides,
-      });
-    }),
-  };
-}
+  ],
+});
 
-// Standalone packing prototype, reachable via ?theme=pack (kept out of the
-// main fridge campaign so progression is unaffected).
-export const PICNIC_LEVEL = buildPicnicLevel();
+// --- Level: Suitcase (6x3 = 18 cells, perfect fill) ---
+// clothes 2x2(4) + shoes 2x2(4) + 2x towel 3x1(3) + toiletry 2x1(2)
+// + camera 1x1(1) + sunglasses 1x1(1) = 18. A wide grid: very different feel.
+export const SUITCASE_LEVEL = buildPackingLevel({
+  id: "suitcase-pack-1",
+  container: { key: "suitcase-open", file: "suitcase-open.png", size: 760, y: 470 },
+  grid: { x: 375, y: 478, w: 444, h: 288, cols: 6, rows: 3 },
+  theme: { key: "suitcase", title: "Suitcase Packing", subtitle: "Tap to rotate · drag to pack", background: "#dfeaf2" },
+  copy: {
+    intro: "Pack the suitcase! Tap an item to rotate it, then drag it in.",
+    goal: "Fit everything into the suitcase.",
+    difficulty: "Prototype",
+    successTag: "MALA PERFEITA",
+    successTitle: "All packed!",
+    successBody: "Everything fits — ready for the trip.",
+    nextLabel: "Next",
+    retryLabel: "Retry",
+  },
+  tray: { y: 900, rowGap: 122, spanX: [150, 600] },
+  items: [
+    { key: "packClothes" },
+    { key: "packShoes" },
+    { key: "packTowel", id: "packTowel_a" },
+    { key: "packTowel", id: "packTowel_b" },
+    { key: "packToiletry" },
+    { key: "packCamera" },
+    { key: "packSunglasses" },
+  ],
+});
 
 export const FRIDGE_BR_CAMPAIGN = [
   // ====== Level 1: Ad Showcase — "looks lived-in, needs your touch" ======
