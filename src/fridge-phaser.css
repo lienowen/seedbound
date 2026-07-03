@@ -723,51 +723,55 @@ button { font: inherit; }
 .fridge-quick-actions {
   position: absolute;
   z-index: 12;
-  left: 14px;
-  right: 14px;
+  left: 12px;
+  right: 12px;
   bottom: 16px;
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
   pointer-events: none;
 }
 
 .fridge-quick-pill {
-  min-width: 98px;
-  height: 50px;
-  align-self: center;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 54px;
   border: 3px solid rgba(255, 255, 255, .82);
-  border-radius: 999px;
-  padding: 0 16px;
+  border-radius: 18px;
+  padding: 6px 4px;
   color: #6a3a1c;
   background: linear-gradient(180deg, rgba(255, 249, 236, .94), rgba(255, 238, 204, .88));
   box-shadow: 0 8px 16px rgba(103, 62, 26, .12);
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 3px;
   pointer-events: auto;
   backdrop-filter: blur(4px);
   transition: transform .16s ease, background .16s ease, opacity .16s ease, box-shadow .16s ease;
 }
 
 .fridge-quick-pill strong {
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 900;
-  letter-spacing: .04em;
+  letter-spacing: .02em;
   text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .fridge-quick-pill span {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 30px;
-  padding: 0 10px;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 7px;
   border-radius: 999px;
   background: rgba(255,255,255,.92);
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 900;
   color: #8b4513;
   box-shadow: 0 2px 4px rgba(0,0,0,.1);
@@ -806,10 +810,12 @@ button { font: inherit; }
 .fridge-quick-pill.danger span { color: #8b1a00; background: rgba(255,255,255,.95); }
 
 .fridge-quick-btn {
-  width: 38px;
-  height: 38px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 54px;
+  align-self: stretch;
   border: 3px solid rgba(255, 255, 255, .78);
-  border-radius: 999px;
+  border-radius: 18px;
   padding: 0;
   color: #6a3a1c;
   background: rgba(255, 248, 230, .72);
@@ -818,20 +824,22 @@ button { font: inherit; }
   font-weight: 800;
   line-height: 1;
   pointer-events: auto;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   backdrop-filter: blur(3px);
   transition: transform .16s ease, background .16s ease, opacity .16s ease;
   opacity: .84;
 }
 
 .fridge-quick-btn::before {
-  content: attr(data-icon);
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  font-size: 20px;
-  line-height: 1;
+  content: "";
+  display: block;
+  width: 22px;
+  height: 22px;
+  background-color: currentColor;
+  -webkit-mask: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-2.64-6.36'/%3E%3Cpolyline points='21 3 21 9 15 9'/%3E%3C/svg%3E");
+  mask: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-2.64-6.36'/%3E%3Cpolyline points='21 3 21 9 15 9'/%3E%3C/svg%3E");
 }
 
 .fridge-quick-btn:hover,

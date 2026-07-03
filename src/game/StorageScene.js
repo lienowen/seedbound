@@ -1,4 +1,4 @@
-﻿import Phaser from "phaser";
+import Phaser from "phaser";
 import { STORAGE_LEVEL } from "../levels/fridgePhaserLevel.js";
 import { StorageEngine } from "./StorageEngine.js";
 import { createI18n } from "../i18n/index.js";
@@ -300,6 +300,7 @@ export class StorageScene extends Phaser.Scene {
     this.goalLabel?.setY(centerY);
     this.goalText?.setY(centerY);
     this.goalText?.setText(text);
+    this.goalCardBottom = cardY + cardH;
   }
 
   updateChrome(patch = {}) {
@@ -335,17 +336,21 @@ export class StorageScene extends Phaser.Scene {
       this.harmonyLabel?.setText("");
       return;
     }
-    const barW = 200;
-    const barH = 8;
-    const barX = 375 - barW / 2;
-    const barY = 162;
+    const barW = 176;
+    const barH = 10;
+    const labelW = 84;
+    const groupW = barW + 10 + labelW;
+    const barX = 375 - groupW / 2;
+    const barY = (this.goalCardBottom ?? 214) + 16;
     const pct = Math.min(1, score / Math.max(1, target));
     const color = pct >= 1 ? 0x67edb8 : pct >= 0.7 ? 0xffd166 : 0xff7d62;
 
     this.harmonyBarBg.fillStyle(0xe8dcc8, 0.6);
-    this.harmonyBarBg.fillRoundedRect(barX, barY, barW, barH, 4);
+    this.harmonyBarBg.fillRoundedRect(barX, barY, barW, barH, 5);
     this.harmonyBarFill.fillStyle(color, 0.9);
-    this.harmonyBarFill.fillRoundedRect(barX, barY, Math.max(4, barW * pct), barH, 4);
+    this.harmonyBarFill.fillRoundedRect(barX, barY, Math.max(5, barW * pct), barH, 5);
+    this.harmonyLabel?.setOrigin(0, 0.5);
+    this.harmonyLabel?.setPosition(barX + barW + 10, barY + barH / 2);
     this.harmonyLabel?.setText(`${score}/${target}`);
   }
 
@@ -454,19 +459,52 @@ export class StorageScene extends Phaser.Scene {
 
   setToastMessage(message) {
     const text = message || "";
-    const twoLine = text.length > 42 || /\s.{18,}\s/.test(text);
-    const cardH = twoLine ? 76 : 60;
-    const cardY = twoLine ? 1220 : 1236;
+    if (!text) {
+      this.hideToast();
+      return;
+    }
+    const twoLine = text.length > 34 || /\s.{16,}\s/.test(text);
+    const cardH = twoLine ? 68 : 52;
+    const cardW = 560;
+    const cardX = 375 - cardW / 2;
+    // Sit just below the goal/harmony header so it never collides with the
+    // draggable tray or the bottom action bar.
+    const cardY = (this.goalCardBottom ?? 214) + 40;
     const centerY = cardY + cardH / 2;
     this.toastBg?.clear();
     this.toastBg?.fillStyle(0x5b2c1d, 0.95);
     this.toastBg?.lineStyle(3, 0xffffff, 0.8);
-    this.toastBg?.fillRoundedRect(20, cardY, 710, cardH, 20);
-    this.toastBg?.strokeRoundedRect(20, cardY, 710, cardH, 20);
+    this.toastBg?.fillRoundedRect(cardX, cardY, cardW, cardH, 18);
+    this.toastBg?.strokeRoundedRect(cardX, cardY, cardW, cardH, 18);
     this.toastText?.setText(text);
-    this.toastText?.setFontSize(twoLine ? 18 : 22);
+    this.toastText?.setFontSize(twoLine ? 18 : 21);
+    this.toastText?.setWordWrapWidth(cardW - 40, true);
     this.toastText?.setY(centerY);
     this.toastText?.setColor("#ffffff");
+
+    // Fade the banner in, hold, then auto-hide so it doesn't linger over the fridge.
+    const targets = [this.toastBg, this.toastText].filter(Boolean);
+    this.tweens.killTweensOf(targets);
+    for (const t of targets) t.setAlpha(1);
+    this.tweens.add({
+      targets,
+      alpha: 0,
+      delay: 2400,
+      duration: 300,
+      ease: "Sine.easeIn",
+    });
+  }
+
+  hideToast() {
+    const targets = [this.toastBg, this.toastText].filter(Boolean);
+    if (!targets.length) return;
+    this.tweens.killTweensOf(targets);
+    this.tweens.add({
+      targets,
+      alpha: 0,
+      duration: 260,
+      ease: "Sine.easeIn",
+    });
   }
 
   clearHintFx() {
