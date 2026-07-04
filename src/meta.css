@@ -11,23 +11,23 @@
   --meta-mint: #67edb8;
 }
 
-/* ---- Right-edge toolbar ---- */
+/* ---- Top-right toolbar (kept out of the play field so it never covers the board) ---- */
 .meta-toolbar {
   position: absolute;
   z-index: 14;
   right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 10px;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
   pointer-events: none;
 }
 
 .meta-tool {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -474,7 +474,14 @@
   color: #fff;
 }
 
-/* Larger screens: nudge toolbar in from the letterbox edge */
+/* Larger screens: keep the top-right toolbar aligned to the centered game column */
 @media (min-width: 900px) {
-  .meta-toolbar { right: calc(50% - 360px); }
+  .meta-toolbar { right: calc(50% - 360px); top: 12px; }
+}
+
+/* Narrow screens: shrink so the row clears the centered canvas HUD chips */
+@media (max-width: 420px) {
+  .meta-toolbar { gap: 8px; }
+  .meta-tool { width: 42px; height: 42px; }
+  .meta-tool-count { font-size: 10px; }
 }
