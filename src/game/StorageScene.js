@@ -8,6 +8,10 @@ const PREVIEW_COLORS = {
   good: { fill: 0x67edb8, line: 0xeafff7, fillAlpha: 0.12, lineAlpha: 0.88, lineWidth: 3 },
   bad: { fill: 0xff7d62, line: 0xffefe7, fillAlpha: 0.14, lineAlpha: 0.82, lineWidth: 3 },
 };
+// The order in which an item's hard requirements are surfaced (bubble + badge).
+// Only these gate the win — "likesNeighbors" is a soft bonus and never shown as
+// a requirement, so we no longer nag the player to "put me next to X".
+const NEED_PRIORITY = ["cold", "warm", "zone", "topShelf", "visible", "hates"];
 // Inner-wall regions where the shop skin "liner" wallpaper is tiled. Tuned to
 // the realistic fridge board: the main cabinet (shelves/drawers) and the door.
 const SKIN_LINER_REGIONS = [
@@ -1470,38 +1474,41 @@ export class StorageScene extends Phaser.Scene {
 
   // ---- WISH BUBBLE: makes each item's hidden preference legible on pickup ----
   describeWish(item) {
-    const prefs = item.prefs || {};
     const w = this.i18n.ui;
-    if (prefs.likesNeighbors && prefs.likesNeighbors.length) {
-      const friend = prefs.likesNeighbors.find((k) => this.textures.exists(k)) || prefs.likesNeighbors[0];
-      return { kind: "likes", text: w.wishLikes, friendKey: friend };
+    // Surface ONLY the rules that actually decide the win. The engine's
+    // itemConstraints() is the single source of truth (cold / warm / zone /
+    // topShelf / visible / hates). Neighbor "likes" is deliberately absent — it
+    // is a soft happiness bonus, not a requirement, so it never becomes a hint.
+    const constraints = this.engine.itemConstraints(item);
+    if (!constraints.length) return null;
+    const primary = [...constraints].sort(
+      (a, b) => NEED_PRIORITY.indexOf(a.type) - NEED_PRIORITY.indexOf(b.type),
+    )[0];
+    if (primary.type === "cold") return { kind: "cold", need: "cold", text: w.wishCold };
+    if (primary.type === "warm") return { kind: "warm", need: "warm", text: w.wishWarm };
+    if (primary.type === "topShelf") return { kind: "topShelf", need: "topShelf", text: w.wishTop };
+    if (primary.type === "visible") return { kind: "visible", need: "visible", text: w.wishVisible };
+    if (primary.type === "zone") {
+      return { kind: "zone", need: "zone", zone: primary.zone, text: w.wishZone?.[primary.zone] || w.wishVisible };
     }
-    if (prefs.needsCold) return { kind: "cold", text: w.wishCold };
-    if (prefs.zone && w.wishZone?.[prefs.zone]) return { kind: "zone", text: w.wishZone[prefs.zone] };
-    if (prefs.likesVisible) return { kind: "visible", text: w.wishVisible };
+    if (primary.type === "hates") {
+      const foe = primary.keys.find((k) => this.textures.exists(k)) || primary.keys[0];
+      return { kind: "hates", need: "hates", text: w.wishHates, friendKey: foe };
+    }
     return null;
   }
 
-  buildWishIcon(kind) {
+  buildWishIcon(wish) {
+    // Reuse the exact pictograms drawn on the status badges so the pickup bubble
+    // and the floating badge always speak the same visual language.
+    const c = this.add.container(0, 0);
+    const ink = 0x8a5a2b;
     const g = this.add.graphics();
-    if (kind === "cold") {
-      g.lineStyle(3, 0x5fa8d3, 1);
-      const r = 12;
-      for (let i = 0; i < 3; i += 1) {
-        const a = (Math.PI / 3) * i;
-        g.beginPath();
-        g.moveTo(-Math.cos(a) * r, -Math.sin(a) * r);
-        g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-        g.strokePath();
-      }
-    } else if (kind === "likes") {
-      const s = 12;
-      g.fillStyle(0xff6b8a, 1);
-      g.fillCircle(-s * 0.42, -s * 0.18, s * 0.55);
-      g.fillCircle(s * 0.42, -s * 0.18, s * 0.55);
-      g.fillTriangle(-s * 0.92, s * 0.02, s * 0.92, s * 0.02, 0, s);
-    }
-    return g;
+    g.lineStyle(3, ink, 1);
+    this.drawNeedIcon(g, { need: wish.need || wish.kind, zone: wish.zone }, ink);
+    c.add(g);
+    c.setScale(1.5);
+    return c;
   }
 
   showWishBubble(obj, item) {
@@ -1518,8 +1525,8 @@ export class StorageScene extends Phaser.Scene {
     const gap = 9;
     let cursor = 0;
 
-    if (wish.kind === "cold" || wish.kind === "likes") {
-      const icon = this.buildWishIcon(wish.kind);
+    {
+      const icon = this.buildWishIcon(wish);
       icon.setPosition(cursor + iconSize / 2, 0);
       content.add(icon);
       cursor += iconSize + gap;
@@ -1532,7 +1539,8 @@ export class StorageScene extends Phaser.Scene {
       fontStyle: "bold",
     }).setOrigin(0, 0.5);
     content.add(label);
-    const hasThumb = wish.kind === "likes" && wish.friendKey && this.textures.exists(wish.friendKey);
+    // Only the "avoid X" rule shows a food thumbnail (which food to keep away).
+    const hasThumb = wish.kind === "hates" && wish.friendKey && this.textures.exists(wish.friendKey);
     cursor += label.width + (hasThumb ? gap : 0);
 
     if (hasThumb) {
@@ -2299,8 +2307,8 @@ export class StorageScene extends Phaser.Scene {
     // Build the wish description (reuse the pickup wish logic).
     const wish = this.describeWish(item);
     let wishText = wish?.text || this.i18n.ui.wishVisible;
-    if (wish?.kind === "likes" && wish.friendKey) {
-      wishText = `${wish.text} (${this.i18n.tItem(wish.friendKey, wish.friendKey)})`;
+    if (wish?.kind === "hates" && wish.friendKey) {
+      wishText = `${wish.text} ${this.i18n.tItem(wish.friendKey, wish.friendKey)}`;
     }
     this.setToastMessage(`${itemName}: ${wishText}`);
 
@@ -2559,6 +2567,36 @@ export class StorageScene extends Phaser.Scene {
       }
     };
     if (desc.need === "cold") return snowflake();
+    if (desc.need === "warm") {
+      // Little sun: a filled center with radiating rays (opposite of the snowflake).
+      g.fillStyle(ink, 1);
+      g.fillCircle(0, 0, 3.2);
+      for (let i = 0; i < 8; i += 1) {
+        const a = (Math.PI / 4) * i;
+        g.beginPath();
+        g.moveTo(Math.cos(a) * 5.4, Math.sin(a) * 5.4);
+        g.lineTo(Math.cos(a) * 8.6, Math.sin(a) * 8.6);
+        g.strokePath();
+      }
+      return;
+    }
+    if (desc.need === "topShelf") {
+      // Up-chevron above a shelf line — "keep me up high".
+      g.beginPath();
+      g.moveTo(-6, 6);
+      g.lineTo(6, 6);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(-5, -0.5);
+      g.lineTo(0, -6);
+      g.lineTo(5, -0.5);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(0, -6);
+      g.lineTo(0, 3);
+      g.strokePath();
+      return;
+    }
     if (desc.need === "visible") {
       g.strokeEllipse(0, 0, 16, 9);
       g.fillStyle(ink, 1);
@@ -2635,7 +2673,7 @@ export class StorageScene extends Phaser.Scene {
   updateStatusBadges(itemStatus) {
     if (!this.statusBadges) this.statusBadges = new Map();
     const seen = new Set();
-    const PRIORITY = ["cold", "zone", "visible", "hates"];
+    const PRIORITY = NEED_PRIORITY;
 
     for (const [itemId, info] of Object.entries(itemStatus)) {
       // Easygoing items (no hard rules) never nag or hint — nothing to satisfy.

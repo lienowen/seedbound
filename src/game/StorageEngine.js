@@ -262,11 +262,23 @@ export class StorageEngine {
     const prefs = item?.prefs || {};
     const list = [];
     const coldZone = prefs.zone ? this._COLD_ZONES.has(prefs.zone) : false;
-    // Temperature is a hard "WHERE" rule.
+    const warmZone = prefs.zone ? !this._COLD_ZONES.has(prefs.zone) : false;
+    // Temperature is a hard "WHERE" rule. Cold and warm are mutually exclusive.
     if (prefs.needsCold) list.push({ type: "cold" });
-    // Zone is hard too — but it yields to temperature when they contradict
-    // (a cold item belongs in a cold zone, even if its "nice-to-have" zone is warm).
-    if (prefs.zone && (!prefs.needsCold || coldZone)) list.push({ type: "zone", zone: prefs.zone });
+    // Warmth is the inverse of cold: pantry/room-temp foods that spoil or go stale
+    // in the chilled zones and must stay on an open shelf or in the door.
+    else if (prefs.needsWarm) list.push({ type: "warm" });
+    // Zone is hard too — but it yields to temperature when they contradict (a cold
+    // item belongs in a cold zone; a warm item belongs in a warm zone) even if its
+    // "nice-to-have" zone points the other way.
+    if (
+      prefs.zone &&
+      (!prefs.needsCold || coldZone) &&
+      (!prefs.needsWarm || warmZone)
+    ) list.push({ type: "zone", zone: prefs.zone });
+    // "Up high" — light/showy foods that want a top shelf or the top of the door.
+    // Top cells are warm, so this only applies when it doesn't fight the cold rule.
+    if (prefs.topShelf && !prefs.needsCold) list.push({ type: "topShelf" });
     // Exclusion ("don't sit next to X") is a hard rule.
     if (prefs.hatesNeighbors?.length) list.push({ type: "hates", keys: prefs.hatesNeighbors });
     // Visibility is hard, but only when it doesn't fight the cold requirement.
@@ -320,6 +332,8 @@ export class StorageEngine {
     const results = constraints.map((c) => {
       let satisfied = false;
       if (c.type === "cold") satisfied = this._COLD_ZONES.has(slot.zone);
+      else if (c.type === "warm") satisfied = !this._COLD_ZONES.has(slot.zone);
+      else if (c.type === "topShelf") satisfied = typeof slot.id === "string" && slot.id.includes("top");
       else if (c.type === "zone") satisfied = slot.zone === c.zone;
       else if (c.type === "visible") satisfied = slot.zone === "shelf" || slot.zone === "door";
       else if (c.type === "likes") satisfied = c.keys.some((k) => neighborKeys.has(k));

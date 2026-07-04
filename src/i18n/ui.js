@@ -4,6 +4,9 @@ export const UI = {
     coachTitle: "Arraste o item para o ponto que brilha",
     coachReleased: "Solte para encaixar!",
     wishCold: "Me deixe geladinho!",
+    wishWarm: "Longe do frio!",
+    wishTop: "Quero ir la em cima!",
+    wishHates: "Nao me deixe perto de",
     wishLikes: "Quero ficar junto!",
     wishVisible: "Quero aparecer!",
     wishZone: {
@@ -163,6 +166,9 @@ export const UI = {
     coachTitle: "Drag the item to the glowing spot",
     coachReleased: "Let go to place it!",
     wishCold: "Keep me cold!",
+    wishWarm: "Keep me out of the cold!",
+    wishTop: "I want to be up high!",
+    wishHates: "Don't put me next to",
     wishLikes: "Put me next to",
     wishVisible: "I want to be seen!",
     wishZone: {
@@ -322,6 +328,9 @@ export const UI = {
     coachTitle: "把食材拖到发光的位置",
     coachReleased: "松手放下！",
     wishCold: "我要冷藏！",
+    wishWarm: "别把我放冷的地方！",
+    wishTop: "我想放到高处！",
+    wishHates: "别把我挨着",
     wishLikes: "想挨着",
     wishVisible: "我想露个脸！",
     wishZone: {
