@@ -368,19 +368,23 @@ function buildPackingLevel(config) {
 // Shared per-container geometry (the grid matches each art's visible interior).
 const PICNIC_BASE = {
   container: { key: "picnic-basket", file: "picnic-basket.png", size: 720, y: 628 },
-  grid: { x: 375, y: 648, w: 432, h: 432, cols: 4, rows: 4 },
+  // Grid tuned to sit INSIDE the basket's cream interior (the art is drawn in
+  // perspective, so the playable square is smaller and higher than the art center).
+  grid: { x: 375, y: 601, w: 326, h: 306, cols: 4, rows: 4 },
   theme: { key: "picnic", title: "Picnic Packing", subtitle: "Tap to rotate · drag to pack", background: "#eaf4d8" },
   tray: { y: 1064, spanX: [150, 600] },
 };
 const SUITCASE_BASE = {
   container: { key: "suitcase-open", file: "suitcase-open.png", size: 760, y: 470 },
-  grid: { x: 375, y: 478, w: 444, h: 288, cols: 6, rows: 3 },
+  // Grid tuned to the open suitcase's cream tray interior.
+  grid: { x: 375, y: 494, w: 414, h: 250, cols: 6, rows: 3 },
   theme: { key: "suitcase", title: "Suitcase Packing", subtitle: "Tap to rotate · drag to pack", background: "#dfeaf2" },
   tray: { y: 900, rowGap: 122, spanX: [150, 600] },
 };
 const BENTO_BASE = {
   container: { key: "bento-box", file: "bento-box.png", size: 740, y: 500 },
-  grid: { x: 380, y: 511, w: 492, h: 289, cols: 5, rows: 3 },
+  // Grid tuned to the bento box's cream interior.
+  grid: { x: 380, y: 503, w: 412, h: 222, cols: 5, rows: 3 },
   theme: { key: "bento", title: "Bento Packing", subtitle: "Tap to rotate · drag to pack", background: "#f6ead3" },
   tray: { y: 1000, rowGap: 120, spanX: [150, 600] },
 };

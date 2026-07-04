@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Phaser from "phaser";
 import { StorageScene } from "./game/StorageScene.js";
 import { createUiSounds } from "./game/playFeedback.js";
-import { FRIDGE_BR_CAMPAIGN, PICNIC_LEVEL, SUITCASE_LEVEL } from "./levels/fridgePhaserLevel.js";
+import { FRIDGE_BR_CAMPAIGN, PICNIC_LEVEL, SUITCASE_LEVEL, BENTO_LEVEL_EASY } from "./levels/fridgePhaserLevel.js";
 import { createI18n, localizeCampaign, localizeLevel } from "./i18n/index.js";
 import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progressStorageKey, switchLocaleHref, writeLocalePreference } from "./i18n/locale.js";
 import { MetaLayer } from "./components/MetaLayer.jsx";
@@ -88,7 +88,7 @@ export function FridgePhaserGame() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const editMode = params.get("edit") === "true";
   const themeParam = params.get("theme");
-  const theme = themeParam === "pack" ? "pack" : themeParam === "suitcase" ? "suitcase" : "fridge";
+  const theme = themeParam === "pack" ? "pack" : themeParam === "suitcase" ? "suitcase" : themeParam === "bento" ? "bento" : "fridge";
   // Standalone single-level modes (no campaign progression / economy UI).
   const standalone = theme !== "fridge";
   const [progress, setProgress] = useState(() => (standalone ? { unlocked: 1, coins: 0, current: 0, stars: {} } : readProgress(locale)));
@@ -129,6 +129,7 @@ export function FridgePhaserGame() {
   const level = useMemo(() => {
     if (theme === "pack") return localizeLevel(PICNIC_LEVEL, locale);
     if (theme === "suitcase") return localizeLevel(SUITCASE_LEVEL, locale);
+    if (theme === "bento") return localizeLevel(BENTO_LEVEL_EASY, locale);
     return campaign[currentIndex];
   }, [theme, locale, campaign, currentIndex]);
   const isLastLevel = currentIndex >= campaign.length - 1;
