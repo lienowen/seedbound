@@ -105,7 +105,10 @@ export function FridgePhaserGame() {
   const [lastStars, setLastStars] = useState(0);
   const [meta, setMeta] = useState(() => readMeta());
   const [discovery, setDiscovery] = useState(null);
-  const [autoOpenDaily, setAutoOpenDaily] = useState(true);
+  // Do NOT auto-pop the daily gift on cold start — CrazyGames QA requires
+  // players to land directly in a playable state with nothing blocking the
+  // screen. The gift stays reachable via the menu button (badged when ready).
+  const [autoOpenDaily, setAutoOpenDaily] = useState(false);
   // Screen routing: standalone/edit modes jump straight into the game.
   const [screen, setScreen] = useState(() => (standalone || params.get("edit") === "true" ? "game" : "home"));
   // Lifted meta panel state so Home shortcuts and the in-game toolbar share it.
