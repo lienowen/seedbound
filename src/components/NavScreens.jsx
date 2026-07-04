@@ -1,4 +1,7 @@
 import { useEffect, useRef } from "react";
+import { assetUrl } from "../assetBase.js";
+
+const HOME_HERO_SRC = assetUrl("tidy/home-hero.png");
 
 const svgProps = {
   viewBox: "0 0 24 24",
@@ -255,7 +258,7 @@ export function HomeScreen({
       </header>
 
       <div className="nav-home-hero">
-        <img src="/assets/tidy/home-hero.png" alt="" className="nav-home-art" />
+        <img src={HOME_HERO_SRC} alt="" className="nav-home-art" />
         <h1 className="nav-home-title">Seedbound</h1>
         <p className="nav-home-tagline">{nav.tagline}</p>
       </div>

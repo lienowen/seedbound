@@ -2,8 +2,9 @@ import Phaser from "phaser";
 import { STORAGE_LEVEL } from "../levels/fridgePhaserLevel.js";
 import { StorageEngine } from "./StorageEngine.js";
 import { createI18n } from "../i18n/index.js";
+import { TIDY_BASE } from "../assetBase.js";
 
-const ASSET = `${import.meta.env.BASE_URL}assets/tidy/`;
+const ASSET = TIDY_BASE;
 const PREVIEW_COLORS = {
   good: { fill: 0x67edb8, line: 0xeafff7, fillAlpha: 0.12, lineAlpha: 0.88, lineWidth: 3 },
   bad: { fill: 0xff7d62, line: 0xffefe7, fillAlpha: 0.14, lineAlpha: 0.82, lineWidth: 3 },
