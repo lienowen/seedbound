@@ -2544,9 +2544,66 @@ export class StorageScene extends Phaser.Scene {
   // then go quiet. "violated" items get a bright alert so the eye is drawn ONLY
   // to what still needs solving. As the board is solved, on-screen demands on
   // attention shrink — cognitive load goes DOWN even as the puzzle stays hard.
-  buildStatusBadge(status) {
+  // Draw a small, recognizable pictogram for a single requirement into a
+  // graphics object (already centered at 0,0). This is what turns the vague
+  // "!" into a clear "this food wants X" so the puzzle becomes deducible.
+  drawNeedIcon(g, desc, ink) {
+    const snowflake = () => {
+      const arm = 6.5;
+      for (const deg of [90, 210, 330]) {
+        const r = (deg * Math.PI) / 180;
+        g.beginPath();
+        g.moveTo(-Math.cos(r) * arm, -Math.sin(r) * arm);
+        g.lineTo(Math.cos(r) * arm, Math.sin(r) * arm);
+        g.strokePath();
+      }
+    };
+    if (desc.need === "cold") return snowflake();
+    if (desc.need === "visible") {
+      g.strokeEllipse(0, 0, 16, 9);
+      g.fillStyle(ink, 1);
+      g.fillCircle(0, 0, 2.4);
+      return;
+    }
+    if (desc.need === "hates") {
+      g.strokeCircle(0, 0, 7);
+      g.beginPath();
+      g.moveTo(-4.9, -4.9);
+      g.lineTo(4.9, 4.9);
+      g.strokePath();
+      return;
+    }
+    // zone-based needs
+    const zone = desc.zone || "shelf";
+    if (zone === "chill") return snowflake();
+    if (zone === "door") {
+      g.strokeRoundedRect(-4, -7, 8, 14, 2);
+      g.fillStyle(ink, 1);
+      g.fillCircle(1.6, 0, 1.2);
+      return;
+    }
+    if (zone === "drawer") {
+      g.strokeRoundedRect(-7, -5, 14, 10, 2);
+      g.beginPath();
+      g.moveTo(-3, 0);
+      g.lineTo(3, 0);
+      g.strokePath();
+      return;
+    }
+    // shelf (default): two stacked shelf lines
+    g.beginPath();
+    g.moveTo(-6, -3);
+    g.lineTo(6, -3);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(-6, 3);
+    g.lineTo(6, 3);
+    g.strokePath();
+  }
+
+  buildNeedBadge(desc) {
     const c = this.add.container(0, 0);
-    if (status === "settled") {
+    if (desc.kind === "settled") {
       // Low-salience: soft green disc with a checkmark. Calm, "locked in".
       const disc = this.add.circle(0, 0, 13, 0x67edb8, 1).setStrokeStyle(3, 0xffffff, 0.95);
       c.add(disc);
@@ -2558,50 +2615,75 @@ export class StorageScene extends Phaser.Scene {
       check.lineTo(6, -5);
       check.strokePath();
       c.add(check);
-    } else {
-      // High-salience: amber disc with an exclamation. "Still needs attention".
-      const disc = this.add.circle(0, 0, 15, 0xffb347, 1).setStrokeStyle(3, 0xffffff, 0.98);
-      c.add(disc);
-      const ink = 0x6b3410;
-      c.add(this.add.rectangle(0, -3, 3.2, 8, ink).setOrigin(0.5));
-      c.add(this.add.circle(0, 6, 2, ink));
+      return c;
     }
+    // A requirement is shown as its own pictogram. Two tones:
+    //  - "alert" (placed but wrong): bright amber, draws the eye to what to fix.
+    //  - "calm"  (still in the tray): soft cream, an at-a-glance hint of what it wants.
+    const alert = desc.tone === "alert";
+    const bg = alert ? 0xffb347 : 0xfff1d6;
+    const ink = alert ? 0x6b3410 : 0xa9772f;
+    const disc = this.add.circle(0, 0, 14, bg, 1).setStrokeStyle(3, 0xffffff, 0.98);
+    c.add(disc);
+    const g = this.add.graphics();
+    g.lineStyle(2.4, ink, 1);
+    this.drawNeedIcon(g, desc, ink);
+    c.add(g);
     return c;
   }
 
   updateStatusBadges(itemStatus) {
     if (!this.statusBadges) this.statusBadges = new Map();
     const seen = new Set();
+    const PRIORITY = ["cold", "zone", "visible", "hates"];
 
     for (const [itemId, info] of Object.entries(itemStatus)) {
-      // Easygoing items (no hard rules) never nag the player.
+      // Easygoing items (no hard rules) never nag or hint — nothing to satisfy.
       if (info.easygoing) continue;
-      if (info.status === "pending") continue;
       const sprite = this.sprites.get(itemId);
       if (!sprite) continue;
       if (this.dragItem === sprite) continue;
       const entry = sprite.getData("home");
-      if (!entry || entry.status !== "packed") continue;
+      const placed = !!entry && entry.status === "packed";
+
+      // Build the descriptor: a green check when settled, otherwise the single
+      // most important UNMET requirement (shown on tray items too, so the player
+      // knows what each picky food wants BEFORE placing it).
+      let desc;
+      if (info.status === "settled") {
+        desc = { kind: "settled" };
+      } else {
+        let unmet = info.results && info.results.length
+          ? info.results.filter((r) => !r.satisfied)
+          : this.engine.itemConstraints(sprite.getData("item")); // pending → read from def
+        if (!unmet || !unmet.length) continue;
+        unmet = [...unmet].sort((a, b) => PRIORITY.indexOf(a.type) - PRIORITY.indexOf(b.type));
+        const primary = unmet[0];
+        desc = { kind: "need", need: primary.type, zone: primary.zone, tone: placed ? "alert" : "calm" };
+      }
       seen.add(itemId);
 
-      const status = info.status; // "settled" | "violated"
+      const sig = desc.kind === "settled" ? "settled" : `${desc.need}:${desc.zone || ""}:${desc.tone}`;
       let record = this.statusBadges.get(itemId);
-      if (!record || record.status !== status) {
-        const wasViolated = record && record.status === "violated";
+      if (!record || record.sig !== sig) {
+        const wasNeed = record && record.sig !== "settled";
+        const settledOnce = record?.settledOnce;
         record?.container.destroy();
-        const container = this.buildStatusBadge(status).setDepth(970);
-        this.statusBadges.set(itemId, { container, status });
+        const container = this.buildNeedBadge(desc).setDepth(970);
+        this.statusBadges.set(itemId, { container, sig, settledOnce });
         record = this.statusBadges.get(itemId);
         container.setScale(0);
         this.tweens.add({ targets: container, scale: 1, duration: 220, ease: "Back.out(2.4)" });
         // The satisfying "settle" moment: item just became fully satisfied.
-        if (status === "settled" && (wasViolated || !record.settledOnce)) {
+        if (desc.kind === "settled" && (wasNeed || !record.settledOnce)) {
           record.settledOnce = true;
           this.playSettleEffect(sprite);
         }
       }
       const b = sprite.getBounds();
-      record.container.setPosition(b.right - 6, b.top + 8);
+      // Placed → tuck into the corner; in the tray → float centered above it.
+      if (placed) record.container.setPosition(b.right - 6, b.top + 8);
+      else record.container.setPosition(b.centerX, b.top - 2);
     }
 
     for (const [itemId, record] of this.statusBadges) {
@@ -2769,12 +2851,14 @@ export class StorageScene extends Phaser.Scene {
 
   renderState(state, validation) {
     this.updateChrome({
-      placed: validation.packed,
-      total: validation.total,
+      // Unified, truthful progress: "ready" items (placed + legal + all rules met).
+      // Both the top pill and the settle bar now show the SAME number, and it
+      // hits full exactly when the level is won — no more conflicting counters.
+      placed: validation.doneCount ?? validation.packed,
+      total: validation.doneTotal ?? validation.total,
       harmonyScore: validation.totalScore,
-      // Constraint model: settled = fully satisfied constrained items.
-      settledCount: validation.settledCount,
-      constrainedTotal: validation.constrainedTotal,
+      settledCount: validation.doneCount ?? validation.settledCount,
+      constrainedTotal: validation.doneTotal ?? validation.constrainedTotal,
     });
     this.updateStatusBadges(validation.itemStatus || {});
     this.events.emit("hud", { placed: validation.packed, total: validation.total });

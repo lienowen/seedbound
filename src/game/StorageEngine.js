@@ -1055,6 +1055,14 @@ export class StorageEngine {
     // Complete = everything placed legally AND every constrained item is settled.
     const complete = allPlaced && validPlacement && allSettled;
 
+    // SINGLE TRUTHFUL PROGRESS METRIC: an item is "ready" when it's placed,
+    // legal, and has all its rules satisfied (easygoing placed items count too).
+    // doneCount === doneTotal is exactly equivalent to `complete`, so the player
+    // sees ONE number that reaches full precisely when they win. This replaces
+    // the old confusing pair (placed/total vs settled/constrained).
+    const doneCount = Object.values(report.itemStatus).filter((s) => s.status === "settled").length;
+    const doneTotal = movable.length;
+
     return {
       validPlacement,
       complete,
@@ -1079,6 +1087,9 @@ export class StorageEngine {
       settledCount: report.settledCount,
       constrainedTotal: report.constrainedTotal,
       allSettled,
+      // Unified progress (see above): use these for all player-facing counters.
+      doneCount,
+      doneTotal,
     };
   }
 
