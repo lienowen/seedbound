@@ -289,15 +289,18 @@ function packTrayLayout(items, { y = 1070, rowGap = 128, maxWidth = 660, cellPx 
 // is the single packing slot, `items` is the tray set (footprints should total
 // the grid cell count for a clean perfect-fit puzzle).
 function buildPackingLevel(config) {
-  const { id, theme, copy, container, grid, items, harmony, tray } = config;
+  const { id, theme, copy, container, grid, items, harmony, tray, phase, reward } = config;
   const trayPos = packTrayLayout(items, tray);
   return {
     id,
     revision: 1,
-    phase: 1,
-    reward: 120,
+    phase: phase || 1,
+    reward: reward || 120,
     topDown: true,
     winMode: "packing",
+    // Marks a level as a packing puzzle so campaign systems (collection book,
+    // hint/best-spot tools, goal copy) can branch without inspecting winMode.
+    packing: true,
     harmony: harmony || { target: 300, gold: 420, perfect: 520 },
     copy,
     theme,
@@ -339,6 +342,7 @@ function buildPackingLevel(config) {
 // + sandwich 1x1(1) + jam 1x1(1) = 16. Long items must rotate to interlock.
 export const PICNIC_LEVEL = buildPackingLevel({
   id: "picnic-pack-1",
+  reward: 120,
   container: { key: "picnic-basket", file: "picnic-basket.png", size: 720, y: 628 },
   grid: { x: 375, y: 628, w: 500, h: 500, cols: 4, rows: 4 },
   theme: { key: "picnic", title: "Picnic Packing", subtitle: "Tap to rotate · drag to pack", background: "#eaf4d8" },
@@ -369,6 +373,7 @@ export const PICNIC_LEVEL = buildPackingLevel({
 // + camera 1x1(1) + sunglasses 1x1(1) = 18. A wide grid: very different feel.
 export const SUITCASE_LEVEL = buildPackingLevel({
   id: "suitcase-pack-1",
+  reward: 160,
   container: { key: "suitcase-open", file: "suitcase-open.png", size: 760, y: 470 },
   grid: { x: 375, y: 478, w: 444, h: 288, cols: 6, rows: 3 },
   theme: { key: "suitcase", title: "Suitcase Packing", subtitle: "Tap to rotate · drag to pack", background: "#dfeaf2" },
@@ -394,7 +399,7 @@ export const SUITCASE_LEVEL = buildPackingLevel({
   ],
 });
 
-export const FRIDGE_BR_CAMPAIGN = [
+const FRIDGE_LEVELS = [
   // ====== Level 1: Ad Showcase — "looks lived-in, needs your touch" ======
   buildFridgeLevel({
     id: "fridge-br-1",
@@ -917,6 +922,30 @@ export const FRIDGE_BR_CAMPAIGN = [
     ],
   }),
 ];
+
+// Interleave packing levels into the single fridge campaign so both playstyles
+// share one linear progression (coins, unlocks, streaks, collection). Packing
+// levels appear after specific fridge levels to vary the pacing. Insertion is
+// keyed by the fridge level id it should follow, so re-ordering fridge levels
+// keeps the packing beats anchored to the right place.
+const PACKING_INSERTS = {
+  "fridge-br-3": [PICNIC_LEVEL],
+  "fridge-br-8": [SUITCASE_LEVEL],
+};
+
+function assembleCampaign() {
+  const out = [];
+  for (const fridge of FRIDGE_LEVELS) {
+    out.push(fridge);
+    const inserts = PACKING_INSERTS[fridge.id];
+    if (inserts) out.push(...inserts);
+  }
+  // Renumber phase sequentially so the HUD "Level N" label and the level-select
+  // dots stay continuous regardless of authored phase values.
+  return out.map((level, index) => ({ ...level, phase: index + 1 }));
+}
+
+export const FRIDGE_BR_CAMPAIGN = assembleCampaign();
 
 export const STORAGE_LEVEL = FRIDGE_BR_CAMPAIGN[0];
 

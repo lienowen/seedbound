@@ -12,21 +12,43 @@ import "./meta.css";
 const HINT_COST = 25;
 const LOW_COINS_HINT = HINT_COST - 1;
 
+// Bump when the campaign ordering changes in a way that shifts level indices,
+// so we can migrate saved unlock counts instead of stranding players mid-way.
+const CAMPAIGN_LAYOUT_VERSION = 2;
+
+// Number of packing levels inserted at or before each original fridge index.
+// Original layout was 20 fridge levels (indices 0..19). Packing levels were
+// inserted after fridge-br-3 (orig index 2) and fridge-br-8 (orig index 7).
+function migrateUnlockedIndex(oldUnlocked) {
+  // oldUnlocked is a 1-based count of unlocked levels in the OLD layout.
+  // Shift it forward by how many inserts fall before that boundary.
+  let shift = 0;
+  if (oldUnlocked > 3) shift += 1; // picnic sits after old level 3
+  if (oldUnlocked > 8) shift += 1; // suitcase sits after old level 8
+  return oldUnlocked + shift;
+}
+
 function readProgress(locale) {
   const key = progressStorageKey(locale);
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) return { unlocked: 1, coins: 125, current: 0 };
+    if (!raw) return { unlocked: 1, coins: 125, current: 0, layout: CAMPAIGN_LAYOUT_VERSION };
     const parsed = JSON.parse(raw);
-    const unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, parsed.unlocked || 1));
+    let rawUnlocked = parsed.unlocked || 1;
+    // Migrate pre-interleave saves so unlock progress lands on the same levels.
+    if ((parsed.layout || 1) < CAMPAIGN_LAYOUT_VERSION) {
+      rawUnlocked = migrateUnlockedIndex(rawUnlocked);
+    }
+    const unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, rawUnlocked));
     const current = Math.max(0, Math.min(unlocked - 1, parsed.current || 0));
     return {
       unlocked,
       coins: Math.max(0, parsed.coins || 0),
       current,
+      layout: CAMPAIGN_LAYOUT_VERSION,
     };
   } catch {
-    return { unlocked: 1, coins: 125, current: 0 };
+    return { unlocked: 1, coins: 125, current: 0, layout: CAMPAIGN_LAYOUT_VERSION };
   }
 }
 
@@ -88,6 +110,9 @@ export function FridgePhaserGame() {
   }, [theme, locale, campaign, currentIndex]);
   const isLastLevel = currentIndex >= campaign.length - 1;
   const unlockedCount = Math.min(progress.unlocked, campaign.length);
+  // Packing levels use rotate+fit mechanics, so the fridge "wish" hint does not
+  // apply — the Best-Spot tool covers hinting instead.
+  const isPacking = !!level.packing;
 
   useEffect(() => {
     document.documentElement.lang = htmlLang(locale);
@@ -110,7 +135,11 @@ export function FridgePhaserGame() {
       total: movableTotal,
       title: nextLevel.theme.title,
       subtitle: nextLevel.theme.subtitle,
-      goal: pickyTotal > 0 ? i18n.ui.constraintGoalText(pickyTotal) : i18n.ui.goalDefault,
+      goal: nextLevel.packing
+        ? (nextLevel.copy?.goal || i18n.ui.packGoalDefault || i18n.ui.goalDefault)
+        : pickyTotal > 0
+          ? i18n.ui.constraintGoalText(pickyTotal)
+          : i18n.ui.goalDefault,
       toast: nextLevel.copy?.intro || i18n.ui.dragHint,
       currentIndex,
       unlockedCount,
@@ -339,7 +368,8 @@ export function FridgePhaserGame() {
           soundRef.current?.snap();
           setMessage(i18n.ui.snapOk);
           const discoverId = payload?.image || payload?.item;
-          if (!standalone && discoverId) {
+          // Packing items are not part of the fridge collection book.
+          if (!standalone && !level.packing && discoverId) {
             const { meta: nextMeta, isNew } = discoverItem(metaRef.current, discoverId);
             if (isNew) {
               handleMetaChange(nextMeta);
@@ -532,17 +562,19 @@ export function FridgePhaserGame() {
               <strong>{i18n.ui.undoLabel}</strong>
               <span>{UNDO_COST}</span>
             </button>
-            <button
-              type="button"
-              className={`fridge-quick-pill${progress.coins <= LOW_COINS_HINT ? " low-coins" : ""}`}
-              onClick={useHint}
-              title={i18n.ui.hintCost(HINT_COST)}
-              aria-label={i18n.ui.hintLabel}
-              disabled={complete || progress.coins < HINT_COST}
-            >
-              <strong>{i18n.ui.hintLabel}</strong>
-              <span>{HINT_COST}</span>
-            </button>
+            {!isPacking && (
+              <button
+                type="button"
+                className={`fridge-quick-pill${progress.coins <= LOW_COINS_HINT ? " low-coins" : ""}`}
+                onClick={useHint}
+                title={i18n.ui.hintCost(HINT_COST)}
+                aria-label={i18n.ui.hintLabel}
+                disabled={complete || progress.coins < HINT_COST}
+              >
+                <strong>{i18n.ui.hintLabel}</strong>
+                <span>{HINT_COST}</span>
+              </button>
+            )}
             <button
               type="button"
               className="fridge-quick-pill accent"
