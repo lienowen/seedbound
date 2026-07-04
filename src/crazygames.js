@@ -10,14 +10,43 @@ function sdk() {
   return window.CrazyGames?.SDK || null;
 }
 
+/**
+ * The SDK script is served on every domain, so `window.CrazyGames.SDK` and its
+ * `init` method exist even off-platform (local dev, the v0 preview, itch, etc).
+ * Calling `init()` there throws "CrazySDK is disabled on this domain". CrazyGames
+ * only enables the SDK when the game is embedded from a crazygames domain, so we
+ * gate initialization on the hostname (checking the top frame when embedded).
+ */
+function onCrazyGamesDomain() {
+  if (typeof window === "undefined") return false;
+  const hosts = [];
+  try {
+    hosts.push(window.location.hostname);
+  } catch {
+    /* no-op */
+  }
+  // When embedded, the parent frame is the crazygames.com page; read it when the
+  // browser allows same-origin access, and fall back to the referrer otherwise.
+  try {
+    if (window.top && window.top !== window.self) hosts.push(window.top.location.hostname);
+  } catch {
+    try {
+      if (document.referrer) hosts.push(new URL(document.referrer).hostname);
+    } catch {
+      /* no-op */
+    }
+  }
+  return hosts.some((h) => /(^|\.)crazygames\.(com|games)$/i.test(h || ""));
+}
+
 let initPromise = null;
 let ready = false;
 
-/** Initialize the SDK once. Safe to call when the SDK is absent. */
+/** Initialize the SDK once. Safe to call when the SDK is absent or disabled. */
 export function initCrazyGames() {
   if (initPromise) return initPromise;
   const s = sdk();
-  if (!s || typeof s.init !== "function") {
+  if (!s || typeof s.init !== "function" || !onCrazyGamesDomain()) {
     initPromise = Promise.resolve(false);
     return initPromise;
   }
