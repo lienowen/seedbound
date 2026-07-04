@@ -339,6 +339,9 @@ export function LevelMapScreen({ nav, coins, campaign, unlockedCount, starsById,
           const isCurrent = index === unlockedCount - 1;
           const stars = starsById[entry.id] || 0;
           const packing = !!entry.packing;
+          const pantry = entry.theme?.key === "pantry";
+          const typeMod = packing ? "pack" : pantry ? "pantry" : "fridge";
+          const typeLabel = packing ? nav.packType : pantry ? nav.pantryType : nav.fridgeType;
           return (
             <li
               key={entry.id}
@@ -355,8 +358,8 @@ export function LevelMapScreen({ nav, coins, campaign, unlockedCount, starsById,
                 <span className="nav-node-num">{locked ? "🔒" : index + 1}</span>
                 <span className="nav-node-info">
                   <strong className="nav-node-name">{entry.theme.title}</strong>
-                  <span className={`nav-node-type nav-node-type--${packing ? "pack" : "fridge"}`}>
-                    {packing ? nav.packType : nav.fridgeType}
+                  <span className={`nav-node-type nav-node-type--${typeMod}`}>
+                    {typeLabel}
                   </span>
                 </span>
                 {!locked && <Stars count={stars} />}

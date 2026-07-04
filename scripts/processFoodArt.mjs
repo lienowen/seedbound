@@ -30,6 +30,18 @@ const ITEMS = [
   { key: "watermelon", file: "watermelon.webp", stackable: false },
   { key: "corn", file: "corn.webp", stackable: false },
   { key: "fish", file: "fish.webp", stackable: false },
+  // ---- PANTRY DRY-GOODS (distinct from fridge items) ----
+  // Narrow [1,1] uprights: jars, cans, tubes.
+  { key: "jam", file: "jam.webp", stackable: false },
+  { key: "honey", file: "honey.webp", stackable: false },
+  { key: "coffee", file: "coffee.webp", stackable: true },
+  { key: "beans", file: "beans.webp", stackable: true },
+  { key: "peanut", file: "peanut.webp", stackable: false },
+  { key: "chips", file: "chips.webp", stackable: false },
+  // Wide [2,1] low boxes/packs: flat tops, stackable.
+  { key: "crackers", file: "crackers.webp", stackable: true },
+  { key: "cookies", file: "cookies.webp", stackable: true },
+  { key: "pasta", file: "pasta.webp", stackable: true },
 ];
 
 // Flood-fill edge-connected near-white background to transparent (leaves the

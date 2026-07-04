@@ -145,6 +145,19 @@ const ITEM_LIBRARY = {
   corn: { image: "corn", file: "corn.webp", name: "Milho", tags: ["food"], size: [2, 1], scale: scaleFromVisibleHeight("corn", 92), anchor: [renderProfile("corn").originX, renderProfile("corn").originY], surface: renderProfile("corn"), bounds: { w: 150, h: 92 }, prefs: { zone: "drawer", needsCold: false, likesNeighbors: ["carrot"] } },
   fish: { image: "fish", file: "fish.webp", name: "Peixe", tags: ["food"], size: [2, 1], scale: scaleFromVisibleHeight("fish", 78), anchor: [renderProfile("fish").originX, renderProfile("fish").originY], surface: renderProfile("fish"), bounds: { w: 200, h: 78 }, prefs: { zone: "chill", needsCold: true, hatesNeighbors: ["cake", "strawberries"] } },
 
+  // ---- PANTRY DRY-GOODS (cupboard-only; never used in the fridge) ---------
+  // Narrow [1,1] uprights (jars/cans/tubes) and wide [2,1] low boxes/packs.
+  // Their prefs are shelf-friendly by default; pantryPrefs() strips temperature.
+  jam: { image: "jam", file: "jam.webp", name: "Geleia", tags: ["jar"], size: [1, 1], scale: scaleFromVisibleHeight("jam", 116), anchor: [renderProfile("jam").originX, renderProfile("jam").originY], surface: renderProfile("jam"), bounds: { w: 96, h: 116 }, prefs: { zone: "shelf", likesNeighbors: ["honey", "peanut"] } },
+  honey: { image: "honey", file: "honey.webp", name: "Mel", tags: ["jar"], size: [1, 1], scale: scaleFromVisibleHeight("honey", 116), anchor: [renderProfile("honey").originX, renderProfile("honey").originY], surface: renderProfile("honey"), bounds: { w: 100, h: 116 }, prefs: { zone: "shelf", likesNeighbors: ["jam", "peanut"] } },
+  coffee: { image: "coffee", file: "coffee.webp", name: "Cafe", tags: ["can"], size: [1, 1], scale: scaleFromVisibleHeight("coffee", 122), anchor: [renderProfile("coffee").originX, renderProfile("coffee").originY], surface: renderProfile("coffee"), bounds: { w: 92, h: 122 }, prefs: { zone: "shelf", likesNeighbors: ["beans"] } },
+  beans: { image: "beans", file: "beans.webp", name: "Enlatado", tags: ["can"], size: [1, 1], scale: scaleFromVisibleHeight("beans", 96), anchor: [renderProfile("beans").originX, renderProfile("beans").originY], surface: renderProfile("beans"), bounds: { w: 100, h: 96 }, prefs: { zone: "shelf", likesNeighbors: ["coffee"] } },
+  peanut: { image: "peanut", file: "peanut.webp", name: "Pasta de Amendoim", tags: ["jar"], size: [1, 1], scale: scaleFromVisibleHeight("peanut", 108), anchor: [renderProfile("peanut").originX, renderProfile("peanut").originY], surface: renderProfile("peanut"), bounds: { w: 100, h: 108 }, prefs: { zone: "shelf", likesNeighbors: ["jam", "honey"] } },
+  chips: { image: "chips", file: "chips.webp", name: "Batatas", tags: ["tube"], size: [1, 1], scale: scaleFromVisibleHeight("chips", 132), anchor: [renderProfile("chips").originX, renderProfile("chips").originY], surface: renderProfile("chips"), bounds: { w: 76, h: 132 }, prefs: { zone: "shelf", likesVisible: true } },
+  crackers: { image: "crackers", file: "crackers.webp", name: "Bolachas", tags: ["box"], size: [2, 1], scale: scaleFromVisibleHeight("crackers", 96), anchor: [renderProfile("crackers").originX, renderProfile("crackers").originY], surface: renderProfile("crackers"), bounds: { w: 170, h: 96 }, prefs: { zone: "shelf" } },
+  cookies: { image: "cookies", file: "cookies.webp", name: "Biscoitos", tags: ["box"], size: [2, 1], scale: scaleFromVisibleHeight("cookies", 96), anchor: [renderProfile("cookies").originX, renderProfile("cookies").originY], surface: renderProfile("cookies"), bounds: { w: 168, h: 96 }, prefs: { zone: "shelf", likesVisible: true } },
+  pasta: { image: "pasta", file: "pasta.webp", name: "Macarrao", tags: ["box"], size: [2, 1], scale: scaleFromVisibleHeight("pasta", 90), anchor: [renderProfile("pasta").originX, renderProfile("pasta").originY], surface: renderProfile("pasta"), bounds: { w: 172, h: 90 }, prefs: { zone: "shelf" } },
+
   // ---- PACKING PROTOTYPE ITEMS (top-down, big + rotatable) --------------
   // These are authored HORIZONTALLY (art lies left-right), so base sizes are
   // wide. Non-square items opt into rotation via `rotatable: true`. They render
@@ -477,6 +490,13 @@ function buildPantryLevel({
 // Difficulty grows by item count and by how many light prefs are in play
 // (topShelf / likesNeighbors / hatesNeighbors) — never by fit pressure. Max 8
 // pockets means a roster never exceeds 8 loose items.
+// Dry-goods roster only — jars/cans/tubes are narrow [1,1] uprights, boxes/packs
+// are wide [2,1]. Capacity model on the 4 shelves × 2 columns: a wide item fills
+// a whole shelf, a narrow takes one column, so shelves_used = (#wide) +
+// ceil(#narrow / 2) must be ≤ 4. At most ONE top-shelf-filling wide per level
+// (pantry_top has 2 columns, a wide occupies both). `likesNeighbors` is a soft
+// harmony bonus; only `topShelf` and `hatesNeighbors` are hard gates, and hate
+// pairs here always sit in different shelf-pairs so every level stays solvable.
 const PANTRY_BLUEPRINTS = [
   {
     tier: "Easy",
@@ -484,10 +504,10 @@ const PANTRY_BLUEPRINTS = [
     reward: 110,
     harmony: 200,
     items: [
-      { key: "apple", prefs: {} },
-      { key: "tomato", prefs: {} },
-      { key: "cheese", prefs: {} },
-      { key: "juice", prefs: {} },
+      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
     ],
   },
   {
@@ -496,11 +516,11 @@ const PANTRY_BLUEPRINTS = [
     reward: 115,
     harmony: 210,
     items: [
-      { key: "greenSoda", prefs: { likesNeighbors: ["redSoda"] } },
-      { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
-      { key: "apple", prefs: {} },
-      { key: "corn", prefs: {} },
-      { key: "cheese", prefs: {} },
+      { key: "pasta", prefs: {} },
+      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
     ],
   },
   {
@@ -509,11 +529,11 @@ const PANTRY_BLUEPRINTS = [
     reward: 120,
     harmony: 220,
     items: [
-      { key: "cake", prefs: { topShelf: true, likesVisible: true } },
-      { key: "bread", prefs: { likesNeighbors: ["cheese"] } },
-      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
-      { key: "tomato", prefs: {} },
-      { key: "juice", prefs: {} },
+      { key: "crackers", prefs: { topShelf: true, likesVisible: true } },
+      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
+      { key: "peanut", prefs: { likesNeighbors: ["jam"] } },
+      { key: "chips", prefs: {} },
     ],
   },
   {
@@ -522,12 +542,12 @@ const PANTRY_BLUEPRINTS = [
     reward: 130,
     harmony: 240,
     items: [
-      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
-      { key: "bread", prefs: { likesNeighbors: ["cheese", "butter"] } },
-      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
-      { key: "corn", prefs: {} },
-      { key: "apple", prefs: {} },
-      { key: "tomato", prefs: {} },
+      { key: "cookies", prefs: { topShelf: true, likesVisible: true } },
+      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
+      { key: "chips", prefs: {} },
     ],
   },
   {
@@ -536,12 +556,12 @@ const PANTRY_BLUEPRINTS = [
     reward: 140,
     harmony: 255,
     items: [
-      { key: "cake", prefs: { topShelf: true, likesVisible: true } },
-      { key: "juice", prefs: {} },
-      { key: "greenSoda", prefs: { hatesNeighbors: ["cake"], likesNeighbors: ["redSoda"] } },
-      { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
-      { key: "cheese", prefs: {} },
-      { key: "apple", prefs: {} },
+      { key: "crackers", prefs: { topShelf: true, likesVisible: true } },
+      { key: "pasta", prefs: {} },
+      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
     ],
   },
   {
@@ -550,13 +570,13 @@ const PANTRY_BLUEPRINTS = [
     reward: 150,
     harmony: 270,
     items: [
-      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
-      { key: "cake", prefs: { topShelf: true, likesVisible: true } },
-      { key: "bread", prefs: { likesNeighbors: ["cheese"] } },
-      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
-      { key: "corn", prefs: {} },
-      { key: "tomato", prefs: {} },
-      { key: "apple", prefs: {} },
+      { key: "cookies", prefs: { topShelf: true, likesVisible: true } },
+      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
+      { key: "peanut", prefs: { likesNeighbors: ["chips"] } },
+      { key: "chips", prefs: { likesNeighbors: ["peanut"] } },
     ],
   },
   {
@@ -565,14 +585,13 @@ const PANTRY_BLUEPRINTS = [
     reward: 160,
     harmony: 290,
     items: [
-      { key: "cake", prefs: { topShelf: true, likesVisible: true } },
-      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
-      { key: "bread", prefs: { likesNeighbors: ["cheese"] } },
-      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
-      { key: "corn", prefs: {} },
-      { key: "apple", prefs: {} },
-      { key: "tomato", prefs: {} },
-      { key: "juice", prefs: {} },
+      { key: "crackers", prefs: { topShelf: true, likesVisible: true } },
+      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { likesNeighbors: ["coffee"], hatesNeighbors: ["chips"] } },
+      { key: "peanut", prefs: { likesNeighbors: ["chips"] } },
+      { key: "chips", prefs: { likesNeighbors: ["peanut"], hatesNeighbors: ["beans"] } },
     ],
   },
   {
@@ -581,14 +600,13 @@ const PANTRY_BLUEPRINTS = [
     reward: 170,
     harmony: 305,
     items: [
-      { key: "cake", prefs: { topShelf: true, likesVisible: true, hatesNeighbors: ["greenSoda"] } },
-      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
-      { key: "greenSoda", prefs: { likesNeighbors: ["redSoda"] } },
-      { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
-      { key: "bread", prefs: { likesNeighbors: ["cheese"] } },
-      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
-      { key: "corn", prefs: {} },
-      { key: "tomato", prefs: {} },
+      { key: "pasta", prefs: { topShelf: true } },
+      { key: "jam", prefs: { likesNeighbors: ["honey"], hatesNeighbors: ["coffee"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
+      { key: "peanut", prefs: { likesNeighbors: ["chips"] } },
+      { key: "chips", prefs: { likesNeighbors: ["peanut"] } },
     ],
   },
   {
@@ -597,14 +615,13 @@ const PANTRY_BLUEPRINTS = [
     reward: 180,
     harmony: 320,
     items: [
-      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
-      { key: "cake", prefs: { topShelf: true, likesVisible: true, hatesNeighbors: ["greenSoda"] } },
-      { key: "bread", prefs: { likesNeighbors: ["cheese", "butter"] } },
-      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
-      { key: "corn", prefs: {} },
-      { key: "apple", prefs: {} },
-      { key: "greenSoda", prefs: { likesNeighbors: ["redSoda"] } },
-      { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
+      { key: "cookies", prefs: { topShelf: true, likesVisible: true } },
+      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { likesNeighbors: ["jam"], hatesNeighbors: ["chips"] } },
+      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
+      { key: "peanut", prefs: { likesNeighbors: ["jam"], hatesNeighbors: ["coffee"] } },
+      { key: "chips", prefs: { likesNeighbors: ["peanut"] } },
     ],
   },
 ];
