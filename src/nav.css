@@ -382,6 +382,115 @@
 }
 .fridge-home-btn:active { transform: translateY(1px); }
 
+/* ================================================================= How to play */
+.nav-help { overflow-y: auto; }
+.nav-help-sub {
+  margin: 0;
+  padding: 0 24px 8px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #9a7332;
+}
+.nav-help-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 20px 4px;
+}
+@media (min-width: 520px) {
+  .nav-help-modes { flex-direction: row; }
+  .nav-help-mode { flex: 1; }
+}
+.nav-help-mode {
+  background: rgba(255, 255, 255, 0.76);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 3px 10px rgba(180, 130, 40, 0.14);
+}
+.nav-help-mode h3 {
+  margin: 8px 0 6px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #5c3f1c;
+}
+.nav-help-mode p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #7c5c2e;
+}
+.nav-help-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.nav-help-tag--fridge { background: rgba(99, 208, 178, 0.22); color: #2b917a; }
+.nav-help-tag--pack { background: rgba(255, 180, 114, 0.28); color: #c9721f; }
+.nav-help-section {
+  margin: 16px 0 4px;
+  padding: 0 24px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #5c3f1c;
+}
+.nav-help-legend-sub {
+  margin: 0;
+  padding: 0 24px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #a98a52;
+}
+.nav-help-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0 20px;
+  display: grid;
+  gap: 10px;
+}
+@media (min-width: 520px) {
+  .nav-help-legend { grid-template-columns: 1fr 1fr; }
+}
+.nav-help-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 2px 8px rgba(180, 130, 40, 0.12);
+}
+.nav-help-badge {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+}
+.nav-help-legend-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.nav-help-legend-text strong { font-size: 14px; color: #5c3f1c; }
+.nav-help-legend-text small { font-size: 12px; color: #8a6a38; line-height: 1.4; }
+.nav-help-tips {
+  margin: 0;
+  padding: 4px 24px calc(28px + env(safe-area-inset-bottom, 0px)) 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #7c5c2e;
+}
+.nav-help-tips li { list-style: disc; }
+
 /* small screens */
 @media (max-height: 680px) {
   .nav-home-art { width: min(58%, 240px); }

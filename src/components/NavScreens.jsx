@@ -243,6 +243,7 @@ export function HomeScreen({
   onCollection,
   onShop,
   onDaily,
+  onHelp,
   dailyReady,
   langSwitch,
 }) {
@@ -297,6 +298,10 @@ export function HomeScreen({
           <span className="nav-chip-icon"><IconGift /></span>
           {nav.daily}
           {dailyReady && <span className="nav-chip-dot" aria-hidden="true" />}
+        </button>
+        <button type="button" className="nav-chip" onClick={onHelp}>
+          <span className="nav-chip-icon"><IconHelp /></span>
+          {nav.howToPlay}
         </button>
         <button type="button" className="nav-chip" onClick={onSettings}>
           <span className="nav-chip-icon"><IconGear /></span>

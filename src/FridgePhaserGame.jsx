@@ -6,7 +6,7 @@ import { FRIDGE_BR_CAMPAIGN, MAKEUP_LEVEL, PICNIC_LEVEL, SUITCASE_LEVEL } from "
 import { createI18n, localizeCampaign, localizeLevel } from "./i18n/index.js";
 import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progressStorageKey, switchLocaleHref, writeLocalePreference } from "./i18n/locale.js";
 import { MetaLayer } from "./components/MetaLayer.jsx";
-import { HomeScreen, LevelMapScreen, SettingsScreen } from "./components/NavScreens.jsx";
+import { HomeScreen, LevelMapScreen, SettingsScreen, HelpScreen } from "./components/NavScreens.jsx";
 import { readMeta, writeMeta, discoverItem, bumpStreak, skinById, setMuted as setMetaMuted, dailyStatus } from "./meta/metaProgress.js";
 import "./meta.css";
 import "./nav.css";
@@ -638,6 +638,7 @@ export function FridgePhaserGame() {
           onCollection={() => setMetaPanel("collection")}
           onShop={() => setMetaPanel("shop")}
           onDaily={() => setMetaPanel("daily")}
+          onHelp={() => setScreen("help")}
           dailyReady={dailyReady}
           langSwitch={langSwitch}
         />
@@ -666,6 +667,9 @@ export function FridgePhaserGame() {
           onBack={goHome}
           langLabels={{ pt: i18n.ui.langPt, en: i18n.ui.langEn, cn: i18n.ui.langCn }}
         />
+      )}
+      {!standalone && !editMode && screen === "help" && (
+        <HelpScreen nav={nav} help={i18n.ui.help} onBack={goHome} />
       )}
       {(screen === "home" || screen === "map" || screen === "settings") && !standalone && !editMode && (
         <MetaLayer
