@@ -368,7 +368,7 @@ function buildPackingLevel(config) {
 // Shared per-container geometry (the grid matches each art's visible interior).
 const PICNIC_BASE = {
   container: { key: "picnic-basket", file: "picnic-basket.png", size: 720, y: 628 },
-  grid: { x: 375, y: 628, w: 500, h: 500, cols: 4, rows: 4 },
+  grid: { x: 375, y: 648, w: 432, h: 432, cols: 4, rows: 4 },
   theme: { key: "picnic", title: "Picnic Packing", subtitle: "Tap to rotate · drag to pack", background: "#eaf4d8" },
   tray: { y: 1064, spanX: [150, 600] },
 };
