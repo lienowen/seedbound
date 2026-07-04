@@ -6,8 +6,10 @@ import { FRIDGE_BR_CAMPAIGN, MAKEUP_LEVEL, PICNIC_LEVEL, SUITCASE_LEVEL } from "
 import { createI18n, localizeCampaign, localizeLevel } from "./i18n/index.js";
 import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progressStorageKey, switchLocaleHref, writeLocalePreference } from "./i18n/locale.js";
 import { MetaLayer } from "./components/MetaLayer.jsx";
-import { readMeta, writeMeta, discoverItem, bumpStreak, skinById } from "./meta/metaProgress.js";
+import { HomeScreen, LevelMapScreen, SettingsScreen } from "./components/NavScreens.jsx";
+import { readMeta, writeMeta, discoverItem, bumpStreak, skinById, setMuted as setMetaMuted, dailyStatus } from "./meta/metaProgress.js";
 import "./meta.css";
+import "./nav.css";
 
 const HINT_COST = 25;
 const LOW_COINS_HINT = HINT_COST - 1;
@@ -103,6 +105,10 @@ export function FridgePhaserGame() {
   const [meta, setMeta] = useState(() => readMeta());
   const [discovery, setDiscovery] = useState(null);
   const [autoOpenDaily, setAutoOpenDaily] = useState(true);
+  // Screen routing: standalone/edit modes jump straight into the game.
+  const [screen, setScreen] = useState(() => (standalone || params.get("edit") === "true" ? "game" : "home"));
+  // Lifted meta panel state so Home shortcuts and the in-game toolbar share it.
+  const [metaPanel, setMetaPanel] = useState(null); // 'collection' | 'shop' | 'daily' | null
   const metaRef = useRef(meta);
   metaRef.current = meta;
   const discoveryTimerRef = useRef(null);
@@ -122,6 +128,14 @@ export function FridgePhaserGame() {
   }, [theme, locale, campaign, currentIndex]);
   const isLastLevel = currentIndex >= campaign.length - 1;
   const unlockedCount = Math.min(progress.unlocked, campaign.length);
+  // ---- Nav-screen derived values ----
+  const nav = i18n.ui.nav;
+  const starsById = progress.stars || {};
+  const levelsDone = campaign.reduce((n, entry) => n + (starsById[entry.id] > 0 ? 1 : 0), 0);
+  const starsEarned = campaign.reduce((n, entry) => n + (starsById[entry.id] || 0), 0);
+  const starsTotal = campaign.length * 3;
+  const hasProgress = progress.unlocked > 1 || levelsDone > 0;
+  const dailyReady = !standalone && dailyStatus(meta).claimable;
   // Packing levels use rotate+fit mechanics, so the fridge "wish" hint does not
   // apply — the Best-Spot tool covers hinting instead.
   const isPacking = !!level.packing;
@@ -257,6 +271,44 @@ export function FridgePhaserGame() {
     setMessage(campaign[0].copy?.intro || i18n.ui.dragHint);
     pendingFreshRef.current = true;
     setReloadToken((prev) => prev + 1);
+    setScreen("home");
+  }
+
+  // ---- Navigation between Home / Map / Game --------------------------------
+  function startFromHome() {
+    // Continue at the current unlocked level (or first level for new players).
+    soundRef.current?.phase();
+    pendingFreshRef.current = true;
+    setComplete(false);
+    setLastReward(0);
+    setLastStars(0);
+    setScreen("game");
+  }
+
+  function playLevelFromMap(index) {
+    if (standalone) return;
+    const unlocked = Math.min(progressRef.current.unlocked, campaign.length);
+    if (index > unlocked - 1) return;
+    soundRef.current?.phase();
+    pendingFreshRef.current = true;
+    setComplete(false);
+    setLastReward(0);
+    setLastStars(0);
+    updateProgress({ current: index });
+    setScreen("game");
+  }
+
+  function goHome() {
+    soundRef.current?.phase?.();
+    setComplete(false);
+    setScreen("home");
+  }
+
+  function toggleSound() {
+    const next = setMetaMuted(metaRef.current, !metaRef.current.settings?.muted);
+    setMeta(next);
+    soundRef.current?.setMuted?.(!!next.settings?.muted);
+    if (!next.settings?.muted) soundRef.current?.snap?.();
   }
 
   function useHint() {
@@ -341,6 +393,7 @@ export function FridgePhaserGame() {
     const unlock = () => sounds.unlock();
     window.addEventListener("pointerdown", unlock, { passive: true });
     window.addEventListener("touchstart", unlock, { passive: true });
+    sounds.setMuted?.(metaRef.current.settings?.muted);
     return () => {
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("touchstart", unlock);
@@ -350,6 +403,14 @@ export function FridgePhaserGame() {
   }, []);
 
   useEffect(() => {
+    soundRef.current?.setMuted?.(!!meta.settings?.muted);
+  }, [meta.settings?.muted]);
+
+  useEffect(() => {
+    // Only mount Phaser while the game screen is active; Home/Map/Settings are
+    // pure React so we free the canvas + audio while the player is browsing.
+    if (screen !== "game") return undefined;
+    if (!mount.current) return undefined;
     const forceFresh = pendingFreshRef.current;
     pendingFreshRef.current = false;
     setBootVariant(hasMountedOnceRef.current ? "swap" : "initial");
@@ -497,7 +558,7 @@ export function FridgePhaserGame() {
       sceneRef.current = null;
       mount.current?.replaceChildren();
     };
-  }, [theme, currentIndex, reloadToken, editMode]);
+  }, [theme, currentIndex, reloadToken, editMode, screen]);
 
   useEffect(() => {
     setHud({ placed: 0, total: level.items.filter((item) => !item.fixed).length });
@@ -548,15 +609,87 @@ export function FridgePhaserGame() {
   }
 
   const search = window.location.search;
+  const langSwitch = localeSwitcherEnabled ? (
+    <nav className="fridge-lang-switch" aria-label="Language">
+      <a className={locale === "pt" ? "active" : ""} href={switchLocaleHref("pt", search)} onClick={(event) => changeLocale("pt", event)}>{i18n.ui.langPt}</a>
+      <a className={locale === "en" ? "active" : ""} href={switchLocaleHref("en", search)} onClick={(event) => changeLocale("en", event)}>{i18n.ui.langEn}</a>
+      <a className={locale === "cn" ? "active" : ""} href={switchLocaleHref("cn", search)} onClick={(event) => changeLocale("cn", event)}>{i18n.ui.langCn}</a>
+    </nav>
+  ) : null;
+  const showGameChrome = !editMode && !standalone && screen === "game";
+  // The Phaser canvas / boot / result surface renders for standalone + edit modes,
+  // and for the campaign only while the game screen is active.
+  const showGame = standalone || editMode || screen === "game";
   return (
     <main className="fridge-shell">
-      {!editMode && !standalone && (
+      {!standalone && !editMode && screen === "home" && (
+        <HomeScreen
+          nav={nav}
+          coins={progress.coins}
+          hasProgress={hasProgress}
+          levelsDone={levelsDone}
+          levelsTotal={campaign.length}
+          starsEarned={starsEarned}
+          starsTotal={starsTotal}
+          onPlay={startFromHome}
+          onContinue={startFromHome}
+          onMap={() => setScreen("map")}
+          onSettings={() => setScreen("settings")}
+          onCollection={() => setMetaPanel("collection")}
+          onShop={() => setMetaPanel("shop")}
+          onDaily={() => setMetaPanel("daily")}
+          dailyReady={dailyReady}
+          langSwitch={langSwitch}
+        />
+      )}
+      {!standalone && !editMode && screen === "map" && (
+        <LevelMapScreen
+          nav={nav}
+          coins={progress.coins}
+          campaign={campaign}
+          unlockedCount={unlockedCount}
+          starsById={starsById}
+          onPlayLevel={playLevelFromMap}
+          onBack={goHome}
+        />
+      )}
+      {!standalone && !editMode && screen === "settings" && (
+        <SettingsScreen
+          nav={nav}
+          muted={!!meta.settings?.muted}
+          onToggleSound={toggleSound}
+          locale={locale}
+          onSetLocale={(code) => changeLocale(code, { preventDefault() {} })}
+          onReset={() => {
+            if (window.confirm(nav.resetConfirm)) resetCampaign();
+          }}
+          onBack={goHome}
+          langLabels={{ pt: i18n.ui.langPt, en: i18n.ui.langEn, cn: i18n.ui.langCn }}
+        />
+      )}
+      {(screen === "home" || screen === "map" || screen === "settings") && !standalone && !editMode && (
+        <MetaLayer
+          i18n={i18n}
+          locale={locale}
+          coins={progress.coins}
+          meta={meta}
+          onMetaChange={handleMetaChange}
+          onAddCoins={addCoins}
+          onSpendCoins={spendCoins}
+          discovery={discovery}
+          autoOpenDaily={autoOpenDaily && screen === "home"}
+          onDailyAutoHandled={() => setAutoOpenDaily(false)}
+          panel={metaPanel}
+          setPanel={setMetaPanel}
+          showToolbar={false}
+        />
+      )}
+      {showGameChrome && (
         <>
-          {localeSwitcherEnabled && <nav className="fridge-lang-switch" aria-label="Language">
-            <a className={locale === "pt" ? "active" : ""} href={switchLocaleHref("pt", search)} onClick={(event) => changeLocale("pt", event)}>{i18n.ui.langPt}</a>
-            <a className={locale === "en" ? "active" : ""} href={switchLocaleHref("en", search)} onClick={(event) => changeLocale("en", event)}>{i18n.ui.langEn}</a>
-            <a className={locale === "cn" ? "active" : ""} href={switchLocaleHref("cn", search)} onClick={(event) => changeLocale("cn", event)}>{i18n.ui.langCn}</a>
-          </nav>}
+          <button type="button" className="fridge-home-btn" onClick={goHome} aria-label={nav.home} title={nav.home}>
+            ‹ {nav.home}
+          </button>
+          {langSwitch}
           <div className="fridge-quick-actions">
             <button
               type="button"
@@ -626,11 +759,14 @@ export function FridgePhaserGame() {
             discovery={discovery}
             autoOpenDaily={autoOpenDaily}
             onDailyAutoHandled={() => setAutoOpenDaily(false)}
+            panel={metaPanel}
+            setPanel={setMetaPanel}
+            showToolbar
           />
         </>
       )}
-      <div className="fridge-game-mount" ref={mount} />
-      <div className={`fridge-boot-overlay fridge-boot-overlay--${bootVariant}${booting ? " visible" : ""}`} aria-hidden={!booting}>
+      {showGame && <div className="fridge-game-mount" ref={mount} />}
+      {showGame && <div className={`fridge-boot-overlay fridge-boot-overlay--${bootVariant}${booting ? " visible" : ""}`} aria-hidden={!booting}>
         <div className="fridge-boot-overlay__veil" />
         <div className="fridge-boot-overlay__card">
           <div className="fridge-boot-badge">Seedbound</div>
@@ -658,8 +794,8 @@ export function FridgePhaserGame() {
           <strong>{level.theme.title}</strong>
           <p>{level.copy?.intro || i18n.ui.dragHint}</p>
         </div>
-      </div>
-      {complete && (
+      </div>}
+      {showGame && complete && (
         <section className="fridge-result fridge-result--celebrate">
           <div className="fridge-result-sparkles" aria-hidden="true">
             <span />
@@ -678,6 +814,7 @@ export function FridgePhaserGame() {
           <div className="fridge-result-actions">
             {!isLastLevel && <button onClick={goNextLevel}>{level.copy?.nextLabel || i18n.ui.nextLabel}</button>}
             <button className="secondary" onClick={replayLevel}>{level.copy?.retryLabel || i18n.ui.retryLabel}</button>
+            {!standalone && <button className="secondary" onClick={() => { setComplete(false); setScreen("map"); }}>{nav.levelMap}</button>}
           </div>
         </section>
       )}
