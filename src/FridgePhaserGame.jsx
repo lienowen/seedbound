@@ -8,6 +8,7 @@ import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progre
 import { MetaLayer } from "./components/MetaLayer.jsx";
 import { HomeScreen, LevelMapScreen, SettingsScreen, HelpScreen } from "./components/NavScreens.jsx";
 import { readMeta, writeMeta, discoverItem, bumpStreak, skinById, setMuted as setMetaMuted, dailyStatus } from "./meta/metaProgress.js";
+import { initCrazyGames, cgLoadingStart, cgLoadingStop, cgGameplayStart, cgGameplayStop, cgHappytime, cgMidgameAd } from "./crazygames.js";
 import "./meta.css";
 import "./nav.css";
 
@@ -114,6 +115,8 @@ export function FridgePhaserGame() {
   const discoveryTimerRef = useRef(null);
   const placedRef = useRef(0);
   const currentIndexRef = useRef(0);
+  // Timestamp of the last midgame ad, to keep ads from showing too frequently.
+  const lastAdRef = useRef(0);
   const progressRef = useRef(progress);
   const hasMountedOnceRef = useRef(false);
 
@@ -235,9 +238,16 @@ export function FridgePhaserGame() {
     setReloadToken((prev) => prev + 1);
   }
 
-  function goNextLevel() {
+  async function goNextLevel() {
     if (standalone) return;
     const nextIndex = Math.min(currentIndex + 1, campaign.length - 1);
+    // Show a midgame ad at this natural break, throttled to at most once per
+    // ~90s so we never spam the player (a CrazyGames QA requirement).
+    const now = Date.now();
+    if (now - lastAdRef.current > 90000) {
+      lastAdRef.current = now;
+      await cgMidgameAd();
+    }
     soundRef.current?.phase();
     pendingFreshRef.current = true;
     updateProgress({ current: nextIndex });
@@ -414,6 +424,27 @@ export function FridgePhaserGame() {
     soundRef.current?.setMuted?.(!!meta.settings?.muted);
   }, [meta.settings?.muted]);
 
+  // ---- CrazyGames SDK lifecycle -------------------------------------------
+  // Initialize once on mount. All calls no-op when the SDK isn't present.
+  useEffect(() => {
+    initCrazyGames();
+  }, []);
+
+  // Loading state: bracket asset boot with loadingStart/loadingStop so the
+  // portal can show its own loading UI and hold ads until the game is ready.
+  useEffect(() => {
+    if (booting) cgLoadingStart();
+    else cgLoadingStop();
+  }, [booting]);
+
+  // Gameplay is active exactly while the game screen is showing an unfinished
+  // level (not on Home/Map/Settings, not on the win overlay, not while booting).
+  const gameplayActive = screen === "game" && !complete && !booting;
+  useEffect(() => {
+    if (gameplayActive) cgGameplayStart();
+    else cgGameplayStop();
+  }, [gameplayActive]);
+
   useEffect(() => {
     // Only mount Phaser while the game screen is active; Home/Map/Settings are
     // pure React so we free the canvas + audio while the player is browsing.
@@ -507,6 +538,7 @@ export function FridgePhaserGame() {
         soundRef.current?.success();
       }
       setComplete(true);
+      cgHappytime();
       setLastReward(detail.gold || 0);
       setLastStars(detail.stars || 1);
       const starText = i18n.ui.starLabel(detail.stars || 1);
