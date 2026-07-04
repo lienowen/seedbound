@@ -44,9 +44,10 @@ function readProgress(locale) {
     if (!raw) return { unlocked: 1, coins: 125, current: 0, layout: CAMPAIGN_LAYOUT_VERSION };
     const parsed = JSON.parse(raw);
     let rawUnlocked = parsed.unlocked || 1;
-    // Migrate pre-interleave saves so unlock progress lands on the same levels.
-    if ((parsed.layout || 1) < CAMPAIGN_LAYOUT_VERSION) {
-      rawUnlocked = migrateUnlockedIndex(rawUnlocked);
+    // Migrate older-layout saves so unlock progress lands on the same levels.
+    const savedLayout = parsed.layout || 1;
+    if (savedLayout < CAMPAIGN_LAYOUT_VERSION) {
+      rawUnlocked = migrateUnlockedIndex(rawUnlocked, savedLayout);
     }
     const unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, rawUnlocked));
     const current = Math.max(0, Math.min(unlocked - 1, parsed.current || 0));
