@@ -17,7 +17,9 @@ export function createUiSounds() {
       if (!AudioContextCtor) return null;
       ctx = new AudioContextCtor();
     }
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    // iOS can leave the context "interrupted" after backgrounding/phone calls,
+    // and "suspended" before the first gesture. Resume on both from a user gesture.
+    if (ctx.state === "suspended" || ctx.state === "interrupted") ctx.resume().catch(() => {});
     return ctx;
   }
 
