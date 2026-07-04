@@ -15,7 +15,10 @@ import path from "path";
 import { PNG } from "pngjs";
 
 const DIR = "public/assets/tidy/";
-const BG_THRESH = 232; // pixels brighter than this (all channels) = white paper
+// The regenerated art ships with a painted "fake transparency" checkerboard:
+// a perfectly neutral gray pattern (r === g === b, chroma 0) ranging dark→light.
+// Real rendered food keeps a slight color cast even in whites, so we treat only
+// near-perfectly-neutral pixels as background.
 
 const FILES = [
   // bento
@@ -28,13 +31,18 @@ const FILES = [
 
 function cutout(png) {
   const { width: w, height: h, data } = png;
+  // Reset alpha so the pass is idempotent (a prior run may have zeroed pixels
+  // that the current, improved classifier should keep). RGB is left untouched.
+  for (let i = 3; i < data.length; i += 4) data[i] = 255;
   const isBg = (i) => {
     const r = data[i], g = data[i + 1], b = data[i + 2];
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    if (min >= BG_THRESH) return true; // near-white paper
-    const chroma = max - min;
-    const bright = (r + g + b) / 3;
-    return chroma <= 22 && bright >= 140; // soft neutral-gray shadow
+    const max = Math.max(r, g, b);
+    const chroma = max - Math.min(r, g, b);
+    // Near-perfectly-neutral gray = painted checkerboard background. The
+    // checkerboard's lightest squares top out around 190, while bright white
+    // foods (rice, folded whites, egg white) sit above 225 — so the brightness
+    // cap keeps the fill from climbing out of the background into those foods.
+    return chroma <= 12 && max <= 205;
   };
   const visited = new Uint8Array(w * h);
   const stack = [];
