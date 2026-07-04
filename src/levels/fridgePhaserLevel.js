@@ -375,15 +375,16 @@ const PANTRY_ASSETS = {
 // their id so `topShelf` preferences resolve there. Every zone is "shelf" so the
 // natural-lean + shelf-seat offset logic applies and no item ever needs a cold
 // zone (which the cupboard doesn't have) to settle.
+const PANTRY_ALLOW = ["carton", "dairy", "box", "bottle", "food"];
 const PANTRY_SLOTS = [
-  { id: "pantry_top_1", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 292, y: 317, w: 150, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
-  { id: "pantry_top_2", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 458, y: 317, w: 150, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 111 },
-  { id: "pantry_up_1", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 290, y: 461, w: 158, h: 124, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
-  { id: "pantry_up_2", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 460, y: 461, w: 158, h: 124, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 131 },
-  { id: "pantry_low_1", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 288, y: 599, w: 162, h: 128, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
-  { id: "pantry_low_2", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 462, y: 599, w: 162, h: 128, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 151 },
-  { id: "pantry_base_1", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 288, y: 736, w: 162, h: 130, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
-  { id: "pantry_base_2", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 462, y: 736, w: 162, h: 130, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 171 },
+  { id: "pantry_top_1", zone: "shelf", allow: PANTRY_ALLOW, x: 305, y: 258, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
+  { id: "pantry_top_2", zone: "shelf", allow: PANTRY_ALLOW, x: 445, y: 258, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 111 },
+  { id: "pantry_up_1", zone: "shelf", allow: PANTRY_ALLOW, x: 305, y: 388, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
+  { id: "pantry_up_2", zone: "shelf", allow: PANTRY_ALLOW, x: 445, y: 388, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 131 },
+  { id: "pantry_low_1", zone: "shelf", allow: PANTRY_ALLOW, x: 305, y: 516, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
+  { id: "pantry_low_2", zone: "shelf", allow: PANTRY_ALLOW, x: 445, y: 516, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 151 },
+  { id: "pantry_base_1", zone: "shelf", allow: PANTRY_ALLOW, x: 305, y: 640, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
+  { id: "pantry_base_2", zone: "shelf", allow: PANTRY_ALLOW, x: 445, y: 640, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 171 },
 ];
 
 // The cupboard has no cold zone, so any "needsCold" preference would be
@@ -460,61 +461,154 @@ function buildPantryLevel({
 }
 
 // --- PANTRY LEVELS (rising difficulty) --------------------------------------
-// Easy: six small goods, every item just wants "a shelf" — pure relaxing tidy.
-export const PANTRY_LEVEL_EASY = buildPantryLevel({
-  id: "pantry-1",
-  reward: 110,
-  harmonyTarget: 200,
-  copy: pantryCopy({ difficulty: "Easy", goal: "Guarde os mantimentos nas prateleiras." }),
-  items: [
-    { key: "apple", prefs: {} },
-    { key: "tomato", prefs: {} },
-    { key: "cheese", prefs: {} },
-    { key: "juice", prefs: {} },
-    { key: "greenSoda", prefs: {} },
-    { key: "redSoda", prefs: {} },
-  ],
-});
+// Nine cupboard interludes that replace the old grid-packing beats. Each has a
+// distinct roster so the surface-tidy beats stay fresh across the campaign.
+// Difficulty grows by item count and by how many light prefs are in play
+// (topShelf / likesNeighbors / hatesNeighbors) — never by fit pressure. Max 8
+// pockets means a roster never exceeds 8 loose items.
+const PANTRY_BLUEPRINTS = [
+  {
+    tier: "Easy",
+    goal: "Guarde os mantimentos nas prateleiras.",
+    reward: 110,
+    harmony: 200,
+    items: [
+      { key: "apple", prefs: {} },
+      { key: "tomato", prefs: {} },
+      { key: "cheese", prefs: {} },
+      { key: "juice", prefs: {} },
+    ],
+  },
+  {
+    tier: "Easy",
+    goal: "Arrume a despensa com calma.",
+    reward: 115,
+    harmony: 210,
+    items: [
+      { key: "greenSoda", prefs: { likesNeighbors: ["redSoda"] } },
+      { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
+      { key: "apple", prefs: {} },
+      { key: "corn", prefs: {} },
+      { key: "cheese", prefs: {} },
+    ],
+  },
+  {
+    tier: "Easy",
+    goal: "Coloque cada item numa prateleira.",
+    reward: 120,
+    harmony: 220,
+    items: [
+      { key: "cake", prefs: { topShelf: true, likesVisible: true } },
+      { key: "bread", prefs: { likesNeighbors: ["cheese"] } },
+      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
+      { key: "tomato", prefs: {} },
+      { key: "juice", prefs: {} },
+    ],
+  },
+  {
+    tier: "Normal",
+    goal: "Organize a despensa com capricho.",
+    reward: 130,
+    harmony: 240,
+    items: [
+      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
+      { key: "bread", prefs: { likesNeighbors: ["cheese", "butter"] } },
+      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
+      { key: "corn", prefs: {} },
+      { key: "apple", prefs: {} },
+      { key: "tomato", prefs: {} },
+    ],
+  },
+  {
+    tier: "Normal",
+    goal: "Deixe a despensa nos trinques.",
+    reward: 140,
+    harmony: 255,
+    items: [
+      { key: "cake", prefs: { topShelf: true, likesVisible: true } },
+      { key: "juice", prefs: {} },
+      { key: "greenSoda", prefs: { hatesNeighbors: ["cake"], likesNeighbors: ["redSoda"] } },
+      { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
+      { key: "cheese", prefs: {} },
+      { key: "apple", prefs: {} },
+    ],
+  },
+  {
+    tier: "Normal",
+    goal: "Arrume os mantimentos com carinho.",
+    reward: 150,
+    harmony: 270,
+    items: [
+      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
+      { key: "cake", prefs: { topShelf: true, likesVisible: true } },
+      { key: "bread", prefs: { likesNeighbors: ["cheese"] } },
+      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
+      { key: "corn", prefs: {} },
+      { key: "tomato", prefs: {} },
+      { key: "apple", prefs: {} },
+    ],
+  },
+  {
+    tier: "Hard",
+    goal: "Encaixe toda a despensa com carinho.",
+    reward: 160,
+    harmony: 290,
+    items: [
+      { key: "cake", prefs: { topShelf: true, likesVisible: true } },
+      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
+      { key: "bread", prefs: { likesNeighbors: ["cheese"] } },
+      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
+      { key: "corn", prefs: {} },
+      { key: "apple", prefs: {} },
+      { key: "tomato", prefs: {} },
+      { key: "juice", prefs: {} },
+    ],
+  },
+  {
+    tier: "Hard",
+    goal: "Organize a despensa cheia.",
+    reward: 170,
+    harmony: 305,
+    items: [
+      { key: "cake", prefs: { topShelf: true, likesVisible: true, hatesNeighbors: ["greenSoda"] } },
+      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
+      { key: "greenSoda", prefs: { likesNeighbors: ["redSoda"] } },
+      { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
+      { key: "bread", prefs: { likesNeighbors: ["cheese"] } },
+      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
+      { key: "corn", prefs: {} },
+      { key: "tomato", prefs: {} },
+    ],
+  },
+  {
+    tier: "Hard",
+    goal: "Capriche na despensa inteira.",
+    reward: 180,
+    harmony: 320,
+    items: [
+      { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
+      { key: "cake", prefs: { topShelf: true, likesVisible: true, hatesNeighbors: ["greenSoda"] } },
+      { key: "bread", prefs: { likesNeighbors: ["cheese", "butter"] } },
+      { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
+      { key: "corn", prefs: {} },
+      { key: "apple", prefs: {} },
+      { key: "greenSoda", prefs: { likesNeighbors: ["redSoda"] } },
+      { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
+    ],
+  },
+];
 
-// Medium: adds a couple of wide goods and one "keep it up top" item, plus a
-// light "don't put these two together" pair for a touch of planning.
-export const PANTRY_LEVEL_MED = buildPantryLevel({
-  id: "pantry-2",
-  reward: 140,
-  harmonyTarget: 260,
-  copy: pantryCopy({ difficulty: "Normal", goal: "Organize a despensa com capricho." }),
-  items: [
-    { key: "bread", prefs: { needsWarm: true, likesNeighbors: ["cheese", "butter"] } },
-    { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
-    { key: "corn", prefs: {} },
-    { key: "apple", prefs: {} },
-    { key: "tomato", prefs: {} },
-    { key: "cake", prefs: { topShelf: true, likesVisible: true } },
-    { key: "juice", prefs: {} },
-    { key: "greenSoda", prefs: { hatesNeighbors: ["cake"] } },
-  ],
-});
-
-// Hard: a full cupboard — two "up top" items and a spacing rule keep it engaging
-// without any perfect-fit stress.
-export const PANTRY_LEVEL_HARD = buildPantryLevel({
-  id: "pantry-3",
-  reward: 170,
-  harmonyTarget: 300,
-  copy: pantryCopy({ difficulty: "Hard", goal: "Encaixe toda a despensa com carinho." }),
-  items: [
-    { key: "cake", prefs: { topShelf: true, likesVisible: true } },
-    { key: "watermelon", prefs: { topShelf: true, likesVisible: true } },
-    { key: "bread", prefs: { needsWarm: true, likesNeighbors: ["cheese"] } },
-    { key: "cheese", prefs: { likesNeighbors: ["bread"] } },
-    { key: "corn", prefs: {} },
-    { key: "apple", prefs: {} },
-    { key: "tomato", prefs: {} },
-    { key: "juice", prefs: {} },
-    { key: "greenSoda", prefs: { hatesNeighbors: ["cake"], likesNeighbors: ["redSoda"] } },
-    { key: "redSoda", prefs: { likesNeighbors: ["greenSoda"] } },
-  ],
-});
+const PANTRY_LEVELS = PANTRY_BLUEPRINTS.map((bp, i) =>
+  buildPantryLevel({
+    id: `pantry-${i + 1}`,
+    reward: bp.reward,
+    harmonyTarget: bp.harmony,
+    harmonyGold: Math.round(bp.harmony * 1.3),
+    harmonyPerfect: Math.round(bp.harmony * 1.65),
+    copy: pantryCopy({ difficulty: bp.tier, goal: bp.goal }),
+    items: bp.items,
+  })
+);
 
 // ===========================================================================
 // PACKING ROSTER
@@ -1245,30 +1339,31 @@ const FRIDGE_LEVELS = [
   }),
 ];
 
-// Interleave packing levels into the single fridge campaign so both playstyles
-// share one linear progression (coins, unlocks, streaks, collection). Packing
-// levels appear after specific fridge levels to vary the pacing. Insertion is
-// keyed by the fridge level id it should follow, so re-ordering fridge levels
-// keeps the packing beats anchored to the right place.
-// Difficulty rises with campaign depth and the three container themes rotate
-// (bento -> picnic -> suitcase) so the packing beats always feel fresh.
-const PACKING_INSERTS = {
-  "fridge-br-2": [BENTO_LEVEL_EASY],
-  "fridge-br-4": [PICNIC_LEVEL_EASY],
-  "fridge-br-6": [SUITCASE_LEVEL_EASY],
-  "fridge-br-8": [BENTO_LEVEL_MED],
-  "fridge-br-10": [PICNIC_LEVEL],
-  "fridge-br-12": [SUITCASE_LEVEL],
-  "fridge-br-14": [BENTO_LEVEL_HARD],
-  "fridge-br-16": [PICNIC_LEVEL_HARD],
-  "fridge-br-18": [SUITCASE_LEVEL_HARD],
+// Interleave pantry (surface-tidy) levels into the single fridge campaign so
+// both settings share one linear progression (coins, unlocks, streaks,
+// collection). Pantry beats appear after specific fridge levels to vary the
+// pacing. Insertion is keyed by the fridge level id it should follow, so
+// re-ordering fridge levels keeps the interludes anchored to the right place.
+// Difficulty rises with campaign depth (the pantry blueprints are ordered
+// easy -> hard) so the cupboard beats always feel fresh and relaxing rather
+// than the old grid-packing pressure.
+const PANTRY_INSERTS = {
+  "fridge-br-2": [PANTRY_LEVELS[0]],
+  "fridge-br-4": [PANTRY_LEVELS[1]],
+  "fridge-br-6": [PANTRY_LEVELS[2]],
+  "fridge-br-8": [PANTRY_LEVELS[3]],
+  "fridge-br-10": [PANTRY_LEVELS[4]],
+  "fridge-br-12": [PANTRY_LEVELS[5]],
+  "fridge-br-14": [PANTRY_LEVELS[6]],
+  "fridge-br-16": [PANTRY_LEVELS[7]],
+  "fridge-br-18": [PANTRY_LEVELS[8]],
 };
 
 function assembleCampaign() {
   const out = [];
   for (const fridge of FRIDGE_LEVELS) {
     out.push(fridge);
-    const inserts = PACKING_INSERTS[fridge.id];
+    const inserts = PANTRY_INSERTS[fridge.id];
     if (inserts) out.push(...inserts);
   }
   // Renumber phase sequentially so the HUD "Level N" label and the level-select
