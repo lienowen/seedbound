@@ -47,6 +47,167 @@ function IconGear() {
   );
 }
 
+function IconHelp() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3.5" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+// Requirement badge pictograms — kept visually in sync with drawNeedIcon()
+// in StorageScene.js so the legend matches what players see on items.
+const badgeProps = {
+  viewBox: "0 0 32 32",
+  width: 30,
+  height: 30,
+  "aria-hidden": true,
+};
+function badgeInk(alert) {
+  return alert ? "#6b3410" : "#a9772f";
+}
+function BadgeBase({ alert = false, children }) {
+  return (
+    <svg {...badgeProps}>
+      <circle cx="16" cy="16" r="14" fill={alert ? "#ffb347" : "#fff1d6"} stroke="#ffffff" strokeWidth="3" />
+      <g
+        transform="translate(16 16)"
+        fill="none"
+        stroke={badgeInk(alert)}
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {children}
+      </g>
+    </svg>
+  );
+}
+function NeedIcon({ need, alert }) {
+  const ink = badgeInk(alert);
+  switch (need) {
+    case "cold":
+      return (
+        <BadgeBase alert={alert}>
+          {[90, 210, 330].map((deg) => {
+            const r = (deg * Math.PI) / 180;
+            const x = Math.cos(r) * 6.5;
+            const y = Math.sin(r) * 6.5;
+            return <line key={deg} x1={-x} y1={-y} x2={x} y2={y} />;
+          })}
+        </BadgeBase>
+      );
+    case "warm":
+      return (
+        <BadgeBase alert={alert}>
+          <circle cx="0" cy="0" r="3.2" fill={ink} stroke="none" />
+          {Array.from({ length: 8 }).map((_, i) => {
+            const a = (Math.PI / 4) * i;
+            return (
+              <line
+                key={i}
+                x1={Math.cos(a) * 5.4}
+                y1={Math.sin(a) * 5.4}
+                x2={Math.cos(a) * 8.6}
+                y2={Math.sin(a) * 8.6}
+              />
+            );
+          })}
+        </BadgeBase>
+      );
+    case "top":
+      return (
+        <BadgeBase alert={alert}>
+          <line x1="-6" y1="6" x2="6" y2="6" />
+          <polyline points="-5,-0.5 0,-6 5,-0.5" />
+          <line x1="0" y1="-6" x2="0" y2="3" />
+        </BadgeBase>
+      );
+    case "visible":
+      return (
+        <BadgeBase alert={alert}>
+          <ellipse cx="0" cy="0" rx="8" ry="4.5" />
+          <circle cx="0" cy="0" r="2.4" fill={ink} stroke="none" />
+        </BadgeBase>
+      );
+    case "hates":
+      return (
+        <BadgeBase alert={alert}>
+          <circle cx="0" cy="0" r="7" />
+          <line x1="-4.9" y1="-4.9" x2="4.9" y2="4.9" />
+        </BadgeBase>
+      );
+    case "zone":
+    default:
+      return (
+        <BadgeBase alert={alert}>
+          <line x1="-6" y1="-3" x2="6" y2="-3" />
+          <line x1="-6" y1="3" x2="6" y2="3" />
+        </BadgeBase>
+      );
+  }
+}
+
+/* ---------------------------------------------------------- How to play */
+export function HelpScreen({ nav, help, onBack }) {
+  const legend = [
+    { need: "cold", name: help.needCold, desc: help.needColdDesc },
+    { need: "warm", name: help.needWarm, desc: help.needWarmDesc },
+    { need: "top", name: help.needTop, desc: help.needTopDesc },
+    { need: "zone", name: help.needZone, desc: help.needZoneDesc },
+    { need: "visible", name: help.needVisible, desc: help.needVisibleDesc },
+    { need: "hates", name: help.needHates, desc: help.needHatesDesc },
+  ];
+  return (
+    <section className="nav-screen nav-help" aria-label={help.title}>
+      <header className="nav-bar">
+        <button type="button" className="nav-back" onClick={onBack} aria-label={nav.back}>
+          ‹ {nav.back}
+        </button>
+        <h2 className="nav-bar-title">{help.title}</h2>
+        <span className="nav-bar-spacer" />
+      </header>
+      <p className="nav-help-sub">{help.subtitle}</p>
+
+      <div className="nav-help-modes">
+        <article className="nav-help-mode">
+          <span className="nav-help-tag nav-help-tag--fridge">{nav.fridgeType}</span>
+          <h3>{help.fridgeTitle}</h3>
+          <p>{help.fridgeBody}</p>
+        </article>
+        <article className="nav-help-mode">
+          <span className="nav-help-tag nav-help-tag--pack">{nav.packType}</span>
+          <h3>{help.packTitle}</h3>
+          <p>{help.packBody}</p>
+        </article>
+      </div>
+
+      <h3 className="nav-help-section">{help.legendTitle}</h3>
+      <p className="nav-help-legend-sub">{help.legendSub}</p>
+      <ul className="nav-help-legend">
+        {legend.map((row) => (
+          <li key={row.need} className="nav-help-legend-row">
+            <span className="nav-help-badge"><NeedIcon need={row.need} /></span>
+            <span className="nav-help-legend-text">
+              <strong>{row.name}</strong>
+              <small>{row.desc}</small>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <h3 className="nav-help-section">{help.tipsTitle}</h3>
+      <ul className="nav-help-tips">
+        <li>{help.tip1}</li>
+        <li>{help.tip2}</li>
+        <li>{help.tip3}</li>
+      </ul>
+    </section>
+  );
+}
+
 function CoinPill({ coins }) {
   return (
     <div className="nav-coin" aria-label={`${coins} coins`}>

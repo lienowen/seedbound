@@ -11,7 +11,7 @@ const PREVIEW_COLORS = {
 // The order in which an item's hard requirements are surfaced (bubble + badge).
 // Only these gate the win — "likesNeighbors" is a soft bonus and never shown as
 // a requirement, so we no longer nag the player to "put me next to X".
-const NEED_PRIORITY = ["cold", "warm", "zone", "topShelf", "visible", "hates"];
+const NEED_PRIORITY = ["cold", "warm", "topShelf", "zone", "visible", "hates"];
 // Inner-wall regions where the shop skin "liner" wallpaper is tiled. Tuned to
 // the realistic fridge board: the main cabinet (shelves/drawers) and the door.
 const SKIN_LINER_REGIONS = [
