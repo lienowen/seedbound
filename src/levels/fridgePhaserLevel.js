@@ -152,6 +152,14 @@ const ITEM_LIBRARY = {
   packToiletry: { image: "pack-toiletry", file: "pack-toiletry.png", name: "Necessaire", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
   packCamera: { image: "pack-camera", file: "pack-camera.png", name: "Camera", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
   packSunglasses: { image: "pack-sunglasses", file: "pack-sunglasses.png", name: "Oculos", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+
+  // ---- BENTO PACKING ITEMS (lunch box theme, 5x3 grid) ----
+  packRice: { image: "pack-rice", file: "pack-rice.png", name: "Arroz", tags: ["pack"], size: [2, 2], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packEgg: { image: "pack-egg", file: "pack-egg.png", name: "Tamago", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packSushi: { image: "pack-sushi", file: "pack-sushi.png", name: "Sushi", tags: ["pack"], size: [3, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packBroccoli: { image: "pack-broccoli", file: "pack-broccoli.png", name: "Brocolis", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packSausage: { image: "pack-sausage", file: "pack-sausage.png", name: "Salsicha", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packTomato: { image: "pack-tomato", file: "pack-tomato.png", name: "Tomate", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
 };
 
 const TRAY_POSITIONS = [
@@ -337,26 +345,126 @@ function buildPackingLevel(config) {
   };
 }
 
-// --- Level: Picnic basket (4x4 = 16 cells, perfect fill) ---
-// watermelon 2x2(4) + 2x baguette 3x1(3) + bottle 2x1(2) + cheese 2x1(2)
-// + sandwich 1x1(1) + jam 1x1(1) = 16. Long items must rotate to interlock.
-export const PICNIC_LEVEL = buildPackingLevel({
-  id: "picnic-pack-1",
-  reward: 120,
+// ===========================================================================
+// PACKING ROSTER
+// Three container themes, each with an easy/medium/hard perfect-fill puzzle.
+// Difficulty rises via piece count and how many items must be rotated to
+// interlock. Every tiling below is a verified perfect fit (see
+// scripts/verify-packing.mjs) so no level can be unwinnable.
+// ===========================================================================
+
+// Shared per-container geometry (the grid matches each art's visible interior).
+const PICNIC_BASE = {
   container: { key: "picnic-basket", file: "picnic-basket.png", size: 720, y: 628 },
   grid: { x: 375, y: 628, w: 500, h: 500, cols: 4, rows: 4 },
   theme: { key: "picnic", title: "Picnic Packing", subtitle: "Tap to rotate · drag to pack", background: "#eaf4d8" },
-  copy: {
-    intro: "Pack the basket! Tap an item to rotate it, then drag it in.",
-    goal: "Fit every treat inside the picnic basket.",
-    difficulty: "Prototype",
-    successTag: "CESTA PERFEITA",
+  tray: { y: 1064, spanX: [150, 600] },
+};
+const SUITCASE_BASE = {
+  container: { key: "suitcase-open", file: "suitcase-open.png", size: 760, y: 470 },
+  grid: { x: 375, y: 478, w: 444, h: 288, cols: 6, rows: 3 },
+  theme: { key: "suitcase", title: "Suitcase Packing", subtitle: "Tap to rotate · drag to pack", background: "#dfeaf2" },
+  tray: { y: 900, rowGap: 122, spanX: [150, 600] },
+};
+const BENTO_BASE = {
+  container: { key: "bento-box", file: "bento-box.png", size: 740, y: 500 },
+  grid: { x: 380, y: 511, w: 492, h: 289, cols: 5, rows: 3 },
+  theme: { key: "bento", title: "Bento Packing", subtitle: "Tap to rotate · drag to pack", background: "#f6ead3" },
+  tray: { y: 1000, rowGap: 120, spanX: [150, 600] },
+};
+
+function packCopy(overrides) {
+  return {
+    intro: "Tap an item to rotate it, then drag it in.",
+    goal: "Fit everything inside.",
+    difficulty: "Normal",
+    successTag: "PERFECT FIT",
     successTitle: "All packed!",
-    successBody: "Everything fits — ready for the picnic.",
+    successBody: "Everything fits — nice and tidy.",
     nextLabel: "Next",
     retryLabel: "Retry",
-  },
-  tray: { y: 1064, spanX: [150, 600] },
+    ...overrides,
+  };
+}
+
+// --- BENTO (5x3 = 15 cells) --------------------------------------------------
+// Easy: rice 2x2(4) + 2x sushi 3x1(3) + egg 2x1(2) + sausage 2x1(2)
+// + tomato 1x1(1) = 15. Zero rotation needed.
+export const BENTO_LEVEL_EASY = buildPackingLevel({
+  ...BENTO_BASE,
+  id: "bento-pack-1",
+  reward: 100,
+  copy: packCopy({ difficulty: "Easy", goal: "Fill the bento box with lunch.", successTag: "BENTO PERFEITO" }),
+  items: [
+    { key: "packRice" },
+    { key: "packSushi", id: "packSushi_a" },
+    { key: "packSushi", id: "packSushi_b" },
+    { key: "packEgg" },
+    { key: "packSausage" },
+    { key: "packTomato" },
+  ],
+});
+
+// Medium: rice 2x2(4) + 2x egg 2x1(2) + sausage 2x1(2) + sushi 3x1(3)
+// + broccoli 1x1(1) + tomato 1x1(1) = 15. More small pieces to juggle.
+export const BENTO_LEVEL_MED = buildPackingLevel({
+  ...BENTO_BASE,
+  id: "bento-pack-2",
+  reward: 120,
+  copy: packCopy({ difficulty: "Normal", goal: "Fill the bento box with lunch.", successTag: "BENTO PERFEITO" }),
+  items: [
+    { key: "packRice" },
+    { key: "packEgg", id: "packEgg_a" },
+    { key: "packEgg", id: "packEgg_b" },
+    { key: "packSausage" },
+    { key: "packSushi" },
+    { key: "packBroccoli" },
+    { key: "packTomato" },
+  ],
+});
+
+// Hard: 2x sushi 3x1(3) + rice 2x2(4) + egg 2x1(2) + sausage 2x1(2)
+// + tomato 1x1(1) = 15. Sushi must rotate vertical to interlock.
+export const BENTO_LEVEL_HARD = buildPackingLevel({
+  ...BENTO_BASE,
+  id: "bento-pack-3",
+  reward: 150,
+  copy: packCopy({ difficulty: "Hard", goal: "Squeeze everything into the bento box.", successTag: "BENTO PERFEITO" }),
+  items: [
+    { key: "packSushi", id: "packSushi_a" },
+    { key: "packSushi", id: "packSushi_b" },
+    { key: "packRice" },
+    { key: "packEgg" },
+    { key: "packSausage" },
+    { key: "packTomato" },
+  ],
+});
+
+// --- PICNIC (4x4 = 16 cells) -------------------------------------------------
+// Easy: 2x watermelon 2x2(4) + 2x bottle 2x1(2) + 2x cheese 2x1(2) = 16.
+// Zero rotation needed.
+export const PICNIC_LEVEL_EASY = buildPackingLevel({
+  ...PICNIC_BASE,
+  id: "picnic-pack-1",
+  reward: 110,
+  copy: packCopy({ difficulty: "Easy", goal: "Fit every treat inside the picnic basket.", successTag: "CESTA PERFEITA", successBody: "Everything fits — ready for the picnic." }),
+  items: [
+    { key: "packWatermelon", id: "packWatermelon_a" },
+    { key: "packWatermelon", id: "packWatermelon_b" },
+    { key: "packBottle", id: "packBottle_a" },
+    { key: "packBottle", id: "packBottle_b" },
+    { key: "packCheese", id: "packCheese_a" },
+    { key: "packCheese", id: "packCheese_b" },
+  ],
+});
+
+// Medium: watermelon 2x2(4) + 2x baguette 3x1(3) + bottle 2x1(2)
+// + cheese 2x1(2) + sandwich 1x1(1) + jam 1x1(1) = 16. Baguettes rotate.
+export const PICNIC_LEVEL = buildPackingLevel({
+  ...PICNIC_BASE,
+  id: "picnic-pack-2",
+  reward: 130,
+  copy: packCopy({ difficulty: "Normal", goal: "Fit every treat inside the picnic basket.", successTag: "CESTA PERFEITA", successBody: "Everything fits — ready for the picnic." }),
   items: [
     { key: "packWatermelon" },
     { key: "packBaguette", id: "packBaguette_a" },
@@ -368,26 +476,48 @@ export const PICNIC_LEVEL = buildPackingLevel({
   ],
 });
 
-// --- Level: Suitcase (6x3 = 18 cells, perfect fill) ---
-// clothes 2x2(4) + shoes 2x2(4) + 2x towel 3x1(3) + toiletry 2x1(2)
-// + camera 1x1(1) + sunglasses 1x1(1) = 18. A wide grid: very different feel.
-export const SUITCASE_LEVEL = buildPackingLevel({
-  id: "suitcase-pack-1",
+// Hard: 2x baguette 3x1(3) + watermelon 2x2(4) + bottle 2x1(2)
+// + cheese 2x1(2) + sandwich 1x1(1) + jam 1x1(1) = 16. Bottle & cheese rotate.
+export const PICNIC_LEVEL_HARD = buildPackingLevel({
+  ...PICNIC_BASE,
+  id: "picnic-pack-3",
   reward: 160,
-  container: { key: "suitcase-open", file: "suitcase-open.png", size: 760, y: 470 },
-  grid: { x: 375, y: 478, w: 444, h: 288, cols: 6, rows: 3 },
-  theme: { key: "suitcase", title: "Suitcase Packing", subtitle: "Tap to rotate · drag to pack", background: "#dfeaf2" },
-  copy: {
-    intro: "Pack the suitcase! Tap an item to rotate it, then drag it in.",
-    goal: "Fit everything into the suitcase.",
-    difficulty: "Prototype",
-    successTag: "MALA PERFEITA",
-    successTitle: "All packed!",
-    successBody: "Everything fits — ready for the trip.",
-    nextLabel: "Next",
-    retryLabel: "Retry",
-  },
-  tray: { y: 900, rowGap: 122, spanX: [150, 600] },
+  copy: packCopy({ difficulty: "Hard", goal: "Squeeze every treat into the basket.", successTag: "CESTA PERFEITA", successBody: "Everything fits — ready for the picnic." }),
+  items: [
+    { key: "packBaguette", id: "packBaguette_a" },
+    { key: "packBaguette", id: "packBaguette_b" },
+    { key: "packWatermelon" },
+    { key: "packBottle" },
+    { key: "packCheese" },
+    { key: "packSandwich" },
+    { key: "packJam" },
+  ],
+});
+
+// --- SUITCASE (6x3 = 18 cells) -----------------------------------------------
+// Easy: 2x clothes 2x2(4) + shoes 2x2(4) + 2x towel 3x1(3) = 18.
+// Zero rotation needed.
+export const SUITCASE_LEVEL_EASY = buildPackingLevel({
+  ...SUITCASE_BASE,
+  id: "suitcase-pack-1",
+  reward: 120,
+  copy: packCopy({ difficulty: "Easy", goal: "Fit everything into the suitcase.", successTag: "MALA PERFEITA", successBody: "Everything fits — ready for the trip." }),
+  items: [
+    { key: "packClothes", id: "packClothes_a" },
+    { key: "packClothes", id: "packClothes_b" },
+    { key: "packShoes" },
+    { key: "packTowel", id: "packTowel_a" },
+    { key: "packTowel", id: "packTowel_b" },
+  ],
+});
+
+// Medium: clothes 2x2(4) + shoes 2x2(4) + 2x towel 3x1(3) + toiletry 2x1(2)
+// + camera 1x1(1) + sunglasses 1x1(1) = 18. Towels rotate.
+export const SUITCASE_LEVEL = buildPackingLevel({
+  ...SUITCASE_BASE,
+  id: "suitcase-pack-2",
+  reward: 150,
+  copy: packCopy({ difficulty: "Normal", goal: "Fit everything into the suitcase.", successTag: "MALA PERFEITA", successBody: "Everything fits — ready for the trip." }),
   items: [
     { key: "packClothes" },
     { key: "packShoes" },
@@ -396,6 +526,23 @@ export const SUITCASE_LEVEL = buildPackingLevel({
     { key: "packToiletry" },
     { key: "packCamera" },
     { key: "packSunglasses" },
+  ],
+});
+
+// Hard: 2x towel 3x1(3) + clothes 2x2(4) + shoes 2x2(4) + 2x toiletry 2x1(2)
+// = 18. Towels must rotate vertical to interlock along the ends.
+export const SUITCASE_LEVEL_HARD = buildPackingLevel({
+  ...SUITCASE_BASE,
+  id: "suitcase-pack-3",
+  reward: 180,
+  copy: packCopy({ difficulty: "Hard", goal: "Squeeze everything into the suitcase.", successTag: "MALA PERFEITA", successBody: "Everything fits — ready for the trip." }),
+  items: [
+    { key: "packTowel", id: "packTowel_a" },
+    { key: "packTowel", id: "packTowel_b" },
+    { key: "packClothes" },
+    { key: "packShoes" },
+    { key: "packToiletry", id: "packToiletry_a" },
+    { key: "packToiletry", id: "packToiletry_b" },
   ],
 });
 
@@ -928,9 +1075,18 @@ const FRIDGE_LEVELS = [
 // levels appear after specific fridge levels to vary the pacing. Insertion is
 // keyed by the fridge level id it should follow, so re-ordering fridge levels
 // keeps the packing beats anchored to the right place.
+// Difficulty rises with campaign depth and the three container themes rotate
+// (bento -> picnic -> suitcase) so the packing beats always feel fresh.
 const PACKING_INSERTS = {
-  "fridge-br-3": [PICNIC_LEVEL],
-  "fridge-br-8": [SUITCASE_LEVEL],
+  "fridge-br-2": [BENTO_LEVEL_EASY],
+  "fridge-br-4": [PICNIC_LEVEL_EASY],
+  "fridge-br-6": [SUITCASE_LEVEL_EASY],
+  "fridge-br-8": [BENTO_LEVEL_MED],
+  "fridge-br-10": [PICNIC_LEVEL],
+  "fridge-br-12": [SUITCASE_LEVEL],
+  "fridge-br-14": [BENTO_LEVEL_HARD],
+  "fridge-br-16": [PICNIC_LEVEL_HARD],
+  "fridge-br-18": [SUITCASE_LEVEL_HARD],
 };
 
 function assembleCampaign() {

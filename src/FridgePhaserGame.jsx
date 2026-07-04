@@ -14,18 +14,27 @@ const LOW_COINS_HINT = HINT_COST - 1;
 
 // Bump when the campaign ordering changes in a way that shifts level indices,
 // so we can migrate saved unlock counts instead of stranding players mid-way.
-const CAMPAIGN_LAYOUT_VERSION = 2;
+// v2: first interleave (2 packing inserts). v3: full roster (9 packing inserts).
+const CAMPAIGN_LAYOUT_VERSION = 3;
 
-// Number of packing levels inserted at or before each original fridge index.
-// Original layout was 20 fridge levels (indices 0..19). Packing levels were
-// inserted after fridge-br-3 (orig index 2) and fridge-br-8 (orig index 7).
-function migrateUnlockedIndex(oldUnlocked) {
-  // oldUnlocked is a 1-based count of unlocked levels in the OLD layout.
-  // Shift it forward by how many inserts fall before that boundary.
-  let shift = 0;
-  if (oldUnlocked > 3) shift += 1; // picnic sits after old level 3
-  if (oldUnlocked > 8) shift += 1; // suitcase sits after old level 8
-  return oldUnlocked + shift;
+// New layout inserts a packing level AFTER each of these 1-based fridge numbers.
+// Keep in sync with PACKING_INSERTS in fridgePhaserLevel.js.
+const PACK_INSERT_AFTER_FRIDGE = [2, 4, 6, 8, 10, 12, 14, 16, 18];
+
+// Recover the 1-based fridge frontier (how many fridge levels were unlocked) from
+// a legacy save, then re-forward it into the current layout. This keeps players
+// on the same fridge level while auto-unlocking any packing levels ahead of it.
+function migrateUnlockedIndex(oldUnlocked, oldLayout) {
+  let fridgeFrontier = oldUnlocked;
+  if (oldLayout === 2) {
+    // v2 order inserted picnic at pos 4 (after fridge 3) and suitcase at pos 10
+    // (after fridge 8). Subtract those to get back to the pure fridge count.
+    if (oldUnlocked >= 4) fridgeFrontier -= 1;
+    if (oldUnlocked >= 10) fridgeFrontier -= 1;
+  }
+  // oldLayout <= 1 is a pure 20-fridge save: unlocked already equals the frontier.
+  const insertsBefore = PACK_INSERT_AFTER_FRIDGE.filter((k) => k < fridgeFrontier).length;
+  return fridgeFrontier + insertsBefore;
 }
 
 function readProgress(locale) {
