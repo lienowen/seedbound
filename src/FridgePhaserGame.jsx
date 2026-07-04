@@ -41,7 +41,7 @@ function readProgress(locale) {
   const key = progressStorageKey(locale);
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) return { unlocked: 1, coins: 125, current: 0, layout: CAMPAIGN_LAYOUT_VERSION };
+    if (!raw) return { unlocked: 1, coins: 125, current: 0, stars: {}, layout: CAMPAIGN_LAYOUT_VERSION };
     const parsed = JSON.parse(raw);
     let rawUnlocked = parsed.unlocked || 1;
     // Migrate older-layout saves so unlock progress lands on the same levels.
@@ -55,10 +55,12 @@ function readProgress(locale) {
       unlocked,
       coins: Math.max(0, parsed.coins || 0),
       current,
+      // Best stars earned per level, keyed by stable level id (survives layout changes).
+      stars: parsed.stars && typeof parsed.stars === "object" ? parsed.stars : {},
       layout: CAMPAIGN_LAYOUT_VERSION,
     };
   } catch {
-    return { unlocked: 1, coins: 125, current: 0, layout: CAMPAIGN_LAYOUT_VERSION };
+    return { unlocked: 1, coins: 125, current: 0, stars: {}, layout: CAMPAIGN_LAYOUT_VERSION };
   }
 }
 
@@ -86,7 +88,7 @@ export function FridgePhaserGame() {
   const theme = themeParam === "makeup" ? "makeup" : themeParam === "pack" ? "pack" : themeParam === "suitcase" ? "suitcase" : "fridge";
   // Standalone single-level modes (no campaign progression / economy UI).
   const standalone = theme !== "fridge";
-  const [progress, setProgress] = useState(() => (standalone ? { unlocked: 1, coins: 0, current: 0 } : readProgress(locale)));
+  const [progress, setProgress] = useState(() => (standalone ? { unlocked: 1, coins: 0, current: 0, stars: {} } : readProgress(locale)));
   const [hud, setHud] = useState({ placed: 0, total: 4 });
   const [message, setMessage] = useState(i18n.ui.dragHint);
   const [complete, setComplete] = useState(false);
@@ -248,7 +250,7 @@ export function FridgePhaserGame() {
     if (standalone) return;
     soundRef.current?.miss();
     for (const entry of FRIDGE_BR_CAMPAIGN) localStorage.removeItem(`seedbound.storage.${entry.id}`);
-    updateProgress({ unlocked: 1, coins: 125, current: 0 });
+    updateProgress({ unlocked: 1, coins: 125, current: 0, stars: {} });
     setComplete(false);
     setLastReward(0);
     setLastStars(0);
@@ -445,9 +447,14 @@ export function FridgePhaserGame() {
         setMessage(`${i18n.ui.successCoins(detail.gold)} ${starText}`);
       }
       if (!standalone) {
+        const wonLevelId = campaign[currentIndexRef.current]?.id;
+        const wonStars = detail.stars || 1;
         updateProgress((prev) => ({
           coins: prev.coins + detail.gold,
           unlocked: Math.max(prev.unlocked, Math.min(campaign.length, currentIndexRef.current + 2)),
+          stars: wonLevelId
+            ? { ...prev.stars, [wonLevelId]: Math.max(prev.stars?.[wonLevelId] || 0, wonStars) }
+            : prev.stars,
         }));
         const cleanRun = (detail.mistakes || 0) === 0 && (detail.stars || 0) >= 2;
         const { meta: nextMeta } = bumpStreak(metaRef.current, cleanRun);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   CATALOG_ITEMS,
   CATALOG_TEXT,
@@ -225,9 +225,11 @@ export function MetaLayer({
   discovery,
   autoOpenDaily,
   onDailyAutoHandled,
+  panel,
+  setPanel,
+  showToolbar = true,
 }) {
   const ui = i18n.ui.meta;
-  const [panel, setPanel] = useState(null); // 'collection' | 'shop' | 'daily' | null
   const daily = dailyStatus(meta);
 
   // Auto-open the daily gift once per session when it's claimable.
@@ -266,21 +268,23 @@ export function MetaLayer({
 
   return (
     <>
-      <div className="meta-toolbar">
-        <button type="button" className="meta-tool" onClick={() => setPanel("collection")} aria-label={ui.collection} title={ui.collection}>
-          <IconBook />
-          <span className="meta-tool-count">{discoveredCount(meta)}/{CATALOG_ITEMS.length}</span>
-        </button>
-        <button type="button" className="meta-tool" onClick={() => setPanel("shop")} aria-label={ui.shop} title={ui.shop}>
-          <IconBag />
-        </button>
-        <button type="button" className="meta-tool" onClick={() => setPanel("daily")} aria-label={ui.dailyTitle} title={ui.dailyTitle}>
-          <IconGift />
-          {daily.claimable && <span className="meta-badge-dot" aria-hidden="true" />}
-        </button>
-      </div>
+      {showToolbar && (
+        <div className="meta-toolbar">
+          <button type="button" className="meta-tool" onClick={() => setPanel("collection")} aria-label={ui.collection} title={ui.collection}>
+            <IconBook />
+            <span className="meta-tool-count">{discoveredCount(meta)}/{CATALOG_ITEMS.length}</span>
+          </button>
+          <button type="button" className="meta-tool" onClick={() => setPanel("shop")} aria-label={ui.shop} title={ui.shop}>
+            <IconBag />
+          </button>
+          <button type="button" className="meta-tool" onClick={() => setPanel("daily")} aria-label={ui.dailyTitle} title={ui.dailyTitle}>
+            <IconGift />
+            {daily.claimable && <span className="meta-badge-dot" aria-hidden="true" />}
+          </button>
+        </div>
+      )}
 
-      {meta.streak > 1 && (
+      {showToolbar && meta.streak > 1 && (
         <div className="meta-streak" aria-label={ui.streakLabel(meta.streak)}>
           <IconFlame />
           <span>{meta.streak}</span>

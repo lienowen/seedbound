@@ -8,6 +8,7 @@ export function createUiSounds() {
   let lastSpokenAt = 0;
   let lastSpokenText = "";
   let cachedVoice = null;
+  let muted = false;
 
   function ensureContext() {
     if (typeof window === "undefined") return null;
@@ -49,6 +50,7 @@ export function createUiSounds() {
   }
 
   function speakCallout(text, options = {}) {
+    if (muted) return;
     const synth = speechApi();
     if (!synth || typeof window === "undefined" || typeof window.SpeechSynthesisUtterance === "undefined") return;
     if (!text || voiceLocale !== "en") return;
@@ -74,6 +76,7 @@ export function createUiSounds() {
   }
 
   function tone({ frequency, duration = 0.08, type = "sine", volume = 0.04, attack = 0.004, slideTo = null, when = 0 }) {
+    if (muted) return;
     const audio = ensureContext();
     if (!audio) return;
     const now = audio.currentTime + when;
@@ -100,6 +103,13 @@ export function createUiSounds() {
     setLocale(locale) {
       voiceLocale = locale || "en";
       cachedVoice = chooseVoice(voiceLocale) || cachedVoice;
+    },
+    setMuted(next) {
+      muted = !!next;
+      if (muted) speechApi()?.cancel?.();
+    },
+    isMuted() {
+      return muted;
     },
     snap() {
       tone({ frequency: 720, slideTo: 980, duration: 0.08, type: "triangle", volume: 0.06 });

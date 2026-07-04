@@ -113,6 +113,8 @@ function defaultMeta() {
     daily: { lastClaim: null, loginStreak: 0 },
     shop: { owned: ["cream"], equipped: "cream" },
     dailyPuzzle: { date: null, completed: false },
+    settings: { muted: false },
+    tutorialDone: {}, // { fridge: true, packing: true } — FTUE seen flags
   };
 }
 
@@ -131,6 +133,8 @@ export function readMeta() {
         equipped: parsed.shop?.equipped || "cream",
       },
       dailyPuzzle: { ...base.dailyPuzzle, ...(parsed.dailyPuzzle || {}) },
+      settings: { ...base.settings, ...(parsed.settings || {}) },
+      tutorialDone: parsed.tutorialDone || {},
       discovered: parsed.discovered || {},
     };
   } catch {
@@ -230,4 +234,23 @@ export function skinById(id) {
 
 export function discoveredCount(meta) {
   return Object.keys(meta.discovered || {}).length;
+}
+
+// ---- Settings ---------------------------------------------------------------
+export function setMuted(meta, muted) {
+  const next = { ...meta, settings: { ...meta.settings, muted: !!muted } };
+  writeMeta(next);
+  return next;
+}
+
+// ---- Tutorial (FTUE) --------------------------------------------------------
+export function isTutorialDone(meta, key) {
+  return !!meta.tutorialDone?.[key];
+}
+
+export function markTutorialDone(meta, key) {
+  if (meta.tutorialDone?.[key]) return meta;
+  const next = { ...meta, tutorialDone: { ...meta.tutorialDone, [key]: true } };
+  writeMeta(next);
+  return next;
 }
