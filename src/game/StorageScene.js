@@ -1889,52 +1889,67 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
-  showItemMood(x, y, mood, score) {
-    const emoji = mood === "happy" ? "😊" : mood === "ok" ? "😐" : "😟";
-    const color = mood === "happy" ? "#67edb8" : mood === "ok" ? "#ffd166" : "#ff7d62";
-    const moodText = this.add.text(x, y - 50, `${emoji} ${score}%`, {
-      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 22,
-      color,
-      fontStyle: "bold",
-      stroke: "#2d1f14",
-      strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(955).setAlpha(0);
+  // Placement feedback — intentionally emoji-free and number-free to keep the
+  // cozy, premium feel. "happy" floats a cluster of soft vector sparkle stars,
+  // "ok" gives a gentle single ripple, and "sad" is a soft muted puff that never
+  // feels punishing. The exact score still drives combos/callouts elsewhere.
+  showItemMood(x, y, mood /* , score */) {
+    const layer = this.add.layer().setDepth(950);
+    const haloColor = mood === "happy" ? 0x67edb8 : mood === "ok" ? 0xffe6a3 : 0xffd0c2;
 
-    // Halo ring
-    const haloColor = mood === "happy" ? 0x67edb8 : mood === "ok" ? 0xffd166 : 0xff7d62;
-    const halo = this.add.circle(x, y - 14, 20, haloColor, 0.18).setDepth(950);
-    halo.setStrokeStyle(2, haloColor, 0.7);
-
-    this.tweens.add({
-      targets: [moodText],
-      alpha: { from: 0, to: 1 },
-      y: y - 70,
-      scale: { from: 0.6, to: 1.1 },
-      duration: 200,
-      ease: "Back.out(1.5)",
-      onComplete: () => {
-        this.tweens.add({
-          targets: [moodText],
-          alpha: 0,
-          y: y - 100,
-          scale: 0.8,
-          duration: 500,
-          delay: 400,
-          ease: "Sine.in",
-          onComplete: () => moodText.destroy(),
-        });
-      },
-    });
-
+    const halo = this.add.circle(x, y - 14, 18, haloColor, 0.16);
+    halo.setStrokeStyle(2, haloColor, 0.72);
+    layer.add(halo);
     this.tweens.add({
       targets: halo,
-      alpha: { from: 0.8, to: 0 },
-      scale: { from: 1, to: 1.6 },
-      duration: 350,
+      alpha: { from: 0.75, to: 0 },
+      scale: { from: 0.9, to: mood === "happy" ? 1.7 : 1.4 },
+      duration: mood === "happy" ? 380 : 300,
       ease: "Sine.out",
       onComplete: () => halo.destroy(),
     });
+
+    if (mood === "happy") {
+      // A little constellation of 4-point sparkle stars drifting up and out.
+      const starColors = [0xfff8df, 0xbdf5dc, 0xffe9a8];
+      const sparkles = 5;
+      for (let i = 0; i < sparkles; i += 1) {
+        const ang = (Math.PI * 2 * i) / sparkles - Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+        const dist = 20 + Math.random() * 20;
+        const size = 5 + Math.random() * 4;
+        const star = this.add
+          .star(x, y - 16, 4, size * 0.42, size, starColors[i % starColors.length], 0.96)
+          .setDepth(951);
+        layer.add(star);
+        this.tweens.add({
+          targets: star,
+          x: x + Math.cos(ang) * dist,
+          y: y - 16 + Math.sin(ang) * dist - 14,
+          angle: (Math.random() - 0.5) * 180,
+          alpha: { from: 1, to: 0 },
+          scale: { from: 1.15, to: 0.4 },
+          duration: 460 + Math.random() * 160,
+          delay: i * 18,
+          ease: "Quad.out",
+          onComplete: () => star.destroy(),
+        });
+      }
+    } else if (mood === "sad") {
+      // Gentle, non-punishing: a soft puff that sinks slightly and fades.
+      const puff = this.add.circle(x, y - 10, 10, 0xffd0c2, 0.5).setDepth(951);
+      layer.add(puff);
+      this.tweens.add({
+        targets: puff,
+        y: y + 4,
+        alpha: { from: 0.5, to: 0 },
+        scale: { from: 0.8, to: 1.3 },
+        duration: 340,
+        ease: "Sine.in",
+        onComplete: () => puff.destroy(),
+      });
+    }
+
+    this.time.delayedCall(900, () => layer.destroy());
   }
 
   // ---- CALLOUT: big animated text for "Double Kill" moments ----
