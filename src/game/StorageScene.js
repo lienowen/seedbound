@@ -1247,6 +1247,31 @@ export class StorageScene extends Phaser.Scene {
     return { x: 0, y: -lift };
   }
 
+  // Subtle "just set down by hand" lean for items resting on open surfaces
+  // (shelves/chill). A dead-upright grid reads as stiff and fake; a tiny, fixed
+  // tilt per item gives the scene a natural, lived-in feel. The angle is derived
+  // deterministically from the item id so it never jitters between renders or
+  // re-placements, and it is capped small (±3°) so it never looks messy and the
+  // few pixels of horizontal spread stay well inside the slot (no overflow).
+  restTiltFor(item, entry) {
+    if (this.topDown) return 0;
+    if (entry?.status !== "packed") return 0;
+    const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
+    // Doors and drawers hold items snugly against a rail/wall, so a lean there
+    // looks like floating. Only open shelf surfaces get the natural tilt.
+    if (slot?.zone !== "shelf" && slot?.zone !== "chill") return 0;
+    const id = item?.id || "";
+    let h = 0;
+    for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) & 0xffff;
+    const max = 3; // ±3° — "轻微自然"
+    const t = ((h % 1000) / 999) * 2 - 1; // deterministic value in [-1, 1]
+    const tilt = t * max;
+    // Keep a touch of life even for near-zero draws.
+    const min = 0.8;
+    const signed = Math.abs(tilt) < min ? (tilt >= 0 ? min : -min) : tilt;
+    return Number(signed.toFixed(2));
+  }
+
   doorSeatOffset(item, entry) {
     const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
     if (entry?.status !== "packed" || slot?.zone !== "door") return { x: 0, y: 0 };
@@ -1879,6 +1904,8 @@ export class StorageScene extends Phaser.Scene {
       targets: obj,
       x: display.x,
       y: display.y,
+      // On open shelves, settle into a subtle natural lean instead of dead-upright.
+      ...(this.topDown ? {} : { angle: this.restTiltFor(item, entry) }),
       scaleX: targetScale * 1.05,
       scaleY: targetScale * 0.94,
       duration: Math.round(this.level.tuning.snapDuration * 0.72),
@@ -2395,6 +2422,8 @@ export class StorageScene extends Phaser.Scene {
       targets: obj,
       x: display.x,
       y: display.y,
+      // Straighten back up as it returns to the tray (tilt only lives on shelves).
+      ...(this.topDown ? {} : { angle: this.restTiltFor(item, restored) }),
       scaleX: targetScale,
       scaleY: targetScale,
       duration: 220,
@@ -3057,6 +3086,8 @@ export class StorageScene extends Phaser.Scene {
       if (this.topDown) {
         sprite.setAngle(this.topDownAngle(entry));
         sprite.setScale(this.displayScaleFor(item, entry));
+      } else {
+        sprite.setAngle(this.restTiltFor(item, entry));
       }
       sprite.setData("home", entry);
     }
