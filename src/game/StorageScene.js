@@ -954,6 +954,7 @@ export class StorageScene extends Phaser.Scene {
       this.itemLayer.add(sprite);
       this.sprites.set(item.id, sprite);
       this.introSprites.push({ sprite, x: display.x, y: display.y, packed: entry.status === "packed" });
+      this.attachItemShadow(sprite);
       if (!item.fixed) {
         sprite.setInteractive({ draggable: true, pixelPerfect: false });
         this.input.setDraggable(sprite);
@@ -985,6 +986,33 @@ export class StorageScene extends Phaser.Scene {
     this.sortItems();
     this.playLevelIntroPolish();
     this.updateRemainingSpotlight(this.engine.validate());
+  }
+
+  // Soft contact shadow so items feel placed in the world instead of pasted on.
+  // Uses the WebGL preFX pipeline (auto-follows the sprite); no-ops on canvas.
+  attachItemShadow(sprite) {
+    if (!sprite.preFX) return;
+    try {
+      const shadow = sprite.preFX.addShadow(0, 1.4, 0.07, 1.1, 0x1a0d00, 6, 0.32);
+      sprite.setData("shadowFx", shadow);
+    } catch {
+      // Renderer without preFX support — skip gracefully.
+    }
+  }
+
+  // Lift the shadow (bigger, softer, offset) while an item is held; reset on drop.
+  setItemLifted(sprite, lifted) {
+    const shadow = sprite.getData?.("shadowFx");
+    if (!shadow) return;
+    if (lifted) {
+      shadow.y = 5;
+      shadow.decay = 0.12;
+      shadow.intensity = 0.42;
+    } else {
+      shadow.y = 1.4;
+      shadow.decay = 0.07;
+      shadow.intensity = 0.32;
+    }
   }
 
   playLevelIntroPolish() {
@@ -1061,7 +1089,46 @@ export class StorageScene extends Phaser.Scene {
     const baselineY = this.engine.slotBaseline(slot, rows - 1, 1);
 
     if (!this.editMode) {
-      if (rows > 1) {
+      if (this.topDown && (cols > 1 || rows > 1)) {
+        // Clear packing lattice: a rounded playfield with visible cell borders so
+        // players can read exactly which cells they still need to fill.
+        const cellW = slot.w / cols;
+        const cellH = slot.h / rows;
+        const inset = 6;
+        const pfL = left + inset;
+        const pfT = top + inset;
+        const pfW = slot.w - inset * 2;
+        const pfH = slot.h - inset * 2;
+        // Soft inset panel lightens the busy backdrop so the grid reads clearly.
+        slot.guide.fillStyle(0xffffff, 0.20);
+        slot.guide.fillRoundedRect(pfL, pfT, pfW, pfH, 16);
+        // Grid lines drawn twice (dark halo + light core) so they stand out on
+        // any backdrop colour instead of vanishing into the pattern.
+        const drawLine = (x1, y1, x2, y2) => {
+          slot.guide.lineStyle(4, 0x3a2410, 0.16);
+          slot.guide.lineBetween(x1, y1, x2, y2);
+          slot.guide.lineStyle(1.5, 0xffffff, 0.6);
+          slot.guide.lineBetween(x1, y1, x2, y2);
+        };
+        for (let col = 1; col < cols; col += 1) {
+          const x = left + cellW * col;
+          drawLine(x, pfT + 4, x, pfT + pfH - 4);
+        }
+        for (let row = 1; row < rows; row += 1) {
+          const y = top + cellH * row;
+          drawLine(pfL + 4, y, pfL + pfW - 4, y);
+        }
+        // Dots at cell intersections read as a tidy grid.
+        slot.guide.fillStyle(0x3a2410, 0.28);
+        for (let col = 1; col < cols; col += 1) {
+          for (let row = 1; row < rows; row += 1) {
+            slot.guide.fillCircle(left + cellW * col, top + cellH * row, 2.6);
+          }
+        }
+        // Rounded frame around the whole playfield.
+        slot.guide.lineStyle(3, 0x7a4a22, 0.4);
+        slot.guide.strokeRoundedRect(pfL, pfT, pfW, pfH, 16);
+      } else if (rows > 1) {
         slot.guide.lineStyle(1, 0xffffff, 0.18);
         for (let row = 1; row < rows; row += 1) {
           const y = top + (slot.h / rows) * row;
@@ -1683,6 +1750,7 @@ export class StorageScene extends Phaser.Scene {
     this.dragItem = obj;
     this.dragMoved = true;
     obj.setDepth(980);
+    this.setItemLifted(obj, true);
     // Carry the current orientation into the drag so rotation persists.
     this.dragRot = this.topDown ? (obj.getData("home")?.rot || 0) : 0;
     if (this.topDown) obj.setAngle(this.topDownAngle({ rot: this.dragRot }));
@@ -1711,6 +1779,7 @@ export class StorageScene extends Phaser.Scene {
     const preview = this.hoverPlacement;
     this.clearHover();
     this.hideWishBubble();
+    this.setItemLifted(obj, false);
     if (!preview) return this.returnHome(obj);
 
     // Only hard-reject for grid overflow / occupied space

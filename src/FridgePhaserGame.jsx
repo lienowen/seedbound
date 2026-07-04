@@ -276,8 +276,17 @@ export function FridgePhaserGame() {
 
   // ---- Navigation between Home / Map / Game --------------------------------
   function startFromHome() {
-    // Continue at the current unlocked level (or first level for new players).
+    // Continue at the furthest unlocked level so finishing a level and returning
+    // home never drops the player back onto an already-cleared stage. (Beating a
+    // level advances `unlocked`; the newest unlocked index is `unlocked - 1`.)
     soundRef.current?.phase();
+    const furthest = Math.max(
+      0,
+      Math.min(progressRef.current.unlocked - 1, campaign.length - 1),
+    );
+    if (furthest !== progressRef.current.current) {
+      updateProgress({ current: furthest });
+    }
     pendingFreshRef.current = true;
     setComplete(false);
     setLastReward(0);
