@@ -1234,6 +1234,19 @@ export class StorageScene extends Phaser.Scene {
     return { visibleHeight, visibleWidth };
   }
 
+  shelfSeatOffset(item, entry) {
+    const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
+    if (entry?.status !== "packed") return { x: 0, y: 0 };
+    if (slot?.zone !== "shelf" && slot?.zone !== "chill") return { x: 0, y: 0 };
+    // The engine's baseline sits at the cell bottom, which visually lands on the
+    // glass shelf's FRONT EDGE — so items look like they press through the pane.
+    // Lift every shelf/chill item up by the plank thickness so its base rests on
+    // the shelf's top surface instead. Tied to slot height so it scales with the
+    // fridge art, and capped to a sensible plank thickness.
+    const lift = Math.max(8, Math.min(15, Math.round((slot.h || 120) * 0.12)));
+    return { x: 0, y: -lift };
+  }
+
   doorSeatOffset(item, entry) {
     const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
     if (entry?.status !== "packed" || slot?.zone !== "door") return { x: 0, y: 0 };
@@ -1258,10 +1271,11 @@ export class StorageScene extends Phaser.Scene {
   visualOffsetFor(item, entry) {
     const seatOffset = this.drawerSeatOffset(item, entry);
     const doorOffset = this.doorSeatOffset(item, entry);
+    const shelfOffset = this.shelfSeatOffset(item, entry);
     const renderNudge = this.renderNudgeFor(item, entry);
     return {
-      x: seatOffset.x + doorOffset.x + renderNudge.x,
-      y: seatOffset.y + doorOffset.y + renderNudge.y,
+      x: seatOffset.x + doorOffset.x + shelfOffset.x + renderNudge.x,
+      y: seatOffset.y + doorOffset.y + shelfOffset.y + renderNudge.y,
     };
   }
 
