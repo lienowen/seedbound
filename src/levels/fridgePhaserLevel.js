@@ -383,14 +383,17 @@ const PANTRY_ASSETS = {
 // carries "top" in its id so `topShelf` preferences resolve there. Every zone
 // is "shelf" so the natural-lean + shelf-seat-offset logic applies, and no item
 // ever needs a cold zone (which the cupboard lacks) to settle.
-// Plank surfaces (game-y): 453 / 568 / 683 / 798; slot bottom (y + h/2) is set
-// to the surface so items rest on the plank.
+// The engine seats an item's base at slot.y (like the fridge, whose shelf slots
+// sit on the shelf line, e.g. y=425), then shelfSeatOffset lifts it a few px onto
+// the plank's top surface. So slot.y is placed directly ON each plank surface —
+// NOT offset by h/2. Plank surfaces (game-y) measured from the art via in-browser
+// luminance profiling at size 720 / centerY 640: 453 / 568 / 683 / 798.
 const PANTRY_ALLOW = ["carton", "dairy", "box", "bottle", "food"];
 const PANTRY_SLOTS = [
-  { id: "pantry_top", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 393, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
-  { id: "pantry_up", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 508, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
-  { id: "pantry_low", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 623, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
-  { id: "pantry_base", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 738, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
+  { id: "pantry_top", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 453, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
+  { id: "pantry_up", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 568, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
+  { id: "pantry_low", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 683, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
+  { id: "pantry_base", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 798, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
 ];
 
 // The cupboard has no cold zone, so any "needsCold" preference would be
