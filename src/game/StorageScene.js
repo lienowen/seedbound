@@ -1447,16 +1447,17 @@ export class StorageScene extends Phaser.Scene {
       }
     }
 
-    // Mood emoji label
-    const moodEmoji = preview.mood === "happy" ? "😊" : preview.mood === "ok" ? "😐" : "😟";
+    // Clean, emoji-free, number-free fit label. The colored footprint already
+    // communicates quality (green/amber/red); the text just names it in words.
     const placementLabel = this.previewPlacementLabel(preview);
-    const scoreLabel = `${moodEmoji} ${sc}%`;
-    const dropHint = this.i18n.ui.dropHere;
-    const supportText = preview.valid
-      ? `${dropHint} · ${scoreLabel}${placementLabel ? ` · ${placementLabel}` : ""}`
-      : (preview.alwaysPlaceable
-        ? `${this.i18n.ui.dropHere} ${moodEmoji} ${sc}%`
-        : this.translateReason(preview.reason || "reject.generic"));
+    const fitWord = preview.mood === "happy"
+      ? (this.i18n.ui.fitGreat || this.i18n.ui.dropHere)
+      : preview.mood === "ok"
+        ? (this.i18n.ui.fitOk || this.i18n.ui.dropHere)
+        : (this.i18n.ui.fitPoor || this.i18n.ui.dropHere);
+    const supportText = (preview.valid || preview.alwaysPlaceable)
+      ? `${fitWord}${placementLabel ? ` · ${placementLabel}` : ""}`
+      : this.translateReason(preview.reason || "reject.generic");
     this.previewText
       .setText(supportText)
       .setPosition(preview.x, drawY - 8)
@@ -1758,7 +1759,26 @@ export class StorageScene extends Phaser.Scene {
     this.tweens.add({ targets: obj, scale: obj.scale * (this.topDown ? 1.1 : 1.06), duration: 90, ease: "Sine.out" });
     if (this.topDown) this.events.emit("pickup");
     const item = obj.getData("item");
+    // Reveal where THIS item belongs the moment it's lifted, so players always
+    // know which zones accept it (green) vs. which do not (faint neutral).
+    this.revealDropZones(item);
     if (item && !this.topDown) this.showWishBubble(obj, item);
+  }
+
+  // Persistent affordance shown while an item is held: recommended slots get a
+  // soft green glow, the rest a barely-there neutral outline. Live targeting in
+  // refreshHoverZone layers the exact-fit color on top of whichever slot is hovered.
+  revealDropZones(item) {
+    this.goodSlotIds = new Set();
+    if (!item) return;
+    this.slots.forEach((slot) => {
+      const good = this.engine.canUseSlot(item, slot);
+      if (good) this.goodSlotIds.add(slot.id);
+      slot.marker
+        .setScale(1)
+        .setFillStyle(good ? 0x61e7b0 : 0x9fb4c9, good ? 0.1 : 0.001)
+        .setStrokeStyle(good ? 3 : 2, good ? 0x72efc0 : 0x9fb4c9, good ? 0.72 : 0.26);
+    });
   }
 
   onDrag(pointer, obj, x, y) {
@@ -1769,9 +1789,40 @@ export class StorageScene extends Phaser.Scene {
     const previewPoint = this.logicalDragPoint(item, pointer.worldX, pointer.worldY, home);
     const preview = this.engine.previewMove(item.id, previewPoint.x, previewPoint.y, this.level.tuning.magnetPreviewDistance, this.dragRot || 0);
     this.hoverPlacement = preview;
+    // Magnetic lock-on: while the finger is over a real target cell, gently pull
+    // the sprite toward the EXACT resting spot so placement reads as precise and
+    // snapped rather than floaty. Away from any slot it still follows the finger.
+    if (preview && preview.inside) {
+      const target = this.snapTargetPoint(item, preview);
+      if (target) {
+        obj.x += (target.x - obj.x) * 0.4;
+        obj.y += (target.y - obj.y) * 0.4;
+      }
+    }
     this.drawPlacementPreview(item, preview);
     this.refreshHoverZone(preview?.slotId || null, !!preview?.valid, preview?.score ?? 50);
     if (!this.topDown) this.updateWishBubble(obj, preview);
+  }
+
+  // The exact display position an item will rest at for a given preview, matching
+  // displayPointFor so the drag magnet and the final settle agree pixel-for-pixel.
+  snapTargetPoint(item, preview) {
+    if (!preview || !preview.slotId) return null;
+    if (this.topDown) return { x: preview.x, y: preview.y };
+    const offset = this.visualOffsetFor(item, {
+      // Use "packed" so door/drawer seat offsets match the final resting spot
+      // exactly — the magnet target and the settle land on the same pixel.
+      status: "packed",
+      slotId: preview.slotId,
+      col: preview.col,
+      row: preview.row,
+      layer: preview.layer,
+      rot: preview.rot,
+      x: preview.x,
+      y: preview.y,
+      itemId: item.id,
+    });
+    return { x: preview.x + offset.x, y: preview.y + offset.y };
   }
 
   onDragEnd(obj) {
@@ -2292,16 +2343,25 @@ export class StorageScene extends Phaser.Scene {
   }
 
   refreshHoverZone(slotId, valid, score = 50) {
+    let line;
+    if (score >= 70) line = 0x65e7b3;
+    else if (score >= 40) line = 0xffd166;
+    else line = 0xff8667;
+    const good = this.goodSlotIds;
     this.slots.forEach((slot) => {
       const selected = slot.id === slotId;
-      let line;
-      if (score >= 70) line = 0x65e7b3;
-      else if (score >= 40) line = 0xffd166;
-      else line = 0xff8667;
+      if (selected) {
+        // Live-targeted slot: strong exact-fit color + slight lift.
+        slot.marker.setScale(1.02).setFillStyle(line, 0.16).setStrokeStyle(5, line, 0.92);
+        return;
+      }
+      // Non-targeted slots keep the "held item" affordance so the player still
+      // sees every valid home while dragging, instead of them all going blank.
+      const isGood = good ? good.has(slot.id) : false;
       slot.marker
-        .setScale(selected ? 1.02 : 1)
-        .setFillStyle(selected ? line : 0x61e7b0, selected ? 0.16 : 0.001)
-        .setStrokeStyle(selected ? 5 : 3, selected ? line : 0x72efc0, selected ? 0.92 : (this.editMode ? 0.7 : 0));
+        .setScale(1)
+        .setFillStyle(isGood ? 0x61e7b0 : 0x9fb4c9, isGood ? 0.1 : 0.001)
+        .setStrokeStyle(isGood ? 3 : 2, isGood ? 0x72efc0 : 0x9fb4c9, isGood ? 0.6 : (this.editMode ? 0.7 : 0.22));
     });
   }
 
@@ -2352,6 +2412,7 @@ export class StorageScene extends Phaser.Scene {
     this.previewGraphic.clear();
     this.previewText.setVisible(false);
     if (this.previewSprite) this.previewSprite.setVisible(false);
+    this.goodSlotIds = null;
     this.slots.forEach((slot) => {
       slot.marker
         .setScale(1)
