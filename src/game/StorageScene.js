@@ -426,9 +426,10 @@ export class StorageScene extends Phaser.Scene {
       return { bg, text };
     };
 
-    this.phasePill = pill(16, 14, 104);
-    this.coinPill = pill(128, 14, 92);
-    this.progressPill = pill(228, 14, 86);
+    // Shifted right of the React "Home" circle button (campaign top-left overlay).
+    this.phasePill = pill(140, 14, 104);
+    this.coinPill = pill(252, 14, 92);
+    this.progressPill = pill(352, 14, 86);
     this.phasePill.text.setDepth(512);
     this.coinPill.text.setDepth(512);
     this.progressPill.text.setDepth(512);

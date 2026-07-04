@@ -687,7 +687,10 @@ export function FridgePhaserGame() {
       {showGameChrome && (
         <>
           <button type="button" className="fridge-home-btn" onClick={goHome} aria-label={nav.home} title={nav.home}>
-            ‹ {nav.home}
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 11.5 12 4l9 7.5" />
+              <path d="M5 10v9h5v-5h4v5h5v-9" />
+            </svg>
           </button>
           {langSwitch}
           <div className="fridge-quick-actions">
