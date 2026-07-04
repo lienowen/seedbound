@@ -367,24 +367,30 @@ function buildPackingLevel(config) {
 // ===========================================================================
 const PANTRY_STAGE = { width: 750, height: 1334, shapes: [] };
 
+// The cupboard art is square (1024²); it is drawn `contain` sized to the stage
+// width and centered low so its shelves fill the play area (spans game-y
+// ~192–984) with the loose tray sitting just below. Values were tuned against
+// the art's actual shelf planks (measured via luminance profiling in-browser).
 const PANTRY_ASSETS = {
-  back: { key: "pantry-board", file: "pantry-board.png", contain: true, size: 742, y: 470 },
+  back: { key: "pantry-board", file: "pantry-board.png", contain: true, size: 720, y: 640 },
 };
 
-// Four shelves, two placement pockets each. The two top pockets carry "top" in
-// their id so `topShelf` preferences resolve there. Every zone is "shelf" so the
-// natural-lean + shelf-seat offset logic applies and no item ever needs a cold
-// zone (which the cupboard doesn't have) to settle.
+// One wide placement bay per shelf (cols:2 => two items side-by-side, exactly
+// like the fridge shelves), across the art's four upper plank surfaces. This
+// gives 8 capacity — matching the fullest roster — and, crucially, a generous
+// per-item width so items never overflow their cell (the old 120px cols:2 boxes
+// squeezed two items into 60px each, which caused the overflow). The top bay
+// carries "top" in its id so `topShelf` preferences resolve there. Every zone
+// is "shelf" so the natural-lean + shelf-seat-offset logic applies, and no item
+// ever needs a cold zone (which the cupboard lacks) to settle.
+// Plank surfaces (game-y): 453 / 568 / 683 / 798; slot bottom (y + h/2) is set
+// to the surface so items rest on the plank.
 const PANTRY_ALLOW = ["carton", "dairy", "box", "bottle", "food"];
 const PANTRY_SLOTS = [
-  { id: "pantry_top_1", zone: "shelf", allow: PANTRY_ALLOW, x: 305, y: 258, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
-  { id: "pantry_top_2", zone: "shelf", allow: PANTRY_ALLOW, x: 445, y: 258, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 111 },
-  { id: "pantry_up_1", zone: "shelf", allow: PANTRY_ALLOW, x: 305, y: 388, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
-  { id: "pantry_up_2", zone: "shelf", allow: PANTRY_ALLOW, x: 445, y: 388, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 131 },
-  { id: "pantry_low_1", zone: "shelf", allow: PANTRY_ALLOW, x: 305, y: 516, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
-  { id: "pantry_low_2", zone: "shelf", allow: PANTRY_ALLOW, x: 445, y: 516, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 151 },
-  { id: "pantry_base_1", zone: "shelf", allow: PANTRY_ALLOW, x: 305, y: 640, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
-  { id: "pantry_base_2", zone: "shelf", allow: PANTRY_ALLOW, x: 445, y: 640, w: 120, h: 118, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 171 },
+  { id: "pantry_top", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 393, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
+  { id: "pantry_up", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 508, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
+  { id: "pantry_low", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 623, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
+  { id: "pantry_base", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 738, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
 ];
 
 // The cupboard has no cold zone, so any "needsCold" preference would be
