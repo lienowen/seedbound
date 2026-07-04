@@ -1,4 +1,4 @@
-﻿import Phaser from "phaser";
+import Phaser from "phaser";
 import { STORAGE_LEVEL } from "../levels/fridgePhaserLevel.js";
 import { StorageEngine } from "./StorageEngine.js";
 import { createI18n } from "../i18n/index.js";
@@ -8,6 +8,16 @@ const PREVIEW_COLORS = {
   good: { fill: 0x67edb8, line: 0xeafff7, fillAlpha: 0.12, lineAlpha: 0.88, lineWidth: 3 },
   bad: { fill: 0xff7d62, line: 0xffefe7, fillAlpha: 0.14, lineAlpha: 0.82, lineWidth: 3 },
 };
+// The order in which an item's hard requirements are surfaced (bubble + badge).
+// Only these gate the win — "likesNeighbors" is a soft bonus and never shown as
+// a requirement, so we no longer nag the player to "put me next to X".
+const NEED_PRIORITY = ["cold", "warm", "topShelf", "zone", "visible", "hates"];
+// Inner-wall regions where the shop skin "liner" wallpaper is tiled. Tuned to
+// the realistic fridge board: the main cabinet (shelves/drawers) and the door.
+const SKIN_LINER_REGIONS = [
+  { x: 150, y: 372, w: 342, h: 620 }, // main cabinet back wall
+  { x: 528, y: 360, w: 176, h: 680 }, // door shelf column
+];
 const ITEM_PLACEHOLDER_COLORS = {
   milk: 0xf5f8ff,
   eggs: 0xfff6dd,
@@ -120,6 +130,10 @@ export class StorageScene extends Phaser.Scene {
     const payload = { ...this.entryData, ...data };
     this.editMode = !!payload.editMode;
     this.level = structuredClone(payload.level || STORAGE_LEVEL);
+    // Top-down packing prototype renders items centered in a grid with real
+    // rotation, instead of the fridge's front-view baseline system.
+    this.topDown = !!this.level.topDown;
+    this.dragRot = 0;
     this.chromeData = structuredClone(payload.uiState || {});
     this.i18n = createI18n(this.chromeData.locale || "pt");
     this.engine = new StorageEngine(this.level, { forceFresh: !!payload.forceFresh });
@@ -136,14 +150,217 @@ export class StorageScene extends Phaser.Scene {
     this.input.on("dragstart", (_, obj) => this.onDragStart(obj));
     this.input.on("drag", (pointer, obj, dragX, dragY) => this.onDrag(pointer, obj, dragX, dragY));
     this.input.on("dragend", (_, obj) => this.onDragEnd(obj));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardownOnboarding());
+    this.time.delayedCall(600, () => this.maybeStartOnboarding());
+  }
+
+  // ---- FIRST-TIME COACHING ----
+  hasOnboarded() {
+    try {
+      return localStorage.getItem("seedbound_onboarded_v1") === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  markOnboarded() {
+    try {
+      localStorage.setItem("seedbound_onboarded_v1", "1");
+    } catch {
+      /* storage blocked; coaching just won't persist */
+    }
+  }
+
+  maybeStartOnboarding() {
+    if (this.editMode || this.onboardingActive) return;
+    if (this.hasOnboarded()) return;
+    if (this.engine.validate().complete) return;
+    const hint = this.engine.bestHintForNext();
+    if (!hint) return;
+    const sprite = this.sprites.get(hint.itemId);
+    if (!sprite) return;
+    this.startOnboarding(sprite, hint);
+  }
+
+  startOnboarding(sprite, hint) {
+    this.onboardingActive = true;
+    this.onboardingUserGrabbed = false;
+    const sx = sprite.x;
+    const sy = sprite.y;
+    const tx = hint.x;
+    const ty = hint.y;
+
+    const layer = this.add.layer().setDepth(955);
+
+    // Pulsing target ring at the ideal slot.
+    const targetRing = this.add.circle(tx, ty, 42, 0x67edb8, 0.12).setStrokeStyle(4, 0x67edb8, 0.9);
+    layer.add(targetRing);
+    this.tweens.add({
+      targets: targetRing,
+      scale: { from: 0.82, to: 1.16 },
+      alpha: { from: 0.95, to: 0.35 },
+      duration: 780,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.inOut",
+    });
+
+    // Looping "touch" indicator: an outer ring + a solid contact dot travelling
+    // from the item to its ideal spot, so players see exactly what to do.
+    const touch = this.add.container(sx, sy);
+    const touchRing = this.add.circle(0, 0, 26, 0xffffff, 0).setStrokeStyle(4, 0xffffff, 0.95);
+    const touchDot = this.add.circle(0, 0, 15, 0xffffff, 0.92);
+    touch.add([touchRing, touchDot]);
+    layer.add(touch);
+
+    // Contact "press" pulse on the ring.
+    this.tweens.add({
+      targets: touchRing,
+      scale: { from: 0.7, to: 1.35 },
+      alpha: { from: 0.9, to: 0 },
+      duration: 900,
+      repeat: -1,
+      ease: "Sine.out",
+    });
+    // Travel from source to target on a gentle loop.
+    const travel = this.tweens.add({
+      targets: touch,
+      x: { from: sx, to: tx },
+      y: { from: sy, to: ty },
+      duration: 950,
+      hold: 380,
+      repeatDelay: 650,
+      repeat: -1,
+      ease: "Sine.inOut",
+    });
+
+    // Center instruction card that fades once the player grabs anything.
+    const cardW = 440;
+    const cardH = 64;
+    const cardX = 375 - cardW / 2;
+    const cardY = 470;
+    const banner = this.add.graphics();
+    banner.fillStyle(0x5b2c1d, 0.94);
+    banner.lineStyle(3, 0xffffff, 0.85);
+    banner.fillRoundedRect(cardX, cardY, cardW, cardH, 18);
+    banner.strokeRoundedRect(cardX, cardY, cardW, cardH, 18);
+    const bannerText = this.add.text(375, cardY + cardH / 2, this.i18n.ui.coachTitle, {
+      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+      fontSize: 20,
+      color: "#ffffff",
+      fontStyle: "bold",
+      align: "center",
+      wordWrap: { width: cardW - 36 },
+    }).setOrigin(0.5);
+    layer.add(banner);
+    layer.add(bannerText);
+    banner.setAlpha(0);
+    bannerText.setAlpha(0);
+    this.tweens.add({ targets: [banner, bannerText], alpha: 1, duration: 260, ease: "Sine.out" });
+
+    this.onboarding = { layer, targetRing, touch, banner, bannerText, travel };
+  }
+
+  onboardingUserGrabbed_() {
+    if (!this.onboardingActive || !this.onboarding) return;
+    this.onboardingUserGrabbed = true;
+    const { touch, travel, banner, bannerText } = this.onboarding;
+    // Hide the demo hand once the player takes over.
+    travel?.remove?.();
+    this.tweens.killTweensOf(touch);
+    if (touch) this.tweens.add({ targets: touch, alpha: 0, duration: 180, ease: "Sine.in" });
+    bannerText?.setText(this.i18n.ui.coachReleased);
+    // Keep banner + target ring visible to reinforce where to drop.
+    if (banner && bannerText) {
+      this.tweens.add({ targets: [banner, bannerText], alpha: { from: 1, to: 0.9 }, duration: 160 });
+    }
+  }
+
+  finishOnboarding() {
+    if (!this.onboardingActive) return;
+    this.onboardingActive = false;
+    this.markOnboarded();
+    this.teardownOnboarding();
+  }
+
+  applySkin(skin) {
+    // Back-compat: a bare color string still just recolors the camera.
+    const background = typeof skin === "string" ? skin : skin?.background;
+    const pattern = typeof skin === "string" ? null : skin?.pattern;
+    if (background) {
+      this.skinBackground = background;
+      this.cameras?.main?.setBackgroundColor(background);
+    }
+    this.applySkinPattern(pattern, background);
+  }
+
+  applySkinPattern(patternUrl) {
+    // Decorative "liner" wallpaper drawn on the fridge's inner walls: above the
+    // realistic back board (depth 0) but below shelves/items (depth 100). MULTIPLY
+    // blend lets the board's baked shading show through so it reads as one surface.
+    const clearLiners = () => {
+      if (this.skinLiners) for (const img of this.skinLiners) img.destroy();
+      this.skinLiners = [];
+    };
+    const place = (key) => {
+      clearLiners();
+      this.skinLiners = SKIN_LINER_REGIONS.map((r) => {
+        const img = this.add.image(r.x + r.w / 2, r.y + r.h / 2, key)
+          .setDisplaySize(r.w, r.h)
+          .setDepth(1)
+          .setAlpha(0.5)
+          .setBlendMode(Phaser.BlendModes.MULTIPLY);
+        return img;
+      });
+    };
+    if (!patternUrl) {
+      clearLiners();
+      return;
+    }
+    const key = `skin:${patternUrl}`;
+    if (this.textures.exists(key)) {
+      place(key);
+      return;
+    }
+    this.load.image(key, patternUrl);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      if (this.textures.exists(key)) place(key);
+    });
+    this.load.start();
+  }
+
+  teardownOnboarding() {
+    if (!this.onboarding) return;
+    const { layer, targetRing, touch, banner, bannerText, travel } = this.onboarding;
+    travel?.remove?.();
+    const targets = [targetRing, touch, banner, bannerText].filter(Boolean);
+    this.tweens.killTweensOf(targets);
+    this.tweens.add({
+      targets,
+      alpha: 0,
+      duration: 240,
+      ease: "Sine.in",
+      onComplete: () => layer?.destroy(),
+    });
+    this.onboarding = null;
   }
 
   buildStage() {
     const g = this.add.graphics();
     if (this.level.assets?.back) {
-      this.add.image(375, 667, this.level.assets.back.key)
-        .setDisplaySize(this.level.stage.width, this.level.stage.height)
-        .setDepth(0);
+      const back = this.level.assets.back;
+      if (back.contain) {
+        // Preserve the square aspect of a top-down illustration (e.g. the
+        // picnic basket) instead of stretching it to the portrait stage.
+        const size = back.size || this.level.stage.width;
+        this.add.image(375, back.y ?? 667, back.key)
+          .setDisplaySize(size, size)
+          .setDepth(0);
+      } else {
+        this.add.image(375, 667, back.key)
+          .setDisplaySize(this.level.stage.width, this.level.stage.height)
+          .setDepth(0);
+      }
     }
     for (const shape of this.level.stage.shapes) this.drawShape(g, shape);
     g.setDepth(0);
@@ -213,9 +430,10 @@ export class StorageScene extends Phaser.Scene {
       return { bg, text };
     };
 
-    this.phasePill = pill(16, 14, 104);
-    this.coinPill = pill(128, 14, 92);
-    this.progressPill = pill(228, 14, 86);
+    // Shifted right of the React "Home" circle button (campaign top-left overlay).
+    this.phasePill = pill(140, 14, 104);
+    this.coinPill = pill(252, 14, 92);
+    this.progressPill = pill(352, 14, 86);
     this.phasePill.text.setDepth(512);
     this.coinPill.text.setDepth(512);
     this.progressPill.text.setDepth(512);
@@ -300,6 +518,7 @@ export class StorageScene extends Phaser.Scene {
     this.goalLabel?.setY(centerY);
     this.goalText?.setY(centerY);
     this.goalText?.setText(text);
+    this.goalCardBottom = cardY + cardH;
   }
 
   updateChrome(patch = {}) {
@@ -322,31 +541,38 @@ export class StorageScene extends Phaser.Scene {
     if (placed > previousPlaced) this.pulseChromeText(this.progressPill?.text);
     if (coins !== previousCoins) this.pulseChromeText(this.coinPill?.text);
 
-    // Harmony bar
-    const harmony = patch.harmonyScore ?? this.chromeData?.harmonyScore ?? 0;
-    const target = this.level.harmony?.target ?? 300;
-    this.drawHarmonyBar(harmony, target);
+    // Settle meter: how many constrained items are fully satisfied ("locked in").
+    const settledCount = patch.settledCount ?? this.chromeData?.settledCount ?? 0;
+    const constrainedTotal = patch.constrainedTotal ?? this.chromeData?.constrainedTotal ?? 0;
+    this.drawSettleBar(settledCount, constrainedTotal);
   }
 
-  drawHarmonyBar(score, target) {
+  drawSettleBar(count, goal) {
     this.harmonyBarBg?.clear();
     this.harmonyBarFill?.clear();
-    if (!score && score !== 0) {
+    if (!goal) {
       this.harmonyLabel?.setText("");
       return;
     }
-    const barW = 200;
-    const barH = 8;
-    const barX = 375 - barW / 2;
-    const barY = 162;
-    const pct = Math.min(1, score / Math.max(1, target));
-    const color = pct >= 1 ? 0x67edb8 : pct >= 0.7 ? 0xffd166 : 0xff7d62;
+    const barW = 176;
+    const barH = 10;
+    const labelW = 96;
+    const groupW = barW + 10 + labelW;
+    const barX = 375 - groupW / 2;
+    const barY = (this.goalCardBottom ?? 214) + 16;
+    const pct = Math.min(1, count / Math.max(1, goal));
+    const color = pct >= 1 ? 0x67edb8 : pct >= 0.6 ? 0xffd166 : 0xff9f7d;
 
     this.harmonyBarBg.fillStyle(0xe8dcc8, 0.6);
-    this.harmonyBarBg.fillRoundedRect(barX, barY, barW, barH, 4);
-    this.harmonyBarFill.fillStyle(color, 0.9);
-    this.harmonyBarFill.fillRoundedRect(barX, barY, Math.max(4, barW * pct), barH, 4);
-    this.harmonyLabel?.setText(`${score}/${target}`);
+    this.harmonyBarBg.fillRoundedRect(barX, barY, barW, barH, 5);
+    this.harmonyBarFill.fillStyle(color, 0.95);
+    this.harmonyBarFill.fillRoundedRect(barX, barY, Math.max(5, barW * pct), barH, 5);
+    this.harmonyLabel?.setOrigin(0, 0.5);
+    this.harmonyLabel?.setPosition(barX + barW + 10, barY + barH / 2);
+    this.harmonyLabel?.setText(this.i18n.ui.settleMeter(count, goal));
+    // Pulse the meter when the count rises so the player feels the progress.
+    if (count > (this._lastSettledCount ?? 0)) this.pulseChromeText(this.harmonyLabel);
+    this._lastSettledCount = count;
   }
 
   pulseChromeText(node) {
@@ -454,19 +680,52 @@ export class StorageScene extends Phaser.Scene {
 
   setToastMessage(message) {
     const text = message || "";
-    const twoLine = text.length > 42 || /\s.{18,}\s/.test(text);
-    const cardH = twoLine ? 76 : 60;
-    const cardY = twoLine ? 1220 : 1236;
+    if (!text) {
+      this.hideToast();
+      return;
+    }
+    const twoLine = text.length > 34 || /\s.{16,}\s/.test(text);
+    const cardH = twoLine ? 68 : 52;
+    const cardW = 560;
+    const cardX = 375 - cardW / 2;
+    // Sit just below the goal/harmony header so it never collides with the
+    // draggable tray or the bottom action bar.
+    const cardY = (this.goalCardBottom ?? 214) + 40;
     const centerY = cardY + cardH / 2;
     this.toastBg?.clear();
     this.toastBg?.fillStyle(0x5b2c1d, 0.95);
     this.toastBg?.lineStyle(3, 0xffffff, 0.8);
-    this.toastBg?.fillRoundedRect(20, cardY, 710, cardH, 20);
-    this.toastBg?.strokeRoundedRect(20, cardY, 710, cardH, 20);
+    this.toastBg?.fillRoundedRect(cardX, cardY, cardW, cardH, 18);
+    this.toastBg?.strokeRoundedRect(cardX, cardY, cardW, cardH, 18);
     this.toastText?.setText(text);
-    this.toastText?.setFontSize(twoLine ? 18 : 22);
+    this.toastText?.setFontSize(twoLine ? 18 : 21);
+    this.toastText?.setWordWrapWidth(cardW - 40, true);
     this.toastText?.setY(centerY);
     this.toastText?.setColor("#ffffff");
+
+    // Fade the banner in, hold, then auto-hide so it doesn't linger over the fridge.
+    const targets = [this.toastBg, this.toastText].filter(Boolean);
+    this.tweens.killTweensOf(targets);
+    for (const t of targets) t.setAlpha(1);
+    this.tweens.add({
+      targets,
+      alpha: 0,
+      delay: 2400,
+      duration: 300,
+      ease: "Sine.easeIn",
+    });
+  }
+
+  hideToast() {
+    const targets = [this.toastBg, this.toastText].filter(Boolean);
+    if (!targets.length) return;
+    this.tweens.killTweensOf(targets);
+    this.tweens.add({
+      targets,
+      alpha: 0,
+      duration: 260,
+      ease: "Sine.easeIn",
+    });
   }
 
   clearHintFx() {
@@ -695,9 +954,24 @@ export class StorageScene extends Phaser.Scene {
       this.itemLayer.add(sprite);
       this.sprites.set(item.id, sprite);
       this.introSprites.push({ sprite, x: display.x, y: display.y, packed: entry.status === "packed" });
+      this.attachItemShadow(sprite);
       if (!item.fixed) {
         sprite.setInteractive({ draggable: true, pixelPerfect: false });
         this.input.setDraggable(sprite);
+        // Tap-to-rotate for rotatable packing items (top-down mode). A tap is a
+        // pointerup with negligible movement; a drag moves & places instead.
+        if (this.topDown && this.engine.canRotate(item.id)) {
+          sprite.on("pointerdown", (p) => {
+            sprite.setData("downAt", { x: p.worldX, y: p.worldY });
+          });
+          sprite.on("pointerup", (p) => {
+            const down = sprite.getData("downAt");
+            if (!down) return;
+            const moved = Math.hypot(p.worldX - down.x, p.worldY - down.y);
+            sprite.setData("downAt", null);
+            if (moved <= 10) this.rotateItemInPlace(sprite);
+          });
+        }
       }
     }
     if (this.level.items.length) {
@@ -712,6 +986,33 @@ export class StorageScene extends Phaser.Scene {
     this.sortItems();
     this.playLevelIntroPolish();
     this.updateRemainingSpotlight(this.engine.validate());
+  }
+
+  // Soft contact shadow so items feel placed in the world instead of pasted on.
+  // Uses the WebGL preFX pipeline (auto-follows the sprite); no-ops on canvas.
+  attachItemShadow(sprite) {
+    if (!sprite.preFX) return;
+    try {
+      const shadow = sprite.preFX.addShadow(0, 1.4, 0.07, 1.1, 0x1a0d00, 6, 0.32);
+      sprite.setData("shadowFx", shadow);
+    } catch {
+      // Renderer without preFX support — skip gracefully.
+    }
+  }
+
+  // Lift the shadow (bigger, softer, offset) while an item is held; reset on drop.
+  setItemLifted(sprite, lifted) {
+    const shadow = sprite.getData?.("shadowFx");
+    if (!shadow) return;
+    if (lifted) {
+      shadow.y = 5;
+      shadow.decay = 0.12;
+      shadow.intensity = 0.42;
+    } else {
+      shadow.y = 1.4;
+      shadow.decay = 0.07;
+      shadow.intensity = 0.32;
+    }
   }
 
   playLevelIntroPolish() {
@@ -788,7 +1089,46 @@ export class StorageScene extends Phaser.Scene {
     const baselineY = this.engine.slotBaseline(slot, rows - 1, 1);
 
     if (!this.editMode) {
-      if (rows > 1) {
+      if (this.topDown && (cols > 1 || rows > 1)) {
+        // Clear packing lattice: a rounded playfield with visible cell borders so
+        // players can read exactly which cells they still need to fill.
+        const cellW = slot.w / cols;
+        const cellH = slot.h / rows;
+        const inset = 6;
+        const pfL = left + inset;
+        const pfT = top + inset;
+        const pfW = slot.w - inset * 2;
+        const pfH = slot.h - inset * 2;
+        // Soft inset panel lightens the busy backdrop so the grid reads clearly.
+        slot.guide.fillStyle(0xffffff, 0.20);
+        slot.guide.fillRoundedRect(pfL, pfT, pfW, pfH, 16);
+        // Grid lines drawn twice (dark halo + light core) so they stand out on
+        // any backdrop colour instead of vanishing into the pattern.
+        const drawLine = (x1, y1, x2, y2) => {
+          slot.guide.lineStyle(4, 0x3a2410, 0.16);
+          slot.guide.lineBetween(x1, y1, x2, y2);
+          slot.guide.lineStyle(1.5, 0xffffff, 0.6);
+          slot.guide.lineBetween(x1, y1, x2, y2);
+        };
+        for (let col = 1; col < cols; col += 1) {
+          const x = left + cellW * col;
+          drawLine(x, pfT + 4, x, pfT + pfH - 4);
+        }
+        for (let row = 1; row < rows; row += 1) {
+          const y = top + cellH * row;
+          drawLine(pfL + 4, y, pfL + pfW - 4, y);
+        }
+        // Dots at cell intersections read as a tidy grid.
+        slot.guide.fillStyle(0x3a2410, 0.28);
+        for (let col = 1; col < cols; col += 1) {
+          for (let row = 1; row < rows; row += 1) {
+            slot.guide.fillCircle(left + cellW * col, top + cellH * row, 2.6);
+          }
+        }
+        // Rounded frame around the whole playfield.
+        slot.guide.lineStyle(3, 0x7a4a22, 0.4);
+        slot.guide.strokeRoundedRect(pfL, pfT, pfW, pfH, 16);
+      } else if (rows > 1) {
         slot.guide.lineStyle(1, 0xffffff, 0.18);
         for (let row = 1; row < rows; row += 1) {
           const y = top + (slot.h / rows) * row;
@@ -939,11 +1279,55 @@ export class StorageScene extends Phaser.Scene {
   }
 
   displayPointFor(item, entry) {
+    if (this.topDown) return this.topDownPoint(item, entry);
     const offset = this.visualOffsetFor(item, entry);
     return {
       x: entry.x + offset.x,
       y: entry.y + offset.y,
     };
+  }
+
+  // ---- TOP-DOWN PACKING RENDER HELPERS ----
+  topDownAngle(entry) {
+    return ((entry?.rot || 0) % 4) * 90;
+  }
+
+  // Center of a packed item's footprint rectangle within the slot grid.
+  topDownPoint(item, entry) {
+    if (entry?.status !== "packed" || !entry.slotId) {
+      return { x: entry.x, y: entry.y };
+    }
+    const slot = this.findSlot(entry.slotId);
+    if (!slot) return { x: entry.x, y: entry.y };
+    const cols = slot.cols || 1;
+    const rows = slot.rows || 1;
+    const cellW = slot.w / cols;
+    const cellH = slot.h / rows;
+    const left = slot.x - slot.w / 2;
+    const top = slot.y - slot.h / 2;
+    const { w, h } = this.engine.itemSize(item.id, entry.rot || 0);
+    return {
+      x: left + (entry.col + w / 2) * cellW,
+      y: top + (entry.row + h / 2) * cellH,
+    };
+  }
+
+  // Uniform scale so the item's long axis maps to its footprint length. The art
+  // is square with the object filling its long axis, so scaling by the longest
+  // footprint dimension keeps rotation visually consistent.
+  topDownScale(item, entry) {
+    const base = item.size || [1, 1];
+    const longCells = Math.max(base[0] || 1, base[1] || 1);
+    const tex = this.textures.get(item.image)?.getSourceImage?.();
+    const texSize = Math.max(tex?.width || 0, tex?.height || 0) || 1024;
+    let cell;
+    if (entry?.status === "packed" && entry.slotId) {
+      const slot = this.findSlot(entry.slotId);
+      cell = slot ? Math.min(slot.w / (slot.cols || 1), slot.h / (slot.rows || 1)) : 120;
+    } else {
+      cell = 66; // compact tray display
+    }
+    return Number(((longCells * cell * 0.94) / texSize).toFixed(4));
   }
 
   logicalDragPoint(item, x, y, entry) {
@@ -955,6 +1339,7 @@ export class StorageScene extends Phaser.Scene {
   }
 
   displayScaleFor(item, entry) {
+    if (this.topDown) return this.topDownScale(item, entry);
     if (entry?.status === "outside") {
       return Number((item.scale * 1.08).toFixed(3));
     }
@@ -1030,6 +1415,15 @@ export class StorageScene extends Phaser.Scene {
 
     const layerLift = Math.max(0, preview.layer || 0) * 10;
     const drawY = rect.y - layerLift;
+    if (this.topDown) {
+      // Clean grid-footprint highlight — no fridge baseline/footprint chrome.
+      this.previewGraphic.fillStyle(palette.fill, palette.fillAlpha + 0.06);
+      this.previewGraphic.lineStyle(palette.lineWidth, palette.line, palette.lineAlpha);
+      this.previewGraphic.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, rect.r);
+      this.previewGraphic.strokeRoundedRect(rect.x, rect.y, rect.w, rect.h, rect.r);
+      this.previewText.setVisible(false);
+      return;
+    }
     const footprint = this.previewFootprint(item, preview);
     this.previewGraphic.fillStyle(palette.fill, palette.fillAlpha);
     this.previewGraphic.lineStyle(palette.lineWidth, palette.line, palette.lineAlpha);
@@ -1145,13 +1539,225 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
+  // ---- WISH BUBBLE: makes each item's hidden preference legible on pickup ----
+  describeWish(item) {
+    const w = this.i18n.ui;
+    // Surface ONLY the rules that actually decide the win. The engine's
+    // itemConstraints() is the single source of truth (cold / warm / zone /
+    // topShelf / visible / hates). Neighbor "likes" is deliberately absent — it
+    // is a soft happiness bonus, not a requirement, so it never becomes a hint.
+    const constraints = this.engine.itemConstraints(item);
+    if (!constraints.length) return null;
+    const primary = [...constraints].sort(
+      (a, b) => NEED_PRIORITY.indexOf(a.type) - NEED_PRIORITY.indexOf(b.type),
+    )[0];
+    if (primary.type === "cold") return { kind: "cold", need: "cold", text: w.wishCold };
+    if (primary.type === "warm") return { kind: "warm", need: "warm", text: w.wishWarm };
+    if (primary.type === "topShelf") return { kind: "topShelf", need: "topShelf", text: w.wishTop };
+    if (primary.type === "visible") return { kind: "visible", need: "visible", text: w.wishVisible };
+    if (primary.type === "zone") {
+      return { kind: "zone", need: "zone", zone: primary.zone, text: w.wishZone?.[primary.zone] || w.wishVisible };
+    }
+    if (primary.type === "hates") {
+      const foe = primary.keys.find((k) => this.textures.exists(k)) || primary.keys[0];
+      return { kind: "hates", need: "hates", text: w.wishHates, friendKey: foe };
+    }
+    return null;
+  }
+
+  buildWishIcon(wish) {
+    // Reuse the exact pictograms drawn on the status badges so the pickup bubble
+    // and the floating badge always speak the same visual language.
+    const c = this.add.container(0, 0);
+    const ink = 0x8a5a2b;
+    const g = this.add.graphics();
+    g.lineStyle(3, ink, 1);
+    this.drawNeedIcon(g, { need: wish.need || wish.kind, zone: wish.zone }, ink);
+    c.add(g);
+    c.setScale(1.5);
+    return c;
+  }
+
+  showWishBubble(obj, item) {
+    this.hideWishBubble();
+    const wish = this.describeWish(item);
+    if (!wish) return;
+
+    const container = this.add.container(0, 0).setDepth(990);
+    const content = this.add.container(0, 0);
+    container.add(content);
+
+    const iconSize = 28;
+    const thumbSize = 36;
+    const gap = 9;
+    let cursor = 0;
+
+    {
+      const icon = this.buildWishIcon(wish);
+      icon.setPosition(cursor + iconSize / 2, 0);
+      content.add(icon);
+      cursor += iconSize + gap;
+    }
+
+    const label = this.add.text(cursor, 0, wish.text, {
+      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+      fontSize: 23,
+      color: "#5b2c1d",
+      fontStyle: "bold",
+    }).setOrigin(0, 0.5);
+    content.add(label);
+    // Only the "avoid X" rule shows a food thumbnail (which food to keep away).
+    const hasThumb = wish.kind === "hates" && wish.friendKey && this.textures.exists(wish.friendKey);
+    cursor += label.width + (hasThumb ? gap : 0);
+
+    if (hasThumb) {
+      const thumb = this.add.image(cursor + thumbSize / 2, 0, wish.friendKey);
+      const scale = thumbSize / Math.max(thumb.width || 1, thumb.height || 1);
+      thumb.setScale(scale);
+      content.add(thumb);
+      cursor += thumbSize;
+    }
+
+    const totalW = cursor;
+    content.setX(-totalW / 2);
+
+    const padX = 20;
+    const halfH = 28;
+    const bg = this.add.graphics();
+    bg.fillStyle(0xfff8e6, 0.98);
+    bg.lineStyle(3, 0xffffff, 0.92);
+    bg.fillRoundedRect(-totalW / 2 - padX, -halfH, totalW + padX * 2, halfH * 2, 16);
+    bg.strokeRoundedRect(-totalW / 2 - padX, -halfH, totalW + padX * 2, halfH * 2, 16);
+    bg.fillStyle(0xfff8e6, 0.98);
+    bg.fillTriangle(-10, halfH - 2, 10, halfH - 2, 0, halfH + 12);
+    container.addAt(bg, 0);
+
+    this.wishBubble = container;
+    this.wishBubbleOffset = 82;
+    container.setPosition(obj.x, obj.y - this.wishBubbleOffset);
+    container.setScale(0.6);
+    container.setAlpha(0);
+    this.tweens.add({ targets: container, scale: 1, alpha: 1, duration: 190, ease: "Back.out(2)" });
+  }
+
+  updateWishBubble(obj) {
+    if (!this.wishBubble) return;
+    this.wishBubble.setPosition(obj.x, obj.y - (this.wishBubbleOffset || 82));
+  }
+
+  hideWishBubble() {
+    if (!this.wishBubble) return;
+    const bubble = this.wishBubble;
+    this.wishBubble = null;
+    this.tweens.killTweensOf(bubble);
+    this.tweens.add({
+      targets: bubble,
+      alpha: 0,
+      scale: 0.7,
+      duration: 130,
+      ease: "Sine.in",
+      onComplete: () => bubble.destroy(),
+    });
+  }
+
+  // Rotate a packing item 90 degrees. In the tray it just spins visually and
+  // remembers the orientation for the next drag. If already packed, it tries the
+  // rotated placement in-place and reverts (with a shake) if it no longer fits.
+  rotateItemInPlace(sprite) {
+    const item = sprite.getData("item");
+    if (!item || !this.engine.canRotate(item.id)) return;
+    const home = sprite.getData("home");
+    const nextRot = this.engine.normalizeRot((home?.rot || 0) + 1);
+
+    if (home?.status === "packed" && home.slotId) {
+      const placement = { slotId: home.slotId, col: home.col, row: home.row, layer: home.layer, rot: nextRot };
+      const evalr = this.engine.evaluatePlacement(item.id, placement);
+      if (!evalr.valid) {
+        // Blocked: quick wobble + soft "nope" so the player feels the wall.
+        this.tweens.add({ targets: sprite, angle: sprite.angle + 8, duration: 70, yoyo: true, repeat: 1, ease: "Sine.inOut" });
+        this.events.emit("blocked");
+        this.setToastMessage(this.i18n.ui.rotateNoFit || "No room to rotate");
+        return;
+      }
+      const result = this.engine.placeItem(item.id, placement);
+      if (result.ok) {
+        const entry = result.state.items[item.id];
+        sprite.setData("home", entry);
+        this.spinTo(sprite, this.topDownAngle(entry), item, entry);
+        this.events.emit("rotate");
+        this.renderState(result.state, this.engine.validate());
+      }
+    } else {
+      // Tray item: remember pending rotation and spin visually.
+      const entry = { ...(home || {}), rot: nextRot };
+      sprite.setData("home", entry);
+      this.spinTo(sprite, this.topDownAngle(entry), item, entry);
+      this.events.emit("rotate");
+    }
+  }
+
+  // Bright pop-and-fade over the exact cells an item just filled, so a placement
+  // reads as "clicked into the grid". Reuses placementRect for pixel-perfect fit.
+  flashPlacedCells(entry, itemId) {
+    if (!entry?.slotId) return;
+    const size = this.engine.itemSize(itemId, entry.rot || 0);
+    const rect = this.placementRect({
+      slotId: entry.slotId,
+      col: entry.col || 0,
+      row: entry.row || 0,
+      width: size.w,
+      height: size.h,
+    });
+    if (!rect) return;
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    const g = this.add.graphics().setDepth(970);
+    g.fillStyle(0xffffff, 0.5);
+    g.lineStyle(4, 0xffffff, 0.9);
+    g.fillRoundedRect(-rect.w / 2, -rect.h / 2, rect.w, rect.h, rect.r);
+    g.strokeRoundedRect(-rect.w / 2, -rect.h / 2, rect.w, rect.h, rect.r);
+    g.setPosition(cx, cy).setScale(1.14);
+    this.tweens.add({
+      targets: g,
+      scale: 1,
+      alpha: 0,
+      duration: 340,
+      ease: "Quad.out",
+      onComplete: () => g.destroy(),
+    });
+  }
+
+  // Snappy 90-degree spin with a little squash-pop so rotation feels punchy.
+  spinTo(sprite, angle, item, entry) {
+    const base = this.displayScaleFor(item, entry);
+    this.tweens.add({ targets: sprite, angle, duration: 170, ease: "Back.out(2)" });
+    this.tweens.add({
+      targets: sprite,
+      scaleX: base * 1.12,
+      scaleY: base * 0.9,
+      duration: 85,
+      ease: "Sine.out",
+      yoyo: true,
+      onComplete: () => sprite.setScale(base),
+    });
+  }
+
   onDragStart(obj) {
     this.hintTimer?.remove?.();
     this.hintTimer = null;
     this.clearHintFx();
+    if (this.onboardingActive) this.onboardingUserGrabbed_();
     this.dragItem = obj;
+    this.dragMoved = true;
     obj.setDepth(980);
-    this.tweens.add({ targets: obj, scale: obj.scale * 1.06, duration: 90, ease: "Sine.out" });
+    this.setItemLifted(obj, true);
+    // Carry the current orientation into the drag so rotation persists.
+    this.dragRot = this.topDown ? (obj.getData("home")?.rot || 0) : 0;
+    if (this.topDown) obj.setAngle(this.topDownAngle({ rot: this.dragRot }));
+    this.tweens.add({ targets: obj, scale: obj.scale * (this.topDown ? 1.1 : 1.06), duration: 90, ease: "Sine.out" });
+    if (this.topDown) this.events.emit("pickup");
+    const item = obj.getData("item");
+    if (item && !this.topDown) this.showWishBubble(obj, item);
   }
 
   onDrag(pointer, obj, x, y) {
@@ -1160,10 +1766,11 @@ export class StorageScene extends Phaser.Scene {
     if (!item) return;
     const home = obj.getData("home");
     const previewPoint = this.logicalDragPoint(item, pointer.worldX, pointer.worldY, home);
-    const preview = this.engine.previewMove(item.id, previewPoint.x, previewPoint.y, this.level.tuning.magnetPreviewDistance);
+    const preview = this.engine.previewMove(item.id, previewPoint.x, previewPoint.y, this.level.tuning.magnetPreviewDistance, this.dragRot || 0);
     this.hoverPlacement = preview;
     this.drawPlacementPreview(item, preview);
     this.refreshHoverZone(preview?.slotId || null, !!preview?.valid, preview?.score ?? 50);
+    if (!this.topDown) this.updateWishBubble(obj, preview);
   }
 
   onDragEnd(obj) {
@@ -1171,6 +1778,8 @@ export class StorageScene extends Phaser.Scene {
     if (!item) return;
     const preview = this.hoverPlacement;
     this.clearHover();
+    this.hideWishBubble();
+    this.setItemLifted(obj, false);
     if (!preview) return this.returnHome(obj);
 
     // Only hard-reject for grid overflow / occupied space
@@ -1207,6 +1816,12 @@ export class StorageScene extends Phaser.Scene {
     const mood = result.mood || "ok";
     this.showItemMood(display.x, display.y, mood, score);
 
+    // Packing "clicked into place" feel: flash the exact grid cells + a thunk.
+    if (this.topDown) {
+      this.flashPlacedCells(entry, item.id);
+      this.events.emit("lock");
+    }
+
     this.playPlacementPulse(preview.slotId, display.x, display.y, score >= 70 ? this.comboCount : 0);
     this.tweens.add({
       targets: obj,
@@ -1231,7 +1846,19 @@ export class StorageScene extends Phaser.Scene {
       },
     });
 
-    if (mood === "happy") {
+    if (this.topDown) {
+      // Packing mode: show goal-focused progress instead of fridge combo copy.
+      const snap = this.engine.snapshot();
+      const remaining = Object.values(snap.items).filter((i) => i.status !== "packed").length;
+      if (remaining === 0) {
+        this.setToastMessage(this.i18n.ui.packAllIn || "Everything fits!");
+      } else if (remaining === 1) {
+        this.setToastMessage(this.i18n.ui.packOneLeft || "1 more to go!");
+      } else {
+        this.setToastMessage((this.i18n.ui.packLeft && this.i18n.ui.packLeft(remaining)) || `${remaining} left`);
+      }
+      if (this.comboCount >= 3) this.playCallout(this.i18n.ui.calloutGreat, "gold");
+    } else if (mood === "happy") {
       if (this.comboCount >= 7) {
         this.playCallout(this.i18n.ui.calloutUnstoppable, "fire");
         this.setToastMessage(this.i18n.ui.comboFire(this.comboCount));
@@ -1252,7 +1879,8 @@ export class StorageScene extends Phaser.Scene {
     } else {
       this.setToastMessage(this.i18n.ui.snapOk);
     }
-    this.events.emit("snap", { item: item.id, slot: preview.slotId, combo: this.comboCount, score, mood });
+    this.events.emit("snap", { item: item.id, image: item.image, slot: preview.slotId, combo: this.comboCount, score, mood });
+    if (this.onboardingActive) this.finishOnboarding();
 
     // Fire chain reaction animation
     if (result.chain && result.chain.length) {
@@ -1677,10 +2305,15 @@ export class StorageScene extends Phaser.Scene {
       : home;
     const display = this.displayPointFor(item, trayHome);
     const targetScale = this.displayScaleFor(item, trayHome);
+    // In packing mode keep the player's chosen orientation on the tray item.
+    const keepRot = this.topDown ? (home?.rot || 0) : 0;
     if (trayHome.status !== "packed") {
       this.engine.moveOutside(item.id, trayHome.x, trayHome.y);
     }
-    obj.setData("home", this.engine.snapshot().items[item.id] || trayHome);
+    const restored = this.engine.snapshot().items[item.id] || trayHome;
+    if (this.topDown && restored.status !== "packed") restored.rot = keepRot;
+    obj.setData("home", restored);
+    if (this.topDown) obj.setAngle(this.topDownAngle(restored));
     this.playMissFeedback(obj.x, obj.y);
     this.tweens.add({
       targets: obj,
@@ -1714,100 +2347,66 @@ export class StorageScene extends Phaser.Scene {
   }
 
   showHint() {
-    // New hint: find the lowest-scoring PLACED item and highlight it
+    // Reworked hint: instead of solving the puzzle, REVEAL one unsatisfied
+    // item's wish and gently spotlight that item. The player still has to
+    // reason out WHERE it should go.
     const state = this.engine.snapshot();
-    const packed = Object.entries(state.items)
+
+    // 1) Prefer an unhappy PLACED item; 2) else a not-yet-placed item.
+    const placedRanked = Object.entries(state.items)
       .filter(([, e]) => e.status === "packed" && !e.fixed)
-      .map(([id, e]) => {
-        const score = this.engine.scorePlacement(id, e, state);
-        return { id, entry: e, score: score.score, mood: score.mood };
-      })
+      .map(([id, e]) => ({ id, entry: e, score: this.engine.scorePlacement(id, e, state).score }))
+      .filter((r) => r.score < StorageEngine.HAPPY_THRESHOLD)
       .sort((a, b) => a.score - b.score);
 
-    if (!packed.length) {
-      // No items placed yet — suggest placing the item that would benefit most
-      const item = this.engine.firstOutsideMovableItem();
-      if (!item) {
-        this.setToastMessage(this.i18n.ui.hintUnavailable);
-        return { ok: false, message: this.i18n.ui.hintUnavailable };
-      }
-      // Find best placement for this item
-      const placement = this.engine.findFirstValidPlacement(item.id);
-      if (!placement) {
-        this.setToastMessage(this.i18n.ui.hintUnavailable);
-        return { ok: false, message: this.i18n.ui.hintUnavailable };
-      }
-      this.drawPlacementPreview(item, placement);
-      this.refreshHoverZone(placement.slotId, true, placement.score);
-      this.playHintGuidance(item, placement);
-      const itemName = item.name || this.i18n.tItem(item.image, item.image);
-      const slot = this.findSlot(placement.slotId);
-      const zoneLabel = slot ? this.i18n.tZone(slot.zone) : "";
-      this.setToastMessage(this.i18n.ui.hintStart(itemName, zoneLabel));
-      this.hintTimer?.remove?.();
-      this.hintTimer = this.time.delayedCall(1800, () => { if (!this.dragItem) this.clearHover(); });
-      return { ok: true, itemId: item.id, slotId: placement.slotId };
+    let targetId = placedRanked[0]?.id || null;
+    if (!targetId) {
+      const outside = this.engine.firstOutsideMovableItem();
+      targetId = outside?.id || null;
     }
-
-    // Find worst placed item + recommend a better slot
-    const worst = packed[0];
-    const sprite = this.sprites.get(worst.id);
-    if (!sprite) {
+    if (!targetId) {
       this.setToastMessage(this.i18n.ui.hintUnavailable);
       return { ok: false, message: this.i18n.ui.hintUnavailable };
     }
 
-    // Find best alternative placement for this item (different slot)
-    const altPlacement = this.findAlternativePlacement(worst.id);
-    const item = this.engine.itemDef(worst.id);
-    const itemName = item?.name || worst.id;
+    const item = this.engine.itemDef(targetId);
+    const itemName = item?.name || this.i18n.tItem(item?.image, targetId);
+    const sprite = this.sprites.get(targetId);
 
-    // Flash the problem item red
-    this.clearRemainingSpotlight();
-    const baseScale = this.displayScaleFor(item, worst.entry);
-    this.tweens.add({
-      targets: sprite,
-      scaleX: baseScale * 1.12,
-      scaleY: baseScale * 1.12,
-      duration: 180,
-      yoyo: true,
-      repeat: 2,
-      ease: "Sine.inOut",
-      onStart: () => sprite.setTint(0xff7d62),
-      onComplete: () => {
-        sprite.clearTint();
-        sprite.setScale(baseScale);
-      },
-    });
+    // Build the wish description (reuse the pickup wish logic).
+    const wish = this.describeWish(item);
+    let wishText = wish?.text || this.i18n.ui.wishVisible;
+    if (wish?.kind === "hates" && wish.friendKey) {
+      wishText = `${wish.text} ${this.i18n.tItem(wish.friendKey, wish.friendKey)}`;
+    }
+    this.setToastMessage(`${itemName}: ${wishText}`);
 
-    // Red ring around the problem item
-    const ring = this.add.circle(sprite.x, sprite.y - 14, 28, 0xff7d62, 0.18).setDepth(949);
-    ring.setStrokeStyle(3, 0xff7d62, 0.8);
-    this.tweens.add({
-      targets: ring,
-      alpha: 0,
-      scale: 2,
-      duration: 600,
-      ease: "Sine.out",
-      onComplete: () => ring.destroy(),
-    });
-
-    if (altPlacement && altPlacement.score > worst.score + 5) {
-      // Show green preview on recommended slot
-      this.drawPlacementPreview(item, altPlacement);
-      this.refreshHoverZone(altPlacement.slotId, true, altPlacement.score);
-      this.playPlacementPulse(altPlacement.slotId, altPlacement.x, altPlacement.y);
-      const slot = this.findSlot(altPlacement.slotId);
-      const zoneLabel = slot ? this.i18n.tZone(slot.zone) : "";
-      this.setToastMessage(this.i18n.ui.hintMoveTo(itemName, zoneLabel, altPlacement.score));
+    // Gentle golden pulse on the item so the player knows who is talking —
+    // but we do NOT show where it should go.
+    if (sprite) {
+      this.clearRemainingSpotlight();
+      const baseScale = this.displayScaleFor(item, sprite.getData("home"));
+      this.tweens.add({
+        targets: sprite,
+        scaleX: baseScale * 1.12,
+        scaleY: baseScale * 1.12,
+        duration: 200,
+        yoyo: true,
+        repeat: 1,
+        ease: "Sine.inOut",
+        onStart: () => sprite.setTint(0xffe08a),
+        onComplete: () => { sprite.clearTint(); sprite.setScale(baseScale); },
+      });
+      const ring = this.add.circle(sprite.x, sprite.y - 14, 26, 0xffd166, 0.16).setDepth(949);
+      ring.setStrokeStyle(3, 0xffd166, 0.85);
+      this.tweens.add({ targets: ring, alpha: 0, scale: 1.9, duration: 620, ease: "Sine.out", onComplete: () => ring.destroy() });
+      // Show the item's wish bubble briefly.
+      this.showWishBubble(sprite, item);
       this.hintTimer?.remove?.();
-      this.hintTimer = this.time.delayedCall(2500, () => { if (!this.dragItem) this.clearHover(); });
-      return { ok: true, itemId: worst.id, recommendSlotId: altPlacement.slotId, score: worst.score, altScore: altPlacement.score };
+      this.hintTimer = this.time.delayedCall(2200, () => { if (this.dragItem !== sprite) this.hideWishBubble(); });
     }
 
-    this.setToastMessage(this.i18n.ui.hintFix(itemName, worst.score));
-    this.events.emit("miss", { message: this.i18n.ui.hintFix(itemName, worst.score) });
-    return { ok: true, itemId: worst.id, score: worst.score };
+    return { ok: true, itemId: targetId, revealedWish: true };
   }
 
   findAlternativePlacement(itemId) {
@@ -2017,6 +2616,204 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
+  // ---- STATUS BADGES + SETTLING (anti-fatigue core) ----------------------
+  // "settled" items (all hard constraints satisfied) get a small, calm check and
+  // then go quiet. "violated" items get a bright alert so the eye is drawn ONLY
+  // to what still needs solving. As the board is solved, on-screen demands on
+  // attention shrink — cognitive load goes DOWN even as the puzzle stays hard.
+  // Draw a small, recognizable pictogram for a single requirement into a
+  // graphics object (already centered at 0,0). This is what turns the vague
+  // "!" into a clear "this food wants X" so the puzzle becomes deducible.
+  drawNeedIcon(g, desc, ink) {
+    const snowflake = () => {
+      const arm = 6.5;
+      for (const deg of [90, 210, 330]) {
+        const r = (deg * Math.PI) / 180;
+        g.beginPath();
+        g.moveTo(-Math.cos(r) * arm, -Math.sin(r) * arm);
+        g.lineTo(Math.cos(r) * arm, Math.sin(r) * arm);
+        g.strokePath();
+      }
+    };
+    if (desc.need === "cold") return snowflake();
+    if (desc.need === "warm") {
+      // Little sun: a filled center with radiating rays (opposite of the snowflake).
+      g.fillStyle(ink, 1);
+      g.fillCircle(0, 0, 3.2);
+      for (let i = 0; i < 8; i += 1) {
+        const a = (Math.PI / 4) * i;
+        g.beginPath();
+        g.moveTo(Math.cos(a) * 5.4, Math.sin(a) * 5.4);
+        g.lineTo(Math.cos(a) * 8.6, Math.sin(a) * 8.6);
+        g.strokePath();
+      }
+      return;
+    }
+    if (desc.need === "topShelf") {
+      // Up-chevron above a shelf line — "keep me up high".
+      g.beginPath();
+      g.moveTo(-6, 6);
+      g.lineTo(6, 6);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(-5, -0.5);
+      g.lineTo(0, -6);
+      g.lineTo(5, -0.5);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(0, -6);
+      g.lineTo(0, 3);
+      g.strokePath();
+      return;
+    }
+    if (desc.need === "visible") {
+      g.strokeEllipse(0, 0, 16, 9);
+      g.fillStyle(ink, 1);
+      g.fillCircle(0, 0, 2.4);
+      return;
+    }
+    if (desc.need === "hates") {
+      g.strokeCircle(0, 0, 7);
+      g.beginPath();
+      g.moveTo(-4.9, -4.9);
+      g.lineTo(4.9, 4.9);
+      g.strokePath();
+      return;
+    }
+    // zone-based needs
+    const zone = desc.zone || "shelf";
+    if (zone === "chill") return snowflake();
+    if (zone === "door") {
+      g.strokeRoundedRect(-4, -7, 8, 14, 2);
+      g.fillStyle(ink, 1);
+      g.fillCircle(1.6, 0, 1.2);
+      return;
+    }
+    if (zone === "drawer") {
+      g.strokeRoundedRect(-7, -5, 14, 10, 2);
+      g.beginPath();
+      g.moveTo(-3, 0);
+      g.lineTo(3, 0);
+      g.strokePath();
+      return;
+    }
+    // shelf (default): two stacked shelf lines
+    g.beginPath();
+    g.moveTo(-6, -3);
+    g.lineTo(6, -3);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(-6, 3);
+    g.lineTo(6, 3);
+    g.strokePath();
+  }
+
+  buildNeedBadge(desc) {
+    const c = this.add.container(0, 0);
+    if (desc.kind === "settled") {
+      // Low-salience: soft green disc with a checkmark. Calm, "locked in".
+      const disc = this.add.circle(0, 0, 13, 0x67edb8, 1).setStrokeStyle(3, 0xffffff, 0.95);
+      c.add(disc);
+      const check = this.add.graphics();
+      check.lineStyle(2.8, 0x1f5c42, 1);
+      check.beginPath();
+      check.moveTo(-5, 0);
+      check.lineTo(-1.5, 4);
+      check.lineTo(6, -5);
+      check.strokePath();
+      c.add(check);
+      return c;
+    }
+    // A requirement is shown as its own pictogram. Two tones:
+    //  - "alert" (placed but wrong): bright amber, draws the eye to what to fix.
+    //  - "calm"  (still in the tray): soft cream, an at-a-glance hint of what it wants.
+    const alert = desc.tone === "alert";
+    const bg = alert ? 0xffb347 : 0xfff1d6;
+    const ink = alert ? 0x6b3410 : 0xa9772f;
+    const disc = this.add.circle(0, 0, 14, bg, 1).setStrokeStyle(3, 0xffffff, 0.98);
+    c.add(disc);
+    const g = this.add.graphics();
+    g.lineStyle(2.4, ink, 1);
+    this.drawNeedIcon(g, desc, ink);
+    c.add(g);
+    return c;
+  }
+
+  updateStatusBadges(itemStatus) {
+    if (!this.statusBadges) this.statusBadges = new Map();
+    const seen = new Set();
+    const PRIORITY = NEED_PRIORITY;
+
+    for (const [itemId, info] of Object.entries(itemStatus)) {
+      // Easygoing items (no hard rules) never nag or hint — nothing to satisfy.
+      if (info.easygoing) continue;
+      const sprite = this.sprites.get(itemId);
+      if (!sprite) continue;
+      if (this.dragItem === sprite) continue;
+      const entry = sprite.getData("home");
+      const placed = !!entry && entry.status === "packed";
+
+      // Build the descriptor: a green check when settled, otherwise the single
+      // most important UNMET requirement (shown on tray items too, so the player
+      // knows what each picky food wants BEFORE placing it).
+      let desc;
+      if (info.status === "settled") {
+        desc = { kind: "settled" };
+      } else {
+        let unmet = info.results && info.results.length
+          ? info.results.filter((r) => !r.satisfied)
+          : this.engine.itemConstraints(sprite.getData("item")); // pending → read from def
+        if (!unmet || !unmet.length) continue;
+        unmet = [...unmet].sort((a, b) => PRIORITY.indexOf(a.type) - PRIORITY.indexOf(b.type));
+        const primary = unmet[0];
+        desc = { kind: "need", need: primary.type, zone: primary.zone, tone: placed ? "alert" : "calm" };
+      }
+      seen.add(itemId);
+
+      const sig = desc.kind === "settled" ? "settled" : `${desc.need}:${desc.zone || ""}:${desc.tone}`;
+      let record = this.statusBadges.get(itemId);
+      if (!record || record.sig !== sig) {
+        const wasNeed = record && record.sig !== "settled";
+        const settledOnce = record?.settledOnce;
+        record?.container.destroy();
+        const container = this.buildNeedBadge(desc).setDepth(970);
+        this.statusBadges.set(itemId, { container, sig, settledOnce });
+        record = this.statusBadges.get(itemId);
+        container.setScale(0);
+        this.tweens.add({ targets: container, scale: 1, duration: 220, ease: "Back.out(2.4)" });
+        // The satisfying "settle" moment: item just became fully satisfied.
+        if (desc.kind === "settled" && (wasNeed || !record.settledOnce)) {
+          record.settledOnce = true;
+          this.playSettleEffect(sprite);
+        }
+      }
+      const b = sprite.getBounds();
+      // Placed → tuck into the corner; in the tray → float centered above it.
+      if (placed) record.container.setPosition(b.right - 6, b.top + 8);
+      else record.container.setPosition(b.centerX, b.top - 2);
+    }
+
+    for (const [itemId, record] of this.statusBadges) {
+      if (!seen.has(itemId)) {
+        record.container.destroy();
+        this.statusBadges.delete(itemId);
+      }
+    }
+  }
+
+  // A brief, gentle "click into place" flourish when an item settles — a soft
+  // green ring pulse and a tiny bounce. Deliberately quiet (this is a calming
+  // moment, not a fireworks moment) so repeated settles never become noisy.
+  playSettleEffect(sprite) {
+    const ring = this.add.circle(sprite.x, sprite.y - 10, 22, 0x67edb8, 0.16).setDepth(948);
+    ring.setStrokeStyle(3, 0x67edb8, 0.7);
+    this.tweens.add({ targets: ring, alpha: 0, scale: 1.7, duration: 460, ease: "Sine.out", onComplete: () => ring.destroy() });
+    const base = sprite.scale;
+    this.tweens.add({ targets: sprite, scale: base * 1.08, duration: 110, yoyo: true, ease: "Sine.inOut", onComplete: () => sprite.setScale(base) });
+    // Hide any lingering wish bubble for this item — its wish is fulfilled.
+    if (this.wishBubble && this.dragItem !== sprite) this.hideWishBubble();
+  }
+
   playCompletionPolish(stars = 1) {
     if (this.completionPolishStarted) return;
     this.completionPolishStarted = true;
@@ -2105,41 +2902,72 @@ export class StorageScene extends Phaser.Scene {
       });
     });
 
-    // Celebration particles for 3-star
-    if (stars >= 3) {
-      this.time.delayedCall(800, () => {
-        for (let i = 0; i < 14; i += 1) {
-          const confetti = this.add.circle(
-            200 + Math.random() * 350,
-            180 + Math.random() * 60,
-            3 + Math.random() * 4,
-            [0xffd166, 0xff6b6b, 0x67edb8, 0x89c4ff, 0xffb347][Math.floor(Math.random() * 5)],
-            0.9,
-          ).setDepth(562);
-          this.tweens.add({
-            targets: confetti,
-            y: confetti.y + 200 + Math.random() * 300,
-            x: confetti.x + (Math.random() - 0.5) * 260,
-            alpha: 0,
-            angle: Math.random() * 720,
-            duration: 900 + Math.random() * 600,
-            delay: Math.random() * 200,
-            ease: "Sine.in",
-            onComplete: () => confetti.destroy(),
-          });
-        }
-      });
-    }
+    // Every win deserves a burst — intensity scales with stars so 1-star still
+    // feels celebratory and 3-star feels spectacular.
+    this.time.delayedCall(650, () => this.burstConfetti(stars));
 
     this.setToastMessage(stars >= 3 ? this.i18n.ui.successPerfect : this.i18n.ui.successTag);
   }
 
+  // Confetti + streamer burst for level completion. Count/spread scale with stars.
+  burstConfetti(stars = 1) {
+    const palette = [0xffd166, 0xff6b6b, 0x67edb8, 0x89c4ff, 0xffb347, 0xff8fc7];
+    const count = 22 + stars * 16;
+    const layer = this.add.layer().setDepth(562);
+    // Two side cannons firing toward the center-top, plus a light top sprinkle.
+    const cannons = [
+      { x: 90, y: 470, vx: 1, spread: 0.5 },
+      { x: 660, y: 470, vx: -1, spread: 0.5 },
+    ];
+    for (let i = 0; i < count; i += 1) {
+      const cannon = cannons[i % cannons.length];
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      const isStrip = Math.random() > 0.45;
+      const startX = cannon.x + (Math.random() - 0.5) * 40;
+      const startY = cannon.y + (Math.random() - 0.5) * 40;
+      const piece = isStrip
+        ? this.add.rectangle(startX, startY, 6 + Math.random() * 5, 12 + Math.random() * 8, color, 0.95)
+        : this.add.circle(startX, startY, 3 + Math.random() * 4, color, 0.95);
+      layer.add(piece);
+      const launchX = cannon.vx * (160 + Math.random() * 260);
+      const apex = 220 + Math.random() * 160;
+      // Arc up-and-out, then fall with gravity-like ease and fade.
+      this.tweens.add({
+        targets: piece,
+        x: startX + launchX,
+        y: startY - apex,
+        angle: (Math.random() - 0.5) * 540,
+        duration: 480 + Math.random() * 220,
+        ease: "Quad.easeOut",
+        onComplete: () => {
+          this.tweens.add({
+            targets: piece,
+            y: startY - apex + 520 + Math.random() * 220,
+            x: piece.x + (Math.random() - 0.5) * 120,
+            angle: piece.angle + (Math.random() - 0.5) * 540,
+            alpha: 0,
+            duration: 900 + Math.random() * 500,
+            ease: "Quad.easeIn",
+            onComplete: () => piece.destroy(),
+          });
+        },
+      });
+    }
+    this.time.delayedCall(2600, () => layer.destroy());
+  }
+
   renderState(state, validation) {
     this.updateChrome({
-      placed: validation.packed,
-      total: validation.total,
+      // Unified, truthful progress: "ready" items (placed + legal + all rules met).
+      // Both the top pill and the settle bar now show the SAME number, and it
+      // hits full exactly when the level is won — no more conflicting counters.
+      placed: validation.doneCount ?? validation.packed,
+      total: validation.doneTotal ?? validation.total,
       harmonyScore: validation.totalScore,
+      settledCount: validation.doneCount ?? validation.settledCount,
+      constrainedTotal: validation.doneTotal ?? validation.constrainedTotal,
     });
+    this.updateStatusBadges(validation.itemStatus || {});
     this.events.emit("hud", { placed: validation.packed, total: validation.total });
     for (const [itemId, entry] of Object.entries(state.items)) {
       const sprite = this.sprites.get(itemId);
@@ -2149,23 +2977,33 @@ export class StorageScene extends Phaser.Scene {
       if (Math.abs(sprite.x - display.x) > 0.5 || Math.abs(sprite.y - display.y) > 0.5) {
         sprite.setPosition(display.x, display.y);
       }
+      if (this.topDown) {
+        sprite.setAngle(this.topDownAngle(entry));
+        sprite.setScale(this.displayScaleFor(item, entry));
+      }
       sprite.setData("home", entry);
     }
     this.sortItems();
     this.updateRemainingSpotlight(validation);
-    // If all items placed but target not met, tell the player
-    if (validation.allPlaced && !validation.targetMet && !validation.complete && !this.winSent) {
-      this.setToastMessage(this.i18n.ui.rearrangeHint(this.level.harmony?.target || 300, validation.totalScore || 0));
+    // If all items placed but some constraints unmet, nudge the player.
+    if (validation.allPlaced && !validation.allSettled && !validation.complete && !this.winSent) {
+      this.setToastMessage(this.i18n.ui.constraintRearrange(validation.settledCount || 0, validation.constrainedTotal || 0));
     }
     if (validation.complete && !this.winSent) {
       this.clearRemainingSpotlight();
       this.winSent = true;
-      // Star rating based on harmony thresholds
-      const h = this.level.harmony || { target: 300, gold: 380, perfect: 440 };
-      const score = validation.totalScore || 0;
+      // Star rating based on how many foods are happy:
+      // 1★ = reached the goal, 2★ = beat it, 3★ = every food is happy.
+      const happy = validation.happyCount || 0;
+      const goal = validation.happyGoal || 0;
+      const all = validation.happyTotal || 0;
       let stars = 1;
-      if (score >= h.perfect) stars = 3;
-      else if (score >= h.gold) stars = 2;
+      if (this.topDown) {
+        // Packing mode: fitting everything in legally is already a perfect win.
+        stars = 3;
+      } else if (happy >= all) stars = 3;
+      else if (happy >= goal + 1) stars = 2;
+      const score = validation.totalScore || 0;
       this.playCompletionPolish(stars);
       // Kill-style callout on completion
       this.time.delayedCall(400, () => {

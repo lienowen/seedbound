@@ -94,13 +94,28 @@ export class StorageEngine {
     };
   }
 
-  itemSize(itemId) {
+  // itemSize returns the grid footprint. When an item is rotated 90 or 270
+  // degrees (odd rot), width and height swap. rot is 0..3 (each step = 90deg);
+  // only its parity affects the footprint.
+  itemSize(itemId, rot = 0) {
     const item = this.itemDef(itemId);
     const [w = 1, h = 1] = item?.size || [1, 1];
-    return {
-      w: Math.max(1, Math.round(w)),
-      h: Math.max(1, Math.round(h)),
-    };
+    const bw = Math.max(1, Math.round(w));
+    const bh = Math.max(1, Math.round(h));
+    return (Math.round(rot) % 2 !== 0) ? { w: bh, h: bw } : { w: bw, h: bh };
+  }
+
+  // An item is rotatable only if it opts in AND is non-square (rotation changes
+  // its footprint — rotating a 1x1 or 2x2 would be pointless).
+  canRotate(itemId) {
+    const item = this.itemDef(itemId);
+    if (!item?.rotatable) return false;
+    const [w = 1, h = 1] = item.size || [1, 1];
+    return Math.round(w) !== Math.round(h);
+  }
+
+  normalizeRot(rot = 0) {
+    return ((Math.round(rot) % 4) + 4) % 4;
   }
 
   itemPlacementNudge(itemId, placement = null, mode = "packed") {
@@ -200,7 +215,7 @@ export class StorageEngine {
     // 5. Neighbor preferences
     const packedById = this.packedItemsById(candidate);
     const occupancy = this.buildOccupancy(candidate, itemId);
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, placement.rot);
     const neighborIds = new Set();
 
     // Check adjacent cells for neighbors
@@ -236,6 +251,134 @@ export class StorageEngine {
     else mood = "sad";
 
     return { score: clamped, mood, reasons };
+  }
+
+  // ---- CONSTRAINT MODEL (prototype) --------------------------------------
+  // Turns an item's soft prefs into DISCRETE, binary rules. Each rule is either
+  // satisfied or violated — no 0-100 fuzziness. This is what makes the puzzle
+  // feel deductive (you can *reason* the answer) instead of a slider you keep
+  // nudging. An item with prefs but no hard rules is "easygoing" (place anywhere).
+  itemConstraints(item) {
+    const prefs = item?.prefs || {};
+    const list = [];
+    const coldZone = prefs.zone ? this._COLD_ZONES.has(prefs.zone) : false;
+    const warmZone = prefs.zone ? !this._COLD_ZONES.has(prefs.zone) : false;
+    // Temperature is a hard "WHERE" rule. Cold and warm are mutually exclusive.
+    if (prefs.needsCold) list.push({ type: "cold" });
+    // Warmth is the inverse of cold: pantry/room-temp foods that spoil or go stale
+    // in the chilled zones and must stay on an open shelf or in the door.
+    else if (prefs.needsWarm) list.push({ type: "warm" });
+    // Zone is hard too — but it yields to temperature when they contradict (a cold
+    // item belongs in a cold zone; a warm item belongs in a warm zone) even if its
+    // "nice-to-have" zone points the other way.
+    if (
+      prefs.zone &&
+      (!prefs.needsCold || coldZone) &&
+      (!prefs.needsWarm || warmZone)
+    ) list.push({ type: "zone", zone: prefs.zone });
+    // "Up high" — light/showy foods that want a top shelf or the top of the door.
+    // Top cells are warm, so this only applies when it doesn't fight the cold rule.
+    if (prefs.topShelf && !prefs.needsCold) list.push({ type: "topShelf" });
+    // Exclusion ("don't sit next to X") is a hard rule.
+    if (prefs.hatesNeighbors?.length) list.push({ type: "hates", keys: prefs.hatesNeighbors });
+    // Visibility is hard, but only when it doesn't fight the cold requirement.
+    if (prefs.likesVisible && !prefs.needsCold) list.push({ type: "visible" });
+    // NOTE: likesNeighbors (adjacency) is intentionally NOT a hard constraint.
+    // Positioning items next to each other is the high-effort, fiddly part; making
+    // it a win gate is what caused fatigue AND over-constrained levels into being
+    // unsolvable. It stays a SOFT bonus that feeds happiness/stars, not the gate.
+    return list;
+  }
+
+  hasConstraints(item) {
+    return this.itemConstraints(item).length > 0;
+  }
+
+  // Compute the set of adjacent neighbor item-ids for a placement, using the
+  // exact same adjacency rule as scorePlacement so results stay consistent.
+  neighborIdsFor(itemId, placement, candidate = this.state) {
+    const slot = this.slotById(placement.slotId);
+    if (!slot) return new Set();
+    const occupancy = this.buildOccupancy(candidate, itemId);
+    const { w, h } = this.itemSize(itemId, placement.rot);
+    const ids = new Set();
+    for (let dc = -1; dc <= w; dc += 1) {
+      for (let dr = -1; dr <= h; dr += 1) {
+        const nc = placement.col + dc;
+        const nr = placement.row + dr;
+        if (nc >= placement.col && nc < placement.col + w && nr >= placement.row && nr < placement.row + h) continue;
+        const nid = occupancy.get(`${slot.id}:${placement.layer || 0}:${nc}:${nr}`);
+        if (nid) ids.add(nid);
+      }
+    }
+    return ids;
+  }
+
+  // Evaluate every hard constraint for an item at a placement. Returns discrete
+  // per-rule results plus allSatisfied (used for "settling"/locking).
+  evaluateConstraints(itemId, placement, candidate = this.state) {
+    const item = this.itemDef(itemId);
+    const slot = this.slotById(placement?.slotId);
+    const constraints = this.itemConstraints(item);
+    if (!item || !slot || !constraints.length) {
+      return { constraints: [], results: [], allSatisfied: true, easygoing: !constraints.length };
+    }
+
+    const neighborKeys = new Set();
+    for (const nid of this.neighborIdsFor(itemId, placement, candidate)) {
+      neighborKeys.add(this.itemDef(nid)?.image || nid);
+    }
+
+    const results = constraints.map((c) => {
+      let satisfied = false;
+      if (c.type === "cold") satisfied = this._COLD_ZONES.has(slot.zone);
+      else if (c.type === "warm") satisfied = !this._COLD_ZONES.has(slot.zone);
+      else if (c.type === "topShelf") satisfied = typeof slot.id === "string" && slot.id.includes("top");
+      else if (c.type === "zone") satisfied = slot.zone === c.zone;
+      else if (c.type === "visible") satisfied = slot.zone === "shelf" || slot.zone === "door";
+      else if (c.type === "likes") satisfied = c.keys.some((k) => neighborKeys.has(k));
+      else if (c.type === "hates") satisfied = !c.keys.some((k) => neighborKeys.has(k));
+      return { ...c, satisfied };
+    });
+
+    return {
+      constraints,
+      results,
+      allSatisfied: results.every((r) => r.satisfied),
+      easygoing: false,
+    };
+  }
+
+  // Whole-board constraint report: per-item status and settled counts.
+  // status: "pending" (not placed) | "violated" | "settled".
+  constraintReport(candidate = this.state) {
+    const movable = this.movableItems();
+    const itemStatus = {};
+    let settledCount = 0;
+    let constrainedTotal = 0; // items that actually have hard rules
+
+    for (const item of movable) {
+      const hasRules = this.hasConstraints(item);
+      if (hasRules) constrainedTotal += 1;
+      const entry = candidate.items[item.id];
+      if (!entry || entry.status !== "packed") {
+        itemStatus[item.id] = { status: "pending", easygoing: !hasRules, results: [] };
+        continue;
+      }
+      const evalc = this.evaluateConstraints(item.id, entry, candidate);
+      // Placement legality also matters (no overlap/overflow).
+      const legal = this.evaluatePlacement(item.id, entry, candidate).valid;
+      const settled = legal && evalc.allSatisfied;
+      if (settled && hasRules) settledCount += 1;
+      itemStatus[item.id] = {
+        status: settled ? "settled" : "violated",
+        easygoing: !hasRules,
+        results: evalc.results,
+        legal,
+      };
+    }
+
+    return { itemStatus, settledCount, constrainedTotal, total: movable.length };
   }
 
   // ---- Chain Reaction: placed item triggers neighbor happiness cascade ----
@@ -344,7 +487,7 @@ export class StorageEngine {
       if (entry.status !== "packed" || entry.itemId === ignoreItemId) continue;
       const slot = this.slotById(entry.slotId);
       if (!slot) continue;
-      const { w, h } = this.itemSize(entry.itemId);
+      const { w, h } = this.itemSize(entry.itemId, entry.rot);
       for (let row = entry.row; row < entry.row + h; row += 1) {
         for (let col = entry.col; col < entry.col + w; col += 1) {
           occupancy.set(`${slot.id}:${entry.layer || 0}:${col}:${row}`, entry.itemId);
@@ -357,7 +500,7 @@ export class StorageEngine {
   supportSurfaceForPlacement(itemId, placement, candidate = this.state) {
     const slot = this.slotById(placement.slotId);
     if (!slot) return { supported: false, reason: "reject.slot.missing", supportIds: [] };
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, placement.rot);
     const layer = placement.layer ?? 0;
     const baselineY = this.slotBaseline(slot, placement.row ?? 0, h);
     if (layer === 0) {
@@ -410,7 +553,7 @@ export class StorageEngine {
 
   placementAnchor(placement, candidate = this.state) {
     const slot = this.slotById(placement.slotId);
-    const { w, h } = this.itemSize(placement.itemId);
+    const { w, h } = this.itemSize(placement.itemId, placement.rot);
     const support = this.supportSurfaceForPlacement(placement.itemId, placement, candidate);
     const fallbackY = this.slotBaseline(slot, placement.row ?? 0, h);
     const nudge = this.itemPlacementNudge(placement.itemId, placement, "packed");
@@ -432,6 +575,7 @@ export class StorageEngine {
       col: placement.col ?? 0,
       row: placement.row ?? 0,
       layer: placement.layer ?? 0,
+      rot: this.normalizeRot(placement.rot),
       x: anchor.x,
       y: anchor.y,
       depth: anchor.depth,
@@ -451,7 +595,7 @@ export class StorageEngine {
     const harmony = this.scorePlacement(itemId, placement, candidate);
 
     const { cols, rows, stackLayers } = this.slotGrid(slot);
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, placement.rot);
     const col = placement.col ?? 0;
     const row = placement.row ?? 0;
     const layer = placement.layer ?? 0;
@@ -506,22 +650,27 @@ export class StorageEngine {
     return Math.hypot(x - anchor.x, y - anchor.y);
   }
 
-  placementFromPoint(itemId, slot, x, y) {
+  placementFromPoint(itemId, slot, x, y, rot = 0) {
     const { cols, rows, stackLayers } = this.slotGrid(slot);
     const { cellW, cellH } = this.slotCellSize(slot);
-    const { w, h } = this.itemSize(itemId);
+    const { w, h } = this.itemSize(itemId, rot);
     const left = this.slotLeft(slot);
     const top = this.slotTop(slot);
     const localX = x - left;
     const localY = y - top;
-    const rawCol = Math.floor(localX / cellW);
-    const rawRow = Math.floor(localY / cellH);
+    // The pointer tracks the item's CENTER, so map the center to the top-left
+    // cell of a w x h footprint (subtract half the footprint). For 1x1 items
+    // this is identical to the old floor() behavior; for multi-cell items it
+    // fixes an off-by-a-cell drift where pieces landed right/below the target.
+    const rawCol = Math.round(localX / cellW - w / 2);
+    const rawRow = Math.round(localY / cellH - h / 2);
     const layerBand = slot.h / stackLayers;
     const rawLayer = stackLayers - 1 - Math.floor(localY / layerBand);
     return {
       col: Math.max(0, Math.min(cols - w, rawCol)),
       row: Math.max(0, Math.min(rows - h, rawRow)),
       layer: Math.max(0, Math.min(stackLayers - 1, rawLayer)),
+      rot: this.normalizeRot(rot),
     };
   }
 
@@ -533,7 +682,7 @@ export class StorageEngine {
     return x >= left && x <= right && y >= top && y <= bottom;
   }
 
-  previewMove(itemId, x, y, maxDistance = 96) {
+  previewMove(itemId, x, y, maxDistance = 96, rot = 0) {
     const item = this.itemDef(itemId);
     if (!item) return null;
 
@@ -543,8 +692,8 @@ export class StorageEngine {
     let bestQuickScore = -1;
     for (const slot of this.level.slots) {
       if (!this.pointInsideSlot(slot, x, y, 10)) continue;
-      const { w, h } = this.itemSize(itemId);
-      const snapped = this.placementFromPoint(itemId, slot, x, y);
+      const { w, h } = this.itemSize(itemId, rot);
+      const snapped = this.placementFromPoint(itemId, slot, x, y, rot);
       const evaluation = this.evaluatePlacement(itemId, { slotId: slot.id, ...snapped });
       const harmony = evaluation.score ?? 50;
       // Prefer valid placements; among those, prefer higher scores
@@ -558,6 +707,7 @@ export class StorageEngine {
           col: snapped.col,
           row: snapped.row,
           layer: snapped.layer,
+          rot: snapped.rot,
           x: anchor.x,
           y: anchor.y,
           width: w,
@@ -579,13 +729,13 @@ export class StorageEngine {
     const candidates = [];
     for (const slot of this.level.slots) {
       const { cols, rows, stackLayers } = this.slotGrid(slot);
-      const { w, h } = this.itemSize(itemId);
+      const { w, h } = this.itemSize(itemId, rot);
       const maxCol = cols - w;
       const maxRow = rows - h;
       if (maxCol < 0 || maxRow < 0) continue;
 
       if (this.pointInsideSlot(slot, x, y, 10)) {
-        const snapped = this.placementFromPoint(itemId, slot, x, y);
+        const snapped = this.placementFromPoint(itemId, slot, x, y, rot);
         const evaluation = this.evaluatePlacement(itemId, { slotId: slot.id, ...snapped });
         const anchor = this.placementAnchor({ slotId: slot.id, ...snapped, itemId });
         candidates.push({
@@ -594,6 +744,7 @@ export class StorageEngine {
           col: snapped.col,
           row: snapped.row,
           layer: snapped.layer,
+          rot: snapped.rot,
           x: anchor.x,
           y: anchor.y,
           width: w,
@@ -613,7 +764,7 @@ export class StorageEngine {
       for (let layer = 0; layer < stackLayers; layer += 1) {
         for (let row = 0; row <= maxRow; row += 1) {
           for (let col = 0; col <= maxCol; col += 1) {
-            const placement = { slotId: slot.id, col, row, layer };
+            const placement = { slotId: slot.id, col, row, layer, rot };
             const distance = this.placementDistance(itemId, placement, x, y);
             if (distance > maxDistance) continue;
             const evaluation = this.evaluatePlacement(itemId, placement);
@@ -624,6 +775,7 @@ export class StorageEngine {
               col,
               row,
               layer,
+              rot: this.normalizeRot(rot),
               x: anchor.x,
               y: anchor.y,
               width: w,
@@ -670,42 +822,48 @@ export class StorageEngine {
     let best = null;
     let bestScore = -1;
 
-    for (const slot of this.level.slots) {
-      const { cols, rows, stackLayers } = this.slotGrid(slot);
-      const { w, h } = this.itemSize(itemId);
-      const maxCol = cols - w;
-      const maxRow = rows - h;
-      if (maxCol < 0 || maxRow < 0) continue;
+    // Try each allowed orientation (both 0 and 90deg for rotatable items).
+    const rotations = this.canRotate(itemId) ? [0, 1] : [0];
 
-      for (let layer = 0; layer < stackLayers; layer += 1) {
-        for (let row = 0; row <= maxRow; row += 1) {
-          for (let col = 0; col <= maxCol; col += 1) {
-            const placement = { slotId: slot.id, col, row, layer };
-            const evaluation = this.evaluatePlacement(itemId, placement, candidate);
-            if (!evaluation.valid) continue;
-            const score = evaluation.score ?? 0;
-            if (score > bestScore) {
-              bestScore = score;
-              const anchor = this.placementAnchor({ ...placement, itemId }, candidate);
-              best = {
-                itemId,
-                slotId: slot.id,
-                zoneId: slot.zone,
-                col,
-                row,
-                layer,
-                x: anchor.x,
-                y: anchor.y,
-                width: w,
-                height: h,
-                valid: true,
-                reason: "",
-                conflicts: [],
-                support: evaluation.support || anchor.support,
-                score,
-                mood: evaluation.mood,
-                inside: true,
-              };
+    for (const rot of rotations) {
+      for (const slot of this.level.slots) {
+        const { cols, rows, stackLayers } = this.slotGrid(slot);
+        const { w, h } = this.itemSize(itemId, rot);
+        const maxCol = cols - w;
+        const maxRow = rows - h;
+        if (maxCol < 0 || maxRow < 0) continue;
+
+        for (let layer = 0; layer < stackLayers; layer += 1) {
+          for (let row = 0; row <= maxRow; row += 1) {
+            for (let col = 0; col <= maxCol; col += 1) {
+              const placement = { slotId: slot.id, col, row, layer, rot };
+              const evaluation = this.evaluatePlacement(itemId, placement, candidate);
+              if (!evaluation.valid) continue;
+              const score = evaluation.score ?? 0;
+              if (score > bestScore) {
+                bestScore = score;
+                const anchor = this.placementAnchor({ ...placement, itemId }, candidate);
+                best = {
+                  itemId,
+                  slotId: slot.id,
+                  zoneId: slot.zone,
+                  col,
+                  row,
+                  layer,
+                  rot: this.normalizeRot(rot),
+                  x: anchor.x,
+                  y: anchor.y,
+                  width: w,
+                  height: h,
+                  valid: true,
+                  reason: "",
+                  conflicts: [],
+                  support: evaluation.support || anchor.support,
+                  score,
+                  mood: evaluation.mood,
+                  inside: true,
+                };
+              }
             }
           }
         }
@@ -845,6 +1003,16 @@ export class StorageEngine {
     this.emit();
   }
 
+  // Per-item happiness: an item is "happy" when its placement scores high enough.
+  static HAPPY_THRESHOLD = 70;
+
+  happyGoalFor(total) {
+    // Reachable but never trivial: you must satisfy most items, yet limited good
+    // spots mean pleasing EVERYONE (3 stars) requires real optimization.
+    if (this.level.harmony?.happyGoal != null) return this.level.harmony.happyGoal;
+    return Math.max(2, Math.round(total * 0.6));
+  }
+
   validate(candidate = this.state) {
     const movable = this.level.items.filter((item) => !item.fixed);
     const movableIds = new Set(movable.map((m) => m.id));
@@ -853,6 +1021,8 @@ export class StorageEngine {
     let illegalReason = "";
     let totalScore = 0;
     let scoredCount = 0;
+    let happyCount = 0;
+    const moods = {}; // itemId -> "happy" | "ok" | "sad" (for live face badges)
 
     for (const entry of packed) {
       const evaluation = this.evaluatePlacement(entry.itemId, entry, candidate);
@@ -862,14 +1032,19 @@ export class StorageEngine {
           conflicts.push([entry.itemId, conflictId]);
         }
       }
-      // Only count movable items toward harmony score
+      // Only count movable items toward harmony/happiness
       if (evaluation.score != null && movableIds.has(entry.itemId)) {
         totalScore += evaluation.score;
         scoredCount += 1;
+        const score = evaluation.score;
+        const mood = score >= StorageEngine.HAPPY_THRESHOLD ? "happy" : score >= 40 ? "ok" : "sad";
+        moods[entry.itemId] = mood;
+        // A happy item must also be legally placed (no conflict/overflow).
+        if (evaluation.valid && mood === "happy") happyCount += 1;
       }
     }
 
-    // Add accumulated chain bonuses
+    // Add accumulated chain bonuses (kept for scoring/analytics only)
     const chainTotal = candidate.chainBonus || 0;
     totalScore += chainTotal;
 
@@ -877,9 +1052,30 @@ export class StorageEngine {
     const validPlacement = conflicts.length === 0 && !illegalReason;
     const avgScore = scoredCount > 0 ? Math.round(totalScore / Math.max(1, scoredCount)) : 0;
     const allPlaced = packedMovable.length === movable.length;
-    const target = this.level.harmony?.target ?? 300;
-    // Complete = all items placed AND harmony score meets the target
-    const complete = allPlaced && validPlacement && totalScore >= target;
+    const happyTotal = movable.length;
+    const happyGoal = this.happyGoalFor(happyTotal);
+    const goalMet = happyCount >= happyGoal;
+
+    // CONSTRAINT MODEL (prototype): the real win condition. Every item with hard
+    // rules must have ALL of them satisfied. Easygoing items don't gate the win.
+    const report = this.constraintReport(candidate);
+    // PACKING MODE: pure spatial puzzle — fitting everything in legally IS the win,
+    // no zone/happiness requirement (used by the picnic-basket prototype).
+    const allSettled = this.level.winMode === "packing"
+      ? true
+      : (report.constrainedTotal > 0
+        ? report.settledCount >= report.constrainedTotal
+        : goalMet); // fall back to happiness if a level defines no hard rules
+    // Complete = everything placed legally AND every constrained item is settled.
+    const complete = allPlaced && validPlacement && allSettled;
+
+    // SINGLE TRUTHFUL PROGRESS METRIC: an item is "ready" when it's placed,
+    // legal, and has all its rules satisfied (easygoing placed items count too).
+    // doneCount === doneTotal is exactly equivalent to `complete`, so the player
+    // sees ONE number that reaches full precisely when they win. This replaces
+    // the old confusing pair (placed/total vs settled/constrained).
+    const doneCount = Object.values(report.itemStatus).filter((s) => s.status === "settled").length;
+    const doneTotal = movable.length;
 
     return {
       validPlacement,
@@ -887,13 +1083,27 @@ export class StorageEngine {
       packed: packedMovable.length,
       total: movable.length,
       conflicts,
-      reason: validPlacement ? (allPlaced && totalScore < target ? "reject.score.low" : "") : (illegalReason || "reject.layer.full"),
+      reason: validPlacement ? (allPlaced && !allSettled ? "reject.constraint.unmet" : "") : (illegalReason || "reject.layer.full"),
       harmonyScore: avgScore,
       totalScore,
       scoredCount,
       allPlaced,
-      targetMet: totalScore >= target,
+      // Happiness model (legacy, kept for coins/analytics)
+      happyCount,
+      happyGoal,
+      happyTotal,
+      moods,
+      goalMet,
+      targetMet: allSettled,
       chainBonus: chainTotal,
+      // Constraint model (prototype)
+      itemStatus: report.itemStatus,
+      settledCount: report.settledCount,
+      constrainedTotal: report.constrainedTotal,
+      allSettled,
+      // Unified progress (see above): use these for all player-facing counters.
+      doneCount,
+      doneTotal,
     };
   }
 

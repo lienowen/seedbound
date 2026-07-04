@@ -1,4 +1,4 @@
-﻿import { ITEM_RENDER_PROFILES } from "./itemRenderProfiles.js";
+import { ITEM_RENDER_PROFILES } from "./itemRenderProfiles.js";
 
 const FRIDGE_STAGE = {
   width: 750,
@@ -41,6 +41,17 @@ const FRIDGE_SLOTS = [
 const FRIDGE_ASSETS = {
   back: { key: "fridge-board", file: "fridge-board.webp" },
   front: { key: "fridge-door-front", file: "fridge-door-front.webp", depth: 430 },
+};
+
+// ---- TOP-DOWN PACKING LEVELS -----------------------------------------------
+// Generic packing mode: fit differently shaped items into a single grid inside
+// a container illustration (picnic basket, suitcase, ...). The container art is
+// drawn with `contain` so it keeps its aspect instead of stretching to the
+// portrait stage. Rotatable long items force spatial planning.
+const PACK_STAGE = {
+  width: 750,
+  height: 1334,
+  shapes: [],
 };
 
 function renderProfile(key) {
@@ -121,6 +132,46 @@ const ITEM_LIBRARY = {
   cake: { image: "cake", file: "cake.webp", name: "Bolo", tags: ["food"], size: [2, 1], scale: ITEM_SCALE.dessertWide, anchor: [renderProfile("cake").originX, renderProfile("cake").originY], surface: renderProfile("cake"), bounds: { w: 106, h: 86 }, nudge: { drawer: { x: 4 } }, prefs: { zone: "shelf", likesVisible: true, hatesNeighbors: ["mustard", "mealbox"] } },
   greenSoda: { image: "green-soda", file: "green-soda.webp", name: "Guarana", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("green-soda").originX, renderProfile("green-soda").originY], surface: renderProfile("green-soda"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 10, y: -1 } }, prefs: { zone: "door", needsCold: false, likesNeighbors: ["red-soda", "juice"] } },
   redSoda: { image: "red-soda", file: "red-soda.webp", name: "Refri", tags: ["bottle"], size: [1, 1], scale: ITEM_SCALE.sodaCan, anchor: [renderProfile("red-soda").originX, renderProfile("red-soda").originY], surface: renderProfile("red-soda"), bounds: { w: 48, h: 100 }, nudge: { door: { x: 10, y: -1 } }, prefs: { zone: "door", needsCold: false, likesNeighbors: ["green-soda", "juice"] } },
+
+  // ---- EXPANDED FOOD LIBRARY (art via scripts/processFoodArt.mjs) --------
+  carrot: { image: "carrot", file: "carrot.webp", name: "Cenoura", tags: ["food"], size: [1, 1], scale: scaleFromVisibleHeight("carrot", 128), anchor: [renderProfile("carrot").originX, renderProfile("carrot").originY], surface: renderProfile("carrot"), bounds: { w: 96, h: 128 }, prefs: { zone: "drawer", needsCold: true, likesNeighbors: ["broccoli", "lettuce"] } },
+  bread: { image: "bread", file: "bread.webp", name: "Pao", tags: ["food"], size: [2, 1], scale: scaleFromVisibleHeight("bread", 96), anchor: [renderProfile("bread").originX, renderProfile("bread").originY], surface: renderProfile("bread"), bounds: { w: 166, h: 96 }, prefs: { zone: "shelf", needsWarm: true, likesNeighbors: ["butter", "cheese"] } },
+  cheese: { image: "cheese", file: "cheese.webp", name: "Queijo", tags: ["dairy"], size: [1, 1], scale: scaleFromVisibleHeight("cheese", 100), anchor: [renderProfile("cheese").originX, renderProfile("cheese").originY], surface: renderProfile("cheese"), bounds: { w: 100, h: 100 }, prefs: { zone: "shelf", needsCold: false, likesNeighbors: ["butter", "bread"] } },
+  apple: { image: "apple", file: "apple.webp", name: "Maca", tags: ["food"], size: [1, 1], scale: scaleFromVisibleHeight("apple", 108), anchor: [renderProfile("apple").originX, renderProfile("apple").originY], surface: renderProfile("apple"), bounds: { w: 92, h: 108 }, prefs: { zone: "drawer", needsCold: false, likesNeighbors: ["tomato"] } },
+  broccoli: { image: "broccoli", file: "broccoli.webp", name: "Brocolis", tags: ["food"], size: [1, 1], scale: scaleFromVisibleHeight("broccoli", 120), anchor: [renderProfile("broccoli").originX, renderProfile("broccoli").originY], surface: renderProfile("broccoli"), bounds: { w: 110, h: 120 }, prefs: { zone: "drawer", needsCold: true, likesNeighbors: ["carrot", "lettuce"] } },
+  tomato: { image: "tomato", file: "tomato.webp", name: "Tomate", tags: ["food"], size: [1, 1], scale: scaleFromVisibleHeight("tomato", 104), anchor: [renderProfile("tomato").originX, renderProfile("tomato").originY], surface: renderProfile("tomato"), bounds: { w: 100, h: 104 }, prefs: { zone: "shelf", needsWarm: true, likesNeighbors: ["apple", "lettuce"] } },
+  butter: { image: "butter", file: "butter.webp", name: "Manteiga", tags: ["dairy"], size: [2, 1], scale: scaleFromVisibleHeight("butter", 70), anchor: [renderProfile("butter").originX, renderProfile("butter").originY], surface: renderProfile("butter"), bounds: { w: 120, h: 70 }, prefs: { zone: "chill", needsCold: true, likesNeighbors: ["cheese", "bread"] } },
+  watermelon: { image: "watermelon", file: "watermelon.webp", name: "Melancia", tags: ["food"], size: [2, 1], scale: scaleFromVisibleHeight("watermelon", 116), anchor: [renderProfile("watermelon").originX, renderProfile("watermelon").originY], surface: renderProfile("watermelon"), bounds: { w: 124, h: 116 }, prefs: { zone: "shelf", topShelf: true, likesVisible: true } },
+  corn: { image: "corn", file: "corn.webp", name: "Milho", tags: ["food"], size: [2, 1], scale: scaleFromVisibleHeight("corn", 92), anchor: [renderProfile("corn").originX, renderProfile("corn").originY], surface: renderProfile("corn"), bounds: { w: 150, h: 92 }, prefs: { zone: "drawer", needsCold: false, likesNeighbors: ["carrot"] } },
+  fish: { image: "fish", file: "fish.webp", name: "Peixe", tags: ["food"], size: [2, 1], scale: scaleFromVisibleHeight("fish", 78), anchor: [renderProfile("fish").originX, renderProfile("fish").originY], surface: renderProfile("fish"), bounds: { w: 200, h: 78 }, prefs: { zone: "chill", needsCold: true, hatesNeighbors: ["cake", "strawberries"] } },
+
+  // ---- PACKING PROTOTYPE ITEMS (top-down, big + rotatable) --------------
+  // These are authored HORIZONTALLY (art lies left-right), so base sizes are
+  // wide. Non-square items opt into rotation via `rotatable: true`. They render
+  // with a center anchor in the top-down grid mode and carry no zone prefs —
+  // the win condition is pure spatial packing.
+  packWatermelon: { image: "pack-watermelon", file: "pack-watermelon.png", name: "Melancia", tags: ["pack"], size: [2, 2], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packBaguette: { image: "pack-baguette", file: "pack-baguette.png", name: "Baguete", tags: ["pack"], size: [3, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packBottle: { image: "pack-bottle", file: "pack-bottle.png", name: "Suco", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packCheese: { image: "pack-cheese", file: "pack-cheese.png", name: "Queijo", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packSandwich: { image: "pack-sandwich", file: "pack-sandwich.png", name: "Sanduiche", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packJam: { image: "pack-jam", file: "pack-jam.png", name: "Geleia", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+
+  // ---- SUITCASE PACKING ITEMS (travel theme, wide grid) ----
+  packClothes: { image: "pack-clothes", file: "pack-clothes.png", name: "Roupas", tags: ["pack"], size: [2, 2], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packTowel: { image: "pack-towel", file: "pack-towel.png", name: "Toalha", tags: ["pack"], size: [3, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packShoes: { image: "pack-shoes", file: "pack-shoes.png", name: "Tenis", tags: ["pack"], size: [2, 2], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packToiletry: { image: "pack-toiletry", file: "pack-toiletry.png", name: "Necessaire", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packCamera: { image: "pack-camera", file: "pack-camera.png", name: "Camera", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packSunglasses: { image: "pack-sunglasses", file: "pack-sunglasses.png", name: "Oculos", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+
+  // ---- BENTO PACKING ITEMS (lunch box theme, 5x3 grid) ----
+  packRice: { image: "pack-rice", file: "pack-rice.png", name: "Arroz", tags: ["pack"], size: [2, 2], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packEgg: { image: "pack-egg", file: "pack-egg.png", name: "Tamago", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packSushi: { image: "pack-sushi", file: "pack-sushi.png", name: "Sushi", tags: ["pack"], size: [3, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packBroccoli: { image: "pack-broccoli", file: "pack-broccoli.png", name: "Brocolis", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
+  packSausage: { image: "pack-sausage", file: "pack-sausage.png", name: "Salsicha", tags: ["pack"], size: [2, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, rotatable: true, prefs: {} },
+  packTomato: { image: "pack-tomato", file: "pack-tomato.png", name: "Tomate", tags: ["pack"], size: [1, 1], scale: 0.12, anchor: [0.5, 0.5], bounds: { w: 128, h: 128 }, topDown: true, prefs: {} },
 };
 
 const TRAY_POSITIONS = [
@@ -215,7 +266,299 @@ function buildFridgeLevel({
   };
 }
 
-export const FRIDGE_BR_CAMPAIGN = [
+// Width-aware tray layout: each loose item reserves horizontal room based on
+// its footprint (long items like baguettes are wide), items flow left-to-right
+// and wrap into new centered rows so nothing ever overlaps in the tray. The
+// tray cell (~62px) mirrors the scene's compact tray display scale.
+function packTrayLayout(items, { y = 1070, rowGap = 128, maxWidth = 660, cellPx = 62, gap = 30, center = 375 } = {}) {
+  const widths = items.map((it) => {
+    const def = ITEM_LIBRARY[it.key] || {};
+    const s = def.size || [1, 1];
+    const longCells = Math.max(s[0] || 1, s[1] || 1);
+    return Math.max(cellPx, longCells * cellPx);
+  });
+  // Greedy wrap into rows that stay within maxWidth.
+  const rows = [];
+  let cur = [];
+  let curW = 0;
+  items.forEach((_, i) => {
+    const w = widths[i];
+    const add = cur.length ? gap + w : w;
+    if (cur.length && curW + add > maxWidth) {
+      rows.push({ idx: cur, w: curW });
+      cur = [];
+      curW = 0;
+    }
+    curW += cur.length ? gap + w : w;
+    cur.push(i);
+  });
+  if (cur.length) rows.push({ idx: cur, w: curW });
+  // Center each row and space items by their reserved width.
+  const positions = new Array(items.length);
+  rows.forEach((row, r) => {
+    let x = center - row.w / 2;
+    row.idx.forEach((i) => {
+      positions[i] = { x: Math.round(x + widths[i] / 2), y: y + r * rowGap };
+      x += widths[i] + gap;
+    });
+  });
+  return positions;
+}
+
+// Generic packing level factory. `container` is the back illustration, `grid`
+// is the single packing slot, `items` is the tray set (footprints should total
+// the grid cell count for a clean perfect-fit puzzle).
+function buildPackingLevel(config) {
+  const { id, theme, copy, container, grid, items, harmony, tray, phase, reward } = config;
+  const trayPos = packTrayLayout(items, tray);
+  return {
+    id,
+    revision: 1,
+    phase: phase || 1,
+    reward: reward || 120,
+    topDown: true,
+    winMode: "packing",
+    // Marks a level as a packing puzzle so campaign systems (collection book,
+    // hint/best-spot tools, goal copy) can branch without inspecting winMode.
+    packing: true,
+    harmony: harmony || { target: 300, gold: 420, perfect: 520 },
+    copy,
+    theme,
+    assets: {
+      back: { key: container.key, file: container.file, contain: true, size: container.size, y: container.y },
+    },
+    tuning: { magnetPreviewDistance: 150, snapDistance: 96, snapDuration: 240 },
+    stage: structuredClone(PACK_STAGE),
+    fronts: [],
+    slots: [
+      {
+        id: "pack",
+        zone: "pack",
+        allow: ["pack"],
+        x: grid.x,
+        y: grid.y,
+        w: grid.w,
+        h: grid.h,
+        cols: grid.cols,
+        rows: grid.rows,
+        stackLayers: 1,
+        baseline: 0.5,
+        depth: 120,
+      },
+    ],
+    items: items.map((item, index) =>
+      buildItem(item.key, {
+        id: item.id || `${item.key}_${index + 1}`,
+        trayX: trayPos[index].x,
+        trayY: trayPos[index].y,
+        ...item.overrides,
+      })
+    ),
+  };
+}
+
+// ===========================================================================
+// PACKING ROSTER
+// Three container themes, each with an easy/medium/hard perfect-fill puzzle.
+// Difficulty rises via piece count and how many items must be rotated to
+// interlock. Every tiling below is a verified perfect fit (see
+// scripts/verify-packing.mjs) so no level can be unwinnable.
+// ===========================================================================
+
+// Shared per-container geometry (the grid matches each art's visible interior).
+const PICNIC_BASE = {
+  container: { key: "picnic-basket", file: "picnic-basket.png", size: 720, y: 628 },
+  grid: { x: 375, y: 628, w: 500, h: 500, cols: 4, rows: 4 },
+  theme: { key: "picnic", title: "Picnic Packing", subtitle: "Tap to rotate · drag to pack", background: "#eaf4d8" },
+  tray: { y: 1064, spanX: [150, 600] },
+};
+const SUITCASE_BASE = {
+  container: { key: "suitcase-open", file: "suitcase-open.png", size: 760, y: 470 },
+  grid: { x: 375, y: 478, w: 444, h: 288, cols: 6, rows: 3 },
+  theme: { key: "suitcase", title: "Suitcase Packing", subtitle: "Tap to rotate · drag to pack", background: "#dfeaf2" },
+  tray: { y: 900, rowGap: 122, spanX: [150, 600] },
+};
+const BENTO_BASE = {
+  container: { key: "bento-box", file: "bento-box.png", size: 740, y: 500 },
+  grid: { x: 380, y: 511, w: 492, h: 289, cols: 5, rows: 3 },
+  theme: { key: "bento", title: "Bento Packing", subtitle: "Tap to rotate · drag to pack", background: "#f6ead3" },
+  tray: { y: 1000, rowGap: 120, spanX: [150, 600] },
+};
+
+function packCopy(overrides) {
+  return {
+    intro: "Tap an item to rotate it, then drag it in.",
+    goal: "Fit everything inside.",
+    difficulty: "Normal",
+    successTag: "PERFECT FIT",
+    successTitle: "All packed!",
+    successBody: "Everything fits — nice and tidy.",
+    nextLabel: "Next",
+    retryLabel: "Retry",
+    ...overrides,
+  };
+}
+
+// --- BENTO (5x3 = 15 cells) --------------------------------------------------
+// Easy: rice 2x2(4) + 2x sushi 3x1(3) + egg 2x1(2) + sausage 2x1(2)
+// + tomato 1x1(1) = 15. Zero rotation needed.
+export const BENTO_LEVEL_EASY = buildPackingLevel({
+  ...BENTO_BASE,
+  id: "bento-pack-1",
+  reward: 100,
+  copy: packCopy({ difficulty: "Easy", goal: "Fill the bento box with lunch.", successTag: "BENTO PERFEITO" }),
+  items: [
+    { key: "packRice" },
+    { key: "packSushi", id: "packSushi_a" },
+    { key: "packSushi", id: "packSushi_b" },
+    { key: "packEgg" },
+    { key: "packSausage" },
+    { key: "packTomato" },
+  ],
+});
+
+// Medium: rice 2x2(4) + 2x egg 2x1(2) + sausage 2x1(2) + sushi 3x1(3)
+// + broccoli 1x1(1) + tomato 1x1(1) = 15. More small pieces to juggle.
+export const BENTO_LEVEL_MED = buildPackingLevel({
+  ...BENTO_BASE,
+  id: "bento-pack-2",
+  reward: 120,
+  copy: packCopy({ difficulty: "Normal", goal: "Fill the bento box with lunch.", successTag: "BENTO PERFEITO" }),
+  items: [
+    { key: "packRice" },
+    { key: "packEgg", id: "packEgg_a" },
+    { key: "packEgg", id: "packEgg_b" },
+    { key: "packSausage" },
+    { key: "packSushi" },
+    { key: "packBroccoli" },
+    { key: "packTomato" },
+  ],
+});
+
+// Hard: 2x sushi 3x1(3) + rice 2x2(4) + egg 2x1(2) + sausage 2x1(2)
+// + tomato 1x1(1) = 15. Sushi must rotate vertical to interlock.
+export const BENTO_LEVEL_HARD = buildPackingLevel({
+  ...BENTO_BASE,
+  id: "bento-pack-3",
+  reward: 150,
+  copy: packCopy({ difficulty: "Hard", goal: "Squeeze everything into the bento box.", successTag: "BENTO PERFEITO" }),
+  items: [
+    { key: "packSushi", id: "packSushi_a" },
+    { key: "packSushi", id: "packSushi_b" },
+    { key: "packRice" },
+    { key: "packEgg" },
+    { key: "packSausage" },
+    { key: "packTomato" },
+  ],
+});
+
+// --- PICNIC (4x4 = 16 cells) -------------------------------------------------
+// Easy: 2x watermelon 2x2(4) + 2x bottle 2x1(2) + 2x cheese 2x1(2) = 16.
+// Zero rotation needed.
+export const PICNIC_LEVEL_EASY = buildPackingLevel({
+  ...PICNIC_BASE,
+  id: "picnic-pack-1",
+  reward: 110,
+  copy: packCopy({ difficulty: "Easy", goal: "Fit every treat inside the picnic basket.", successTag: "CESTA PERFEITA", successBody: "Everything fits — ready for the picnic." }),
+  items: [
+    { key: "packWatermelon", id: "packWatermelon_a" },
+    { key: "packWatermelon", id: "packWatermelon_b" },
+    { key: "packBottle", id: "packBottle_a" },
+    { key: "packBottle", id: "packBottle_b" },
+    { key: "packCheese", id: "packCheese_a" },
+    { key: "packCheese", id: "packCheese_b" },
+  ],
+});
+
+// Medium: watermelon 2x2(4) + 2x baguette 3x1(3) + bottle 2x1(2)
+// + cheese 2x1(2) + sandwich 1x1(1) + jam 1x1(1) = 16. Baguettes rotate.
+export const PICNIC_LEVEL = buildPackingLevel({
+  ...PICNIC_BASE,
+  id: "picnic-pack-2",
+  reward: 130,
+  copy: packCopy({ difficulty: "Normal", goal: "Fit every treat inside the picnic basket.", successTag: "CESTA PERFEITA", successBody: "Everything fits — ready for the picnic." }),
+  items: [
+    { key: "packWatermelon" },
+    { key: "packBaguette", id: "packBaguette_a" },
+    { key: "packBaguette", id: "packBaguette_b" },
+    { key: "packBottle" },
+    { key: "packCheese" },
+    { key: "packSandwich" },
+    { key: "packJam" },
+  ],
+});
+
+// Hard: 2x baguette 3x1(3) + watermelon 2x2(4) + bottle 2x1(2)
+// + cheese 2x1(2) + sandwich 1x1(1) + jam 1x1(1) = 16. Bottle & cheese rotate.
+export const PICNIC_LEVEL_HARD = buildPackingLevel({
+  ...PICNIC_BASE,
+  id: "picnic-pack-3",
+  reward: 160,
+  copy: packCopy({ difficulty: "Hard", goal: "Squeeze every treat into the basket.", successTag: "CESTA PERFEITA", successBody: "Everything fits — ready for the picnic." }),
+  items: [
+    { key: "packBaguette", id: "packBaguette_a" },
+    { key: "packBaguette", id: "packBaguette_b" },
+    { key: "packWatermelon" },
+    { key: "packBottle" },
+    { key: "packCheese" },
+    { key: "packSandwich" },
+    { key: "packJam" },
+  ],
+});
+
+// --- SUITCASE (6x3 = 18 cells) -----------------------------------------------
+// Easy: 2x clothes 2x2(4) + shoes 2x2(4) + 2x towel 3x1(3) = 18.
+// Zero rotation needed.
+export const SUITCASE_LEVEL_EASY = buildPackingLevel({
+  ...SUITCASE_BASE,
+  id: "suitcase-pack-1",
+  reward: 120,
+  copy: packCopy({ difficulty: "Easy", goal: "Fit everything into the suitcase.", successTag: "MALA PERFEITA", successBody: "Everything fits — ready for the trip." }),
+  items: [
+    { key: "packClothes", id: "packClothes_a" },
+    { key: "packClothes", id: "packClothes_b" },
+    { key: "packShoes" },
+    { key: "packTowel", id: "packTowel_a" },
+    { key: "packTowel", id: "packTowel_b" },
+  ],
+});
+
+// Medium: clothes 2x2(4) + shoes 2x2(4) + 2x towel 3x1(3) + toiletry 2x1(2)
+// + camera 1x1(1) + sunglasses 1x1(1) = 18. Towels rotate.
+export const SUITCASE_LEVEL = buildPackingLevel({
+  ...SUITCASE_BASE,
+  id: "suitcase-pack-2",
+  reward: 150,
+  copy: packCopy({ difficulty: "Normal", goal: "Fit everything into the suitcase.", successTag: "MALA PERFEITA", successBody: "Everything fits — ready for the trip." }),
+  items: [
+    { key: "packClothes" },
+    { key: "packShoes" },
+    { key: "packTowel", id: "packTowel_a" },
+    { key: "packTowel", id: "packTowel_b" },
+    { key: "packToiletry" },
+    { key: "packCamera" },
+    { key: "packSunglasses" },
+  ],
+});
+
+// Hard: 2x towel 3x1(3) + clothes 2x2(4) + shoes 2x2(4) + 2x toiletry 2x1(2)
+// = 18. Towels must rotate vertical to interlock along the ends.
+export const SUITCASE_LEVEL_HARD = buildPackingLevel({
+  ...SUITCASE_BASE,
+  id: "suitcase-pack-3",
+  reward: 180,
+  copy: packCopy({ difficulty: "Hard", goal: "Squeeze everything into the suitcase.", successTag: "MALA PERFEITA", successBody: "Everything fits — ready for the trip." }),
+  items: [
+    { key: "packTowel", id: "packTowel_a" },
+    { key: "packTowel", id: "packTowel_b" },
+    { key: "packClothes" },
+    { key: "packShoes" },
+    { key: "packToiletry", id: "packToiletry_a" },
+    { key: "packToiletry", id: "packToiletry_b" },
+  ],
+});
+
+const FRIDGE_LEVELS = [
   // ====== Level 1: Ad Showcase — "looks lived-in, needs your touch" ======
   buildFridgeLevel({
     id: "fridge-br-1",
@@ -262,12 +605,12 @@ export const FRIDGE_BR_CAMPAIGN = [
     fixedItems: [
       { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
-      { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
+      { key: "butter", slot: "shelf_low_1", id: "butter_fixed" },
     ],
     trayItems: [
       { key: "milk" },
-      { key: "strawberries" },
-      { key: "cake" },
+      { key: "bread" },
+      { key: "cheese" },
       { key: "mustard" },
       { key: "ketchup" },
       { key: "juice" },
@@ -292,12 +635,12 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "juice", slot: "door_mid_1", id: "juice_fixed" },
     ],
     trayItems: [
-      { key: "mealbox" },
-      { key: "strawberries" },
+      { key: "carrot" },
+      { key: "broccoli" },
       { key: "greenSoda" },
       { key: "redSoda" },
       { key: "milk" },
-      { key: "cake" },
+      { key: "tomato" },
       { key: "mustard" },
     ],
   }),
@@ -313,10 +656,10 @@ export const FRIDGE_BR_CAMPAIGN = [
     fixedItems: [
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
-      { key: "mealbox", slot: "shelf_low_1", id: "mealbox_fixed" },
+      { key: "fish", slot: "shelf_low_1", id: "fish_fixed" },
     ],
     trayItems: [
-      { key: "cake" },
+      { key: "watermelon" },
       { key: "lettuce" },
       { key: "strawberries" },
       { key: "greenSoda" },
@@ -335,19 +678,19 @@ export const FRIDGE_BR_CAMPAIGN = [
     difficulty: "Cheia",
     reward: 100,
     fixedItems: [
-      { key: "mealbox", slot: "shelf_mid_1", id: "mealbox_fixed" },
+      { key: "corn", slot: "shelf_mid_1", id: "corn_fixed" },
       { key: "eggs", slot: "shelf_low_1", id: "eggs_fixed" },
-      { key: "lettuce", slot: "drawer_left", id: "lettuce_fixed" },
+      { key: "carrot", slot: "drawer_left", id: "carrot_fixed" },
     ],
     trayItems: [
       { key: "greenSoda" },
       { key: "milk" },
       { key: "juice" },
-      { key: "yogurt" },
+      { key: "cheese" },
       { key: "ketchup" },
       { key: "redSoda" },
-      { key: "cake" },
-      { key: "strawberries" },
+      { key: "watermelon" },
+      { key: "apple" },
     ],
   }),
 
@@ -362,14 +705,14 @@ export const FRIDGE_BR_CAMPAIGN = [
     difficulty: "Medio",
     reward: 110,
     fixedItems: [
-      { key: "lettuce", slot: "shelf_top_1", id: "lettuce_fixed" },
+      { key: "broccoli", slot: "shelf_top_1", id: "broccoli_fixed" },
       { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
-      { key: "eggs", slot: "drawer_left", id: "eggs_fixed" },
-      { key: "cake", slot: "shelf_low_1", id: "cake_fixed" },
+      { key: "carrot", slot: "drawer_left", id: "carrot_fixed" },
+      { key: "watermelon", slot: "shelf_low_1", id: "watermelon_fixed" },
       { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
       { key: "juice", slot: "door_low_1", id: "juice_fixed" },
-      { key: "strawberries", slot: "drawer_right", id: "strawberries_fixed" },
+      { key: "tomato", slot: "drawer_right", id: "tomato_fixed" },
     ],
     trayItems: [
       { key: "mealbox" },
@@ -378,7 +721,7 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "redSoda" },
       { key: "milk" },
       { key: "eggs" },
-      { key: "yogurt" },
+      { key: "cheese" },
     ],
   }),
   buildFridgeLevel({
@@ -393,15 +736,15 @@ export const FRIDGE_BR_CAMPAIGN = [
     fixedItems: [
       { key: "juice", slot: "door_top_1", id: "juice_fixed" },
       { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
-      { key: "strawberries", slot: "shelf_top_2", id: "strawberries_fixed" },
+      { key: "apple", slot: "shelf_top_2", id: "apple_fixed" },
       { key: "eggs", slot: "shelf_mid_2", id: "eggs_fixed" },
-      { key: "mealbox", slot: "drawer_left", id: "mealbox_fixed" },
+      { key: "fish", slot: "drawer_left", id: "fish_fixed" },
       { key: "milk", slot: "door_low_1", id: "milk_fixed" },
-      { key: "lettuce", slot: "shelf_low_2", id: "lettuce_fixed" },
+      { key: "broccoli", slot: "shelf_low_2", id: "broccoli_fixed" },
       { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
     ],
     trayItems: [
-      { key: "yogurt" },
+      { key: "cheese" },
       { key: "milk" },
       { key: "redSoda" },
       { key: "mustard" },
@@ -421,18 +764,18 @@ export const FRIDGE_BR_CAMPAIGN = [
     fixedItems: [
       { key: "mealbox", slot: "shelf_mid_1", id: "mealbox_fixed_1" },
       { key: "mealbox", slot: "shelf_mid_2", id: "mealbox_fixed_2" },
-      { key: "strawberries", slot: "shelf_top_1", id: "strawberries_fixed" },
+      { key: "bread", slot: "shelf_top_1", id: "bread_fixed" },
       { key: "eggs", slot: "shelf_low_1", id: "eggs_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
-      { key: "lettuce", slot: "drawer_right", id: "lettuce_fixed" },
+      { key: "carrot", slot: "drawer_right", id: "carrot_fixed" },
       { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
     ],
     trayItems: [
-      { key: "cake" },
+      { key: "watermelon" },
       { key: "ketchup" },
       { key: "mustard" },
       { key: "redSoda" },
-      { key: "yogurt" },
+      { key: "cheese" },
       { key: "juice" },
       { key: "milk" },
     ],
@@ -448,18 +791,18 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 140,
     fixedItems: [
       { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
-      { key: "strawberries", slot: "shelf_top_2", id: "strawberries_fixed" },
-      { key: "mealbox", slot: "drawer_left", id: "mealbox_fixed" },
+      { key: "tomato", slot: "shelf_top_2", id: "tomato_fixed" },
+      { key: "fish", slot: "drawer_left", id: "fish_fixed" },
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
       { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
-      { key: "lettuce", slot: "shelf_low_2", id: "lettuce_fixed" },
+      { key: "broccoli", slot: "shelf_low_2", id: "broccoli_fixed" },
       { key: "juice", slot: "door_low_1", id: "juice_fixed" },
     ],
     trayItems: [
       { key: "greenSoda" },
       { key: "redSoda" },
-      { key: "yogurt" },
+      { key: "cheese" },
       { key: "mustard" },
       { key: "milk" },
       { key: "cake" },
@@ -479,17 +822,17 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "greenSoda", slot: "door_upper_2", id: "greenSoda_fixed" },
       { key: "mealbox", slot: "shelf_mid_1", id: "mealbox_fixed" },
       { key: "eggs", slot: "shelf_low_1", id: "eggs_fixed" },
-      { key: "lettuce", slot: "shelf_top_2", id: "lettuce_fixed" },
-      { key: "strawberries", slot: "drawer_right", id: "strawberries_fixed" },
+      { key: "corn", slot: "shelf_top_2", id: "corn_fixed" },
+      { key: "carrot", slot: "drawer_right", id: "carrot_fixed" },
       { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
       { key: "juice", slot: "door_low_1", id: "juice_fixed" },
     ],
     trayItems: [
-      { key: "eggs" },
-      { key: "yogurt" },
+      { key: "apple" },
+      { key: "cheese" },
       { key: "redSoda" },
       { key: "mealbox" },
-      { key: "cake" },
+      { key: "watermelon" },
     ],
   }),
 
@@ -507,15 +850,15 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
       { key: "juice", slot: "door_top_1", id: "juice_fixed" },
       { key: "mealbox", slot: "shelf_mid_1", id: "mealbox_fixed" },
-      { key: "lettuce", slot: "drawer_right", id: "lettuce_fixed" },
+      { key: "broccoli", slot: "drawer_right", id: "broccoli_fixed" },
       { key: "greenSoda", slot: "door_low_1", id: "gsoda_fixed" },
     ],
     trayItems: [
-      { key: "cake" },
+      { key: "watermelon" },
       { key: "redSoda" },
-      { key: "lettuce" },
+      { key: "carrot" },
       { key: "ketchup" },
-      { key: "yogurt" },
+      { key: "cheese" },
     ],
   }),
   buildFridgeLevel({
@@ -531,14 +874,14 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "lettuce", slot: "shelf_top_2", id: "lettuce_fixed" },
       { key: "yogurt", slot: "door_mid_1", id: "yogurt_fixed" },
-      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "broccoli", slot: "drawer_left", id: "broccoli_fixed" },
     ],
     trayItems: [
       { key: "milk" },
-      { key: "yogurt" },
+      { key: "cheese" },
       { key: "eggs" },
-      { key: "strawberries" },
-      { key: "mealbox" },
+      { key: "carrot" },
+      { key: "tomato" },
       { key: "juice" },
     ],
   }),
@@ -553,7 +896,7 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 180,
     fixedItems: [
       { key: "mustard", slot: "door_top_1", id: "mustard_fixed" },
-      { key: "mealbox", slot: "shelf_mid_2", id: "mealbox_fixed" },
+      { key: "fish", slot: "shelf_mid_2", id: "fish_fixed" },
       { key: "ketchup", slot: "door_mid_1", id: "ketchup_fixed" },
       { key: "greenSoda", slot: "door_low_1", id: "greenSoda_fixed" },
     ],
@@ -563,7 +906,7 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "greenSoda" },
       { key: "redSoda" },
       { key: "juice" },
-      { key: "lettuce" },
+      { key: "corn" },
     ],
   }),
   buildFridgeLevel({
@@ -577,16 +920,16 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 190,
     fixedItems: [
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
-      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
-      { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
+      { key: "carrot", slot: "drawer_left", id: "carrot_fixed" },
+      { key: "fish", slot: "shelf_low_1", id: "fish_fixed" },
     ],
     trayItems: [
       { key: "milk" },
-      { key: "strawberries" },
+      { key: "apple" },
       { key: "juice" },
-      { key: "yogurt" },
+      { key: "cheese" },
       { key: "greenSoda" },
-      { key: "lettuce" },
+      { key: "broccoli" },
       { key: "cake" },
     ],
   }),
@@ -603,15 +946,15 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "cake", slot: "shelf_top_1", id: "cake_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "juice", slot: "door_mid_1", id: "juice_fixed" },
-      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
-      { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
+      { key: "fish", slot: "drawer_left", id: "fish_fixed" },
+      { key: "watermelon", slot: "shelf_low_1", id: "watermelon_fixed" },
     ],
     trayItems: [
       { key: "milk" },
-      { key: "strawberries" },
+      { key: "cheese" },
       { key: "greenSoda" },
       { key: "redSoda" },
-      { key: "lettuce" },
+      { key: "broccoli" },
     ],
   }),
 
@@ -627,7 +970,7 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 220,
     fixedItems: [
       { key: "cake", slot: "shelf_top_2", id: "cake_fixed" },
-      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "watermelon", slot: "drawer_left", id: "watermelon_fixed" },
       { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
       { key: "juice", slot: "door_low_1", id: "juice_fixed" },
     ],
@@ -635,8 +978,8 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "greenSoda" },
       { key: "redSoda" },
       { key: "juice" },
-      { key: "yogurt" },
-      { key: "strawberries" },
+      { key: "cheese" },
+      { key: "apple" },
       { key: "milk" },
     ],
   }),
@@ -651,15 +994,15 @@ export const FRIDGE_BR_CAMPAIGN = [
     reward: 230,
     fixedItems: [
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
-      { key: "yogurt", slot: "shelf_top_2", id: "yogurt_fixed" },
+      { key: "cheese", slot: "shelf_top_2", id: "cheese_fixed" },
       { key: "eggs", slot: "shelf_mid_1", id: "eggs_fixed" },
       { key: "juice", slot: "door_mid_1", id: "juice_fixed" },
-      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "apple", slot: "drawer_left", id: "apple_fixed" },
     ],
     trayItems: [
       { key: "juice" },
       { key: "yogurt" },
-      { key: "strawberries" },
+      { key: "tomato" },
       { key: "greenSoda" },
     ],
   }),
@@ -676,14 +1019,14 @@ export const FRIDGE_BR_CAMPAIGN = [
       { key: "milk", slot: "shelf_top_1", id: "milk_fixed" },
       { key: "greenSoda", slot: "door_top_1", id: "greenSoda_fixed" },
       { key: "redSoda", slot: "door_mid_1", id: "redSoda_fixed" },
-      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "carrot", slot: "drawer_left", id: "carrot_fixed" },
     ],
     trayItems: [
       { key: "eggs" },
-      { key: "strawberries" },
+      { key: "broccoli" },
       { key: "ketchup" },
       { key: "juice" },
-      { key: "yogurt" },
+      { key: "cheese" },
       { key: "greenSoda" },
     ],
   }),
@@ -699,15 +1042,15 @@ export const FRIDGE_BR_CAMPAIGN = [
     fixedItems: [
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
       { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
-      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
-      { key: "lettuce", slot: "shelf_low_1", id: "lettuce_fixed" },
+      { key: "broccoli", slot: "drawer_left", id: "broccoli_fixed" },
+      { key: "fish", slot: "shelf_low_1", id: "fish_fixed" },
     ],
     trayItems: [
       { key: "milk" },
-      { key: "strawberries" },
+      { key: "watermelon" },
       { key: "ketchup" },
       { key: "juice" },
-      { key: "yogurt" },
+      { key: "cheese" },
       { key: "greenSoda" },
       { key: "redSoda" },
     ],
@@ -722,22 +1065,55 @@ export const FRIDGE_BR_CAMPAIGN = [
     difficulty: "Master",
     reward: 300,
     fixedItems: [
-      { key: "lettuce", slot: "shelf_top_1", id: "lettuce_fixed" },
+      { key: "broccoli", slot: "shelf_top_1", id: "broccoli_fixed" },
       { key: "milk", slot: "door_top_1", id: "milk_fixed" },
-      { key: "mealbox", slot: "shelf_low_1", id: "mealbox_fixed" },
+      { key: "fish", slot: "shelf_low_1", id: "fish_fixed" },
       { key: "greenSoda", slot: "door_mid_1", id: "greenSoda_fixed" },
-      { key: "strawberries", slot: "drawer_left", id: "strawberries_fixed" },
+      { key: "carrot", slot: "drawer_left", id: "carrot_fixed" },
     ],
     trayItems: [
       { key: "milk" },
       { key: "eggs" },
-      { key: "strawberries" },
+      { key: "watermelon" },
       { key: "mustard" },
       { key: "juice" },
       { key: "cake" },
     ],
   }),
 ];
+
+// Interleave packing levels into the single fridge campaign so both playstyles
+// share one linear progression (coins, unlocks, streaks, collection). Packing
+// levels appear after specific fridge levels to vary the pacing. Insertion is
+// keyed by the fridge level id it should follow, so re-ordering fridge levels
+// keeps the packing beats anchored to the right place.
+// Difficulty rises with campaign depth and the three container themes rotate
+// (bento -> picnic -> suitcase) so the packing beats always feel fresh.
+const PACKING_INSERTS = {
+  "fridge-br-2": [BENTO_LEVEL_EASY],
+  "fridge-br-4": [PICNIC_LEVEL_EASY],
+  "fridge-br-6": [SUITCASE_LEVEL_EASY],
+  "fridge-br-8": [BENTO_LEVEL_MED],
+  "fridge-br-10": [PICNIC_LEVEL],
+  "fridge-br-12": [SUITCASE_LEVEL],
+  "fridge-br-14": [BENTO_LEVEL_HARD],
+  "fridge-br-16": [PICNIC_LEVEL_HARD],
+  "fridge-br-18": [SUITCASE_LEVEL_HARD],
+};
+
+function assembleCampaign() {
+  const out = [];
+  for (const fridge of FRIDGE_LEVELS) {
+    out.push(fridge);
+    const inserts = PACKING_INSERTS[fridge.id];
+    if (inserts) out.push(...inserts);
+  }
+  // Renumber phase sequentially so the HUD "Level N" label and the level-select
+  // dots stay continuous regardless of authored phase values.
+  return out.map((level, index) => ({ ...level, phase: index + 1 }));
+}
+
+export const FRIDGE_BR_CAMPAIGN = assembleCampaign();
 
 export const STORAGE_LEVEL = FRIDGE_BR_CAMPAIGN[0];
 

@@ -8,6 +8,7 @@ export function createUiSounds() {
   let lastSpokenAt = 0;
   let lastSpokenText = "";
   let cachedVoice = null;
+  let muted = false;
 
   function ensureContext() {
     if (typeof window === "undefined") return null;
@@ -49,6 +50,7 @@ export function createUiSounds() {
   }
 
   function speakCallout(text, options = {}) {
+    if (muted) return;
     const synth = speechApi();
     if (!synth || typeof window === "undefined" || typeof window.SpeechSynthesisUtterance === "undefined") return;
     if (!text || voiceLocale !== "en") return;
@@ -74,6 +76,7 @@ export function createUiSounds() {
   }
 
   function tone({ frequency, duration = 0.08, type = "sine", volume = 0.04, attack = 0.004, slideTo = null, when = 0 }) {
+    if (muted) return;
     const audio = ensureContext();
     if (!audio) return;
     const now = audio.currentTime + when;
@@ -101,12 +104,37 @@ export function createUiSounds() {
       voiceLocale = locale || "en";
       cachedVoice = chooseVoice(voiceLocale) || cachedVoice;
     },
+    setMuted(next) {
+      muted = !!next;
+      if (muted) speechApi()?.cancel?.();
+    },
+    isMuted() {
+      return muted;
+    },
     snap() {
       tone({ frequency: 720, slideTo: 980, duration: 0.08, type: "triangle", volume: 0.06 });
       tone({ frequency: 1180, duration: 0.05, type: "sine", volume: 0.04, when: 0.02 });
     },
     miss() {
       tone({ frequency: 230, slideTo: 170, duration: 0.12, type: "sawtooth", volume: 0.024 });
+    },
+    // Soft "picked up" pop when a packing item is grabbed.
+    pickup() {
+      tone({ frequency: 320, slideTo: 460, duration: 0.06, type: "sine", volume: 0.035 });
+    },
+    // Crisp double-click when an item rotates 90 degrees.
+    rotate() {
+      tone({ frequency: 620, duration: 0.035, type: "square", volume: 0.03 });
+      tone({ frequency: 880, duration: 0.045, type: "triangle", volume: 0.03, when: 0.04 });
+    },
+    // Gentle "nope" thud when a rotation/placement has no room (softer than miss).
+    blocked() {
+      tone({ frequency: 200, slideTo: 150, duration: 0.09, type: "sine", volume: 0.03 });
+    },
+    // Chunky "clicked into place" thunk for a packing snap into the grid.
+    lock() {
+      tone({ frequency: 180, slideTo: 120, duration: 0.09, type: "sine", volume: 0.05 });
+      tone({ frequency: 560, slideTo: 760, duration: 0.06, type: "triangle", volume: 0.045, when: 0.01 });
     },
     phase() {
       tone({ frequency: 480, duration: 0.07, type: "triangle", volume: 0.026 });
