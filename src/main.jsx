@@ -39,7 +39,7 @@ createRoot(document.getElementById("root")).render(
               </div>
             </div>
             <h1>Cozy Shelf</h1>
-            <p>Opening the cozy fridge...</p>
+            <p>Opening up the shop...</p>
           </section>
         </main>
       )}
