@@ -70,6 +70,8 @@ export class StorageScene extends Phaser.Scene {
     this.mistakeCount = 0;
     this.comboSparkTimer?.remove?.();
     this.comboSparkTimer = null;
+    this._clearedShelves = new Set();
+    this._shelfStreak = 0;
     this.phaseButtons = [];
     this.phaseButtonTexts = [];
   }
@@ -985,11 +987,12 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
-  // Restock "planogram" ghosts: a faint silhouette of the exact product each
-  // empty facing wants, seated precisely where the real good will land. They
-  // turn the shelf from a blank surface into a clear "stock me like this" plan,
-  // and vanish one by one as the matching goods are placed — the core restock
-  // satisfaction of watching a shelf fill up to its face-up target.
+  // Restock facing outlines: a neutral empty "slot" frame at each facing the
+  // shelf can hold — NOT the product itself. It shows how many facings a shelf
+  // fits and where they sit, but deliberately reveals nothing about WHICH good
+  // belongs there. The shelf's category label (JARS / CANS / DRINKS…) is the
+  // only sorting clue, so stocking stays a light bit of reasoning instead of
+  // "match the picture to its own shadow." Outlines fade as facings fill.
   buildFacingGhosts() {
     if (this.facingGhosts) this.facingGhosts.forEach((g) => g.ghost.destroy());
     this.facingGhosts = [];
@@ -999,20 +1002,28 @@ export class StorageScene extends Phaser.Scene {
       const slot = this.findSlot(shelf.slotId);
       if (!slot) continue;
       shelf.products.forEach((imageKey, col) => {
-        // Borrow a real level item of this product for size/anchor/scale so the
-        // ghost matches the good that will replace it pixel-for-pixel.
+        // Borrow a real level item only to compute the facing's anchor point and
+        // footprint — never its texture — so the outline sits where a good lands.
         const def = this.level.items.find((it) => it.image === imageKey);
         if (!def) return;
         const anchor = this.engine.placementAnchor({ slotId: slot.id, col, row: 0, layer: 0, rot: 0, itemId: def.id });
         const fakeEntry = { status: "packed", slotId: slot.id, col, row: 0, layer: 0, rot: 0, x: anchor.x, y: anchor.y, itemId: def.id };
         const pt = this.displayPointFor(def, fakeEntry);
         const scale = this.displayScaleFor(def, fakeEntry);
-        const ghost = this.add.image(pt.x, pt.y, imageKey)
-          .setOrigin(def.anchor[0], def.anchor[1])
-          .setScale(scale)
-          .setDepth(100)
-          .setAlpha(0.24)
-          .setTint(0x7a5230);
+        const tex = this.textures.get(imageKey)?.getSourceImage?.();
+        const fw = (tex?.width ?? 120) * scale * 0.62;
+        const fh = (tex?.height ?? 120) * scale * 0.72;
+        const ghost = this.add.container(pt.x, pt.y - fh * 0.28);
+        const frame = this.add.graphics();
+        frame.fillStyle(0x000000, 0.05);
+        frame.fillRoundedRect(-fw / 2, -fh / 2, fw, fh, 10);
+        frame.lineStyle(2, 0x8a6a4a, 0.35);
+        frame.strokeRoundedRect(-fw / 2, -fh / 2, fw, fh, 10);
+        const dot = this.add.graphics();
+        dot.fillStyle(0x8a6a4a, 0.3);
+        dot.fillCircle(0, 0, 4);
+        ghost.add([frame, dot]);
+        ghost.setDepth(60);
         this.itemLayer.add(ghost);
         this.facingGhosts.push({ slotId: slot.id, col, ghost });
       });
@@ -1020,7 +1031,7 @@ export class StorageScene extends Phaser.Scene {
     this.updateFacingGhosts();
   }
 
-  // Hide the ghost for any facing that now holds a real good; show the rest.
+  // Fade out the outline for any facing that now holds a real good; show the rest.
   updateFacingGhosts() {
     if (!this.facingGhosts?.length) return;
     const snap = this.engine.snapshot();
@@ -1029,8 +1040,83 @@ export class StorageScene extends Phaser.Scene {
       if (entry.status === "packed" && entry.slotId != null) occupied.add(`${entry.slotId}:${entry.col ?? 0}`);
     }
     for (const g of this.facingGhosts) {
-      g.ghost.setVisible(!occupied.has(`${g.slotId}:${g.col}`));
+      const filled = occupied.has(`${g.slotId}:${g.col}`);
+      if (filled && g.ghost.visible) {
+        this.tweens.add({ targets: g.ghost, alpha: 0, duration: 160, onComplete: () => g.ghost.setVisible(false) });
+      } else if (!filled) {
+        g.ghost.setVisible(true).setAlpha(1);
+      }
     }
+  }
+
+  // Restock payoff: detect when a whole shelf row just became fully & correctly
+  // stocked, and reward it once. This is the "face up a full row" satisfaction
+  // that makes restocking fun — a sweep of sparkles across the shelf, a callout,
+  // and bonus coins that scale with how many rows you complete in a streak.
+  checkShelfCompletions(slotId) {
+    const plan = this.level?.planogram;
+    if (!plan?.length || slotId == null) return;
+    const shelf = plan.find((s) => s.slotId === slotId);
+    if (!shelf) return;
+    this._clearedShelves = this._clearedShelves || new Set();
+    if (this._clearedShelves.has(slotId)) return;
+
+    const snap = this.engine.snapshot();
+    const occupied = new Set();
+    for (const entry of Object.values(snap.items)) {
+      if (entry.status === "packed" && entry.slotId != null) occupied.add(`${entry.slotId}:${entry.col ?? 0}`);
+    }
+    const full = shelf.products.every((_, col) => occupied.has(`${slotId}:${col}`));
+    if (!full) return;
+
+    this._clearedShelves.add(slotId);
+    this._shelfStreak = (this._shelfStreak || 0) + 1;
+    const streak = this._shelfStreak;
+    const bonus = 15 + (streak - 1) * 10; // 15, 25, 35… for back-to-back rows
+
+    const slot = this.findSlot(slotId);
+    if (slot) this.playShelfClear(slot, shelf.products.length, streak);
+
+    const tag = this.i18n.ui.shelfCleared || "Shelf faced up!";
+    this.playCallout(streak >= 3 ? this.i18n.ui.shelfClearStreak?.(streak) || tag : tag, streak >= 3 ? "fire" : "gold");
+    this.setToastMessage((this.i18n.ui.shelfBonus && this.i18n.ui.shelfBonus(bonus)) || `Full shelf! +${bonus} coins`);
+    this.events.emit("shelf-clear", { slotId, bonus, streak });
+  }
+
+  // A left-to-right sweep of sparkle stars along a completed shelf + a soft
+  // banner sheen, so a finished row reads as an achievement, not just "done".
+  playShelfClear(slot, facings, streak = 1) {
+    const layer = this.add.layer().setDepth(965);
+    const y = slot.y - (slot.h ? slot.h * 0.12 : 24);
+    const x0 = slot.x - (slot.w ? slot.w / 2 : 120);
+    const span = slot.w || 240;
+    const starColors = [0xfff8df, 0xbdf5dc, 0xffe9a8, 0xffd166];
+
+    // Warm sheen bar that wipes across the shelf.
+    const bar = this.add.rectangle(x0, y, span, slot.h ? slot.h * 0.9 : 70, 0xffe9a8, 0.0).setOrigin(0, 0.5);
+    layer.add(bar);
+    this.tweens.add({ targets: bar, alpha: { from: 0.28, to: 0 }, duration: 520, ease: "Sine.out" });
+
+    const count = Math.max(6, facings * 3);
+    for (let i = 0; i < count; i += 1) {
+      const t = i / (count - 1);
+      const sx = x0 + span * t;
+      const size = 5 + Math.random() * 5;
+      const star = this.add.star(sx, y + (Math.random() - 0.5) * 30, 4, size * 0.42, size, starColors[i % starColors.length], 0.95).setDepth(966);
+      star.setScale(0);
+      layer.add(star);
+      this.tweens.add({
+        targets: star,
+        scale: { from: 0, to: 1 },
+        y: star.y - (24 + Math.random() * 20),
+        alpha: { from: 1, to: 0 },
+        delay: Math.round(t * 260),
+        duration: 480,
+        ease: "Quad.out",
+      });
+    }
+    if (streak >= 2) this.cameras.main.flash(120, 255, 233, 168, false);
+    this.time.delayedCall(900, () => layer.destroy());
   }
 
   buildItems() {
@@ -2003,6 +2089,9 @@ export class StorageScene extends Phaser.Scene {
     const targetScale = this.displayScaleFor(item, entry);
     obj.setData("home", entry);
     this.updateFacingGhosts();
+    // Restock payoff: if this placement just completed an entire shelf row,
+    // celebrate it and award bonus coins (see checkShelfCompletions).
+    this.checkShelfCompletions(entry?.slotId);
 
     // Show mood animation
     const mood = result.mood || "ok";

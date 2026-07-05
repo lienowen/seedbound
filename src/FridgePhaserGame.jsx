@@ -560,6 +560,12 @@ export function FridgePhaserGame() {
           soundRef.current?.miss();
           setMessage(event.message);
         });
+        // Full-shelf restock payoff: award bonus coins + a celebratory sound.
+        scene.events.on("shelf-clear", (detail) => {
+          if (detail?.bonus) addCoins(detail.bonus);
+          if ((detail?.streak || 0) >= 2) soundRef.current?.fanfare?.();
+          else soundRef.current?.impact?.();
+        });
         // Packing-mode tactile feedback
         scene.events.on("pickup", () => soundRef.current?.pickup?.());
         scene.events.on("rotate", () => soundRef.current?.rotate?.());
