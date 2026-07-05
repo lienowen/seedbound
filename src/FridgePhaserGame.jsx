@@ -166,6 +166,40 @@ export function FridgePhaserGame() {
   const starsEarned = campaign.reduce((n, entry) => n + (starsById[entry.id] || 0), 0);
   const starsTotal = campaign.length * 3;
   const hasProgress = progress.unlocked > 1 || levelsDone > 0;
+  // Store-map zones: each story chapter is a physical area of the shop, spanning
+  // the campaign levels from its startLevelId up to the next chapter's start.
+  // Meta-progression = areas light up as the frontier advances.
+  const zones = useMemo(() => {
+    const starts = CAMPAIGN_CHAPTERS.map((c) => ({
+      chapter: c,
+      index: Math.max(0, campaign.findIndex((e) => e.id === c.startLevelId)),
+    }));
+    return starts.map((s, i) => {
+      const start = s.index;
+      const end = i + 1 < starts.length ? starts[i + 1].index : campaign.length;
+      const slice = campaign.slice(start, end);
+      const done = slice.reduce((n, e) => n + (starsById[e.id] > 0 ? 1 : 0), 0);
+      const fridgeN = slice.filter((e) => !e.packing && e.theme?.key !== "pantry").length;
+      const kind = fridgeN >= slice.length / 2 ? "fridge" : "pantry";
+      const copy = s.chapter.cn && locale === "cn" ? s.chapter.cn : s.chapter.en;
+      return {
+        id: s.chapter.id,
+        number: s.chapter.number,
+        name: copy.title,
+        startIndex: start,
+        total: slice.length,
+        done,
+        kind,
+        locked: start >= unlockedCount,
+        unlockLevel: start + 1,
+        // Jump target: first uncleared level in the zone, else the zone start.
+        playIndex: (() => {
+          const firstOpen = slice.findIndex((e, k) => !(starsById[e.id] > 0) && start + k < unlockedCount);
+          return firstOpen >= 0 ? start + firstOpen : start;
+        })(),
+      };
+    });
+  }, [campaign, starsById, unlockedCount, locale]);
   const dailyReady = !standalone && dailyStatus(meta).claimable;
   // Packing levels use rotate+fit mechanics, so the fridge "wish" hint does not
   // apply — the Best-Spot tool covers hinting instead.
@@ -760,6 +794,7 @@ export function FridgePhaserGame() {
           nav={nav}
           coins={progress.coins}
           campaign={campaign}
+          zones={zones}
           unlockedCount={unlockedCount}
           starsById={starsById}
           onPlayLevel={playLevelFromMap}

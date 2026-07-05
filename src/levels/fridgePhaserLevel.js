@@ -646,10 +646,42 @@ function gondolaFixture({ id, cx, w, shelfYs, cols = 2, allow = PANTRY_ALLOW, va
   return { shapes, slots };
 }
 
-// Build a restock level whose shelves span MULTIPLE gondola sections placed
-// across the aisle. `sections` = [{ cx, w, shelfYs, shelves }] where each shelf
-// is { category, products:[key,…] } exactly like buildRestockLevel. This is the
-// multi-fixture analogue of buildRestockLevel: same gameplay, more space.
+// One promotional ENDCAP island: a chunky low display stack that stands at the
+// front of the aisle. Two stepped tiers (a tall back riser + a low front step),
+// so it reads as a different fixture from the tall gondolas and adds spatial
+// variety. Same shelf/slot semantics as gondolaFixture.
+function endcapFixture({ id, cx, w, shelfYs, cols = 3, allow = PANTRY_ALLOW, crate = 0xd98c53, panel = 0xf6d9b0 }) {
+  const ux = cx - w / 2;
+  const top = shelfYs[0] - 64;
+  const bottom = shelfYs[shelfYs.length - 1] + 62;
+  const shapes = [
+    { kind: "roundedRect", x: ux - 10, y: bottom - 8, w: w + 20, h: 34, r: 18, fill: 0x3a2410, alpha: 0.14 },
+    // Chunky crate body with a bright promo header.
+    { kind: "roundedRect", x: ux, y: top, w, h: bottom - top, r: 22, fill: panel, line: { width: 4, color: 0xffffff, alpha: 0.6 } },
+    { kind: "roundedRect", x: ux + 10, y: top + 10, w: w - 20, h: bottom - top - 20, r: 16, fill: 0xf0c48f, alpha: 0.5 },
+    { kind: "roundedRect", x: ux - 6, y: top - 34, w: w + 12, h: 42, r: 16, fill: crate, line: { width: 3, color: 0xffe4c2, alpha: 0.75 } },
+    // Wooden crate slats on the front face.
+    { kind: "roundedRect", x: ux + 16, y: bottom - 26, w: w - 32, h: 14, r: 6, fill: 0xc9884f, alpha: 0.55 },
+  ];
+  for (const y of shelfYs) {
+    shapes.push({ kind: "roundedRect", x: ux + 10, y: y + 16, w: w - 20, h: 18, r: 8, fill: 0x3a2410, alpha: 0.1 });
+    shapes.push({ kind: "roundedRect", x: ux + 8, y, w: w - 16, h: 17, r: 7, fill: 0xe9b072, line: { width: 2, color: 0xffe0b8, alpha: 0.85 } });
+  }
+  const slots = shelfYs.map((y, tier) => ({
+    id: `${id}_${tier}`, zone: "shelf", tier, allow,
+    x: cx, y, w: Math.round(w * 0.86), h: 122, cols, rows: 1, stackLayers: 1,
+    baseline: 0.5, depth: 130 + tier * 20,
+  }));
+  return { shapes, slots };
+}
+
+const FIXTURE_BUILDERS = { gondola: gondolaFixture, endcap: endcapFixture };
+
+// Build a restock level whose shelves span MULTIPLE fixtures placed across the
+// aisle. `sections` = [{ kind:"gondola"|"endcap", cx, w, shelfYs, shelves }]
+// where each shelf is { category, products:[key,…] } exactly like
+// buildRestockLevel. This is the multi-fixture analogue of buildRestockLevel:
+// same gameplay, more space and fixture variety.
 function buildAisleRestockLevel({ id, phase, title, subtitle, reward = 130, harmonyTarget = 260, harmonyGold = 340, harmonyPerfect = 420, copy, sections = [] }) {
   const stageShapes = [
     // Store floor beneath the fit-to-width aisle backdrop, matching pantry levels.
@@ -661,7 +693,8 @@ function buildAisleRestockLevel({ id, phase, title, subtitle, reward = 130, harm
   const flat = [];
   sections.forEach((sec, s) => {
     const secId = `sec${s}`;
-    const fixture = gondolaFixture({ id: secId, cx: sec.cx, w: sec.w, shelfYs: sec.shelfYs });
+    const build = FIXTURE_BUILDERS[sec.kind] || gondolaFixture;
+    const fixture = build({ id: secId, cx: sec.cx, w: sec.w, shelfYs: sec.shelfYs });
     stageShapes.push(...fixture.shapes);
     fixture.slots.forEach((slot, tier) => {
       const shelf = sec.shelves[tier];
@@ -829,8 +862,48 @@ const PANTRY_BLUEPRINTS = [
   },
 ];
 
+// Progressive plank heights inside one fixture.
+function shelfYsFor(n) {
+  if (n >= 3) return [440, 630, 815];
+  if (n === 2) return [520, 760];
+  return [640];
+}
+
+// Turn a flat blueprint (list of shelves) into a MULTI-FIXTURE layout that grows
+// with the level index — the core "space expands" curve for the aisle levels:
+//   L1-2  → one centered gondola
+//   L3-5  → two gondolas side by side
+//   L6-8  → two gondolas + a promotional endcap island (three fixtures)
+function aisleSections(shelves, i) {
+  if (i <= 1) {
+    return [{ kind: "gondola", cx: 375, w: 452, shelfYs: shelfYsFor(shelves.length), shelves }];
+  }
+  if (i <= 4) {
+    const half = Math.ceil(shelves.length / 2);
+    const a = shelves.slice(0, half);
+    const b = shelves.slice(half);
+    return [
+      { kind: "gondola", cx: 200, w: 344, shelfYs: shelfYsFor(a.length), shelves: a },
+      { kind: "gondola", cx: 552, w: 344, shelfYs: shelfYsFor(b.length), shelves: b },
+    ];
+  }
+  // Two upper gondolas share the first shelves; the last shelf becomes a low
+  // promo endcap island centered at the front — a different fixture entirely.
+  const top = shelves.slice(0, shelves.length - 1);
+  const last = shelves.slice(shelves.length - 1);
+  const half = Math.max(1, Math.ceil(top.length / 2));
+  const a = top.slice(0, half);
+  const b = top.slice(half);
+  const sections = [
+    { kind: "gondola", cx: 200, w: 344, shelfYs: shelfYsFor(a.length), shelves: a },
+  ];
+  if (b.length) sections.push({ kind: "gondola", cx: 552, w: 344, shelfYs: shelfYsFor(b.length), shelves: b });
+  sections.push({ kind: "endcap", cx: 375, w: 400, shelfYs: [872], shelves: last });
+  return sections;
+}
+
 const PANTRY_LEVELS = PANTRY_BLUEPRINTS.map((bp, i) =>
-  buildRestockLevel({
+  buildAisleRestockLevel({
     id: `pantry-${i + 1}`,
     title: "Restock the Aisle",
     subtitle: "Drag goods from the floor onto the matching shelf.",
@@ -839,7 +912,7 @@ const PANTRY_LEVELS = PANTRY_BLUEPRINTS.map((bp, i) =>
     harmonyGold: Math.round(bp.harmony * 1.3),
     harmonyPerfect: Math.round(bp.harmony * 1.65),
     copy: pantryCopy({ difficulty: bp.tier, goal: bp.goal }),
-    shelves: bp.shelves,
+    sections: aisleSections(bp.shelves, i),
   })
 );
 
@@ -1587,21 +1660,8 @@ const PANTRY_INSERTS = Object.fromEntries(
   PANTRY_LEVELS.map((level, i) => [`fridge-br-${(i + 1) * 2}`, [level]]),
 );
 
-// TEMP dev sample: a two-section aisle to validate the multi-fixture factory.
-const AISLE_SAMPLE = buildAisleRestockLevel({
-  id: "aisle-sample",
-  phase: 1,
-  title: "Two-Section Aisle",
-  subtitle: "Sample multi-fixture layout",
-  sections: [
-    { cx: 195, w: 336, shelfYs: [560, 760], shelves: [{ category: "jars", products: ["jam", "jam"] }, { category: "cans", products: ["coffee", "coffee"] }] },
-    { cx: 555, w: 336, shelfYs: [560, 760], shelves: [{ category: "snacks", products: ["chips", "chips"] }, { category: "jars", products: ["honey", "honey"] }] },
-  ],
-});
-
 function assembleCampaign() {
   const out = [];
-  out.push(AISLE_SAMPLE); // TEMP: sample first for verification
   for (const fridge of FRIDGE_LEVELS) {
     out.push(fridge);
     const inserts = PANTRY_INSERTS[fridge.id];
