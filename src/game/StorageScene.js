@@ -350,6 +350,18 @@ export class StorageScene extends Phaser.Scene {
     const g = this.add.graphics();
     if (this.level.assets?.back) {
       const back = this.level.assets.back;
+      // Warm backdrop fill behind transparent-background stage art (e.g. the
+      // market shelf), so the aisle reads as a store wall + floor.
+      if (back.bg != null) {
+        const sw = this.level.stage.width, sh = this.level.stage.height;
+        g.fillStyle(back.bg, 1);
+        g.fillRect(0, 0, sw, sh);
+        if (back.bgFloor != null) {
+          const floorY = (back.y ?? 667) + (back.size || sw) * 0.32;
+          g.fillStyle(back.bgFloor, 1);
+          g.fillRect(0, floorY, sw, sh - floorY);
+        }
+      }
       if (back.contain) {
         // Preserve the square aspect of a top-down illustration (e.g. the
         // picnic basket) instead of stretching it to the portrait stage.

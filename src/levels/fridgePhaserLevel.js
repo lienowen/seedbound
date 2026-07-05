@@ -385,7 +385,10 @@ const PANTRY_STAGE = { width: 750, height: 1334, shapes: [] };
 // ~192–984) with the loose tray sitting just below. Values were tuned against
 // the art's actual shelf planks (measured via luminance profiling in-browser).
 const PANTRY_ASSETS = {
-  back: { key: "pantry-board", file: "pantry-board.png", contain: true, size: 720, y: 640 },
+  // The shelf art already carries its own opaque warm wall + floor. bg simply
+  // continues that wall color to the stage edges (the art is square/contained,
+  // so there is empty canvas above & below it on the portrait stage).
+  back: { key: "market-shelf-board", file: "market-shelf-board.png", contain: true, size: 760, y: 632, bg: 0xf3e6cb },
 };
 
 // One wide placement bay per shelf (cols:2 => two items side-by-side, exactly
@@ -406,11 +409,15 @@ const PANTRY_ASSETS = {
 const PANTRY_ALLOW = ["carton", "dairy", "box", "bottle", "food", "jar", "can", "tube"];
 // tier is the shelf height index (0 = top … 3 = bottom) used by the weight-gravity
 // rule: "heavy" goods must sit on tier >= 2, "light" goods on tier <= 1.
+// Shelf-top game-y values re-measured against the market-shelf art (contain
+// size 760 / centerY 632) via in-browser luminance band detection: the four
+// gondola shelf surfaces resolve to ~434, 521, 620, 815 (the last being the
+// solid base platform).
 const PANTRY_SLOTS = [
-  { id: "pantry_top", zone: "shelf", tier: 0, allow: PANTRY_ALLOW, x: 375, y: 449, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
-  { id: "pantry_up", zone: "shelf", tier: 1, allow: PANTRY_ALLOW, x: 375, y: 608, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
-  { id: "pantry_low", zone: "shelf", tier: 2, allow: PANTRY_ALLOW, x: 375, y: 759, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
-  { id: "pantry_base", zone: "shelf", tier: 3, allow: PANTRY_ALLOW, x: 375, y: 890, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
+  { id: "pantry_top", zone: "shelf", tier: 0, allow: PANTRY_ALLOW, x: 375, y: 434, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
+  { id: "pantry_up", zone: "shelf", tier: 1, allow: PANTRY_ALLOW, x: 375, y: 521, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
+  { id: "pantry_low", zone: "shelf", tier: 2, allow: PANTRY_ALLOW, x: 375, y: 620, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
+  { id: "pantry_base", zone: "shelf", tier: 3, allow: PANTRY_ALLOW, x: 375, y: 815, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
 ];
 
 // The cupboard has no cold zone, so any "needsCold" preference would be
