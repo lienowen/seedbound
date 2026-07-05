@@ -39,7 +39,7 @@ const FRIDGE_SLOTS = [
 ];
 
 const FRIDGE_ASSETS = {
-  back: { key: "fridge-board", file: "fridge-board.webp" },
+  back: { key: "fridge-board", file: "cooler-cabinet.png" },
   front: { key: "fridge-door-front", file: "fridge-door-front.webp", depth: 430 },
 };
 
