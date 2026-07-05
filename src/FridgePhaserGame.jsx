@@ -8,7 +8,7 @@ import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progre
 import { MetaLayer } from "./components/MetaLayer.jsx";
 import { HomeScreen, LevelMapScreen, SettingsScreen, HelpScreen } from "./components/NavScreens.jsx";
 import { ChapterCutscene } from "./components/ChapterCutscene.jsx";
-import { CAMPAIGN_CHAPTERS } from "./i18n/campaign.js";
+import { CAMPAIGN_CHAPTERS, CAMPAIGN_FINALE } from "./i18n/campaign.js";
 import { readMeta, writeMeta, discoverItem, bumpStreak, skinById, setMuted as setMetaMuted, dailyStatus } from "./meta/metaProgress.js";
 import { initCrazyGames, cgLoadingStart, cgLoadingStop, cgGameplayStart, cgGameplayStop, cgHappytime, cgMidgameAd } from "./crazygames.js";
 import "./meta.css";
@@ -184,6 +184,15 @@ export function FridgePhaserGame() {
     if (!chapter || seenChaptersRef.current.has(chapter.id)) return;
     setCutscene(chapter);
   }, [screen, level?.id, standalone, editMode]);
+
+  // Play the ending once the final level is cleared — the story payoff. Shown
+  // once automatically; can be replayed from the completion screen afterwards.
+  useEffect(() => {
+    if (standalone || editMode) return;
+    if (!complete || !isLastLevel) return;
+    if (seenChaptersRef.current.has(CAMPAIGN_FINALE.id)) return;
+    setCutscene(CAMPAIGN_FINALE);
+  }, [complete, isLastLevel, standalone, editMode]);
 
   function dismissCutscene() {
     setCutscene((current) => {
@@ -913,6 +922,11 @@ export function FridgePhaserGame() {
           <p>{level.copy?.successBody || i18n.ui.successBody}</p>
           <div className="fridge-result-actions">
             {!isLastLevel && <button onClick={goNextLevel}>{level.copy?.nextLabel || i18n.ui.nextLabel}</button>}
+            {isLastLevel && (
+              <button onClick={() => setCutscene(CAMPAIGN_FINALE)}>
+                {locale === "cn" ? "重温结局" : "See the ending"}
+              </button>
+            )}
             <button className="secondary" onClick={replayLevel}>{level.copy?.retryLabel || i18n.ui.retryLabel}</button>
             {!standalone && <button className="secondary" onClick={() => { setComplete(false); setScreen("map"); }}>{nav.levelMap}</button>}
           </div>

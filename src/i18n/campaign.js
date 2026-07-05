@@ -393,7 +393,7 @@ export const CAMPAIGN_I18N = {
     "pantry-6": {
       title: "小心撞款",
       subtitle: "托盘里都是相似货。",
-      intro: "瓶罐听装混在一起——别拿错长得像的那个。",
+      intro: "瓶罐听装混在一起——别拿��长得像的那个。",
       goal: "照示意图把每个排面补对。",
       difficulty: "普通",
     },
@@ -491,3 +491,22 @@ export const CAMPAIGN_CHAPTERS = [
     },
   },
 ];
+
+// Ending sequence shown once the final level is cleared — the story payoff.
+// Reuses the ChapterCutscene shape (id / image / en / cn with kicker/title/body/cta).
+export const CAMPAIGN_FINALE = {
+  id: "finale",
+  image: "/images/story/finale.png",
+  en: {
+    kicker: "The End",
+    title: "A Shop to Be Proud Of",
+    body: "Every shelf is full, every corner cared for. Grandma stops by at golden hour, looks around, and simply smiles. Her little corner store is in good hands — and it's yours now. Thank you for keeping it cozy.",
+    cta: "Take a bow",
+  },
+  cn: {
+    kicker: "尾声",
+    title: "一家值得骄傲的小店",
+    body: "每一排货架都满满当当，每个角落都被细心照料。黄昏时分外婆路过，环顾四周，只是欣慰地笑了。这家街角小店有了好归宿——如今它属于你了。谢谢你把它守护得这样温暖。",
+    cta: "谢幕",
+  },
+};
