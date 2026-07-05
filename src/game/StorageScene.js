@@ -145,6 +145,7 @@ export class StorageScene extends Phaser.Scene {
     this.buildStage();
     this.buildSlots();
     this.buildItems();
+    this.buildFacingGhosts();
     this.buildEditor();
     this.unsubscribeEngine = this.engine.subscribe((state, validation) => this.renderState(state, validation));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.unsubscribeEngine?.());
@@ -981,6 +982,54 @@ export class StorageScene extends Phaser.Scene {
         padding: { x: 8, y: 2 },
       }).setOrigin(0, 0).setDepth(62);
       this.categoryTags.push(tag);
+    }
+  }
+
+  // Restock "planogram" ghosts: a faint silhouette of the exact product each
+  // empty facing wants, seated precisely where the real good will land. They
+  // turn the shelf from a blank surface into a clear "stock me like this" plan,
+  // and vanish one by one as the matching goods are placed — the core restock
+  // satisfaction of watching a shelf fill up to its face-up target.
+  buildFacingGhosts() {
+    if (this.facingGhosts) this.facingGhosts.forEach((g) => g.ghost.destroy());
+    this.facingGhosts = [];
+    const plan = this.level?.planogram;
+    if (!plan?.length || this.editMode) return;
+    for (const shelf of plan) {
+      const slot = this.findSlot(shelf.slotId);
+      if (!slot) continue;
+      shelf.products.forEach((imageKey, col) => {
+        // Borrow a real level item of this product for size/anchor/scale so the
+        // ghost matches the good that will replace it pixel-for-pixel.
+        const def = this.level.items.find((it) => it.image === imageKey);
+        if (!def) return;
+        const anchor = this.engine.placementAnchor({ slotId: slot.id, col, row: 0, layer: 0, rot: 0, itemId: def.id });
+        const fakeEntry = { status: "packed", slotId: slot.id, col, row: 0, layer: 0, rot: 0, x: anchor.x, y: anchor.y, itemId: def.id };
+        const pt = this.displayPointFor(def, fakeEntry);
+        const scale = this.displayScaleFor(def, fakeEntry);
+        const ghost = this.add.image(pt.x, pt.y, imageKey)
+          .setOrigin(def.anchor[0], def.anchor[1])
+          .setScale(scale)
+          .setDepth(100)
+          .setAlpha(0.24)
+          .setTint(0x7a5230);
+        this.itemLayer.add(ghost);
+        this.facingGhosts.push({ slotId: slot.id, col, ghost });
+      });
+    }
+    this.updateFacingGhosts();
+  }
+
+  // Hide the ghost for any facing that now holds a real good; show the rest.
+  updateFacingGhosts() {
+    if (!this.facingGhosts?.length) return;
+    const snap = this.engine.snapshot();
+    const occupied = new Set();
+    for (const entry of Object.values(snap.items)) {
+      if (entry.status === "packed" && entry.slotId != null) occupied.add(`${entry.slotId}:${entry.col ?? 0}`);
+    }
+    for (const g of this.facingGhosts) {
+      g.ghost.setVisible(!occupied.has(`${g.slotId}:${g.col}`));
     }
   }
 
@@ -1950,6 +1999,7 @@ export class StorageScene extends Phaser.Scene {
     const display = this.displayPointFor(item, entry);
     const targetScale = this.displayScaleFor(item, entry);
     obj.setData("home", entry);
+    this.updateFacingGhosts();
 
     // Show mood animation
     const mood = result.mood || "ok";
@@ -2479,6 +2529,7 @@ export class StorageScene extends Phaser.Scene {
     if (this.topDown && restored.status !== "packed") restored.rot = keepRot;
     obj.setData("home", restored);
     if (this.topDown) obj.setAngle(this.topDownAngle(restored));
+    this.updateFacingGhosts();
     this.playMissFeedback(obj.x, obj.y);
     this.tweens.add({
       targets: obj,

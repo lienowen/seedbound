@@ -487,9 +487,14 @@ function pantryCopy(overrides) {
   };
 }
 
-// Pantry factory: same surface mechanic as the fridge (harmony/constraint win),
-// but on the cupboard art with shelf-only, cold-free prefs so it always solves.
-function buildPantryLevel({
+// Restock factory: the supermarket gondola is stocked by lining identical
+// products up along each labelled shelf — one "facing" (slot cell) per product,
+// exactly like filling a real store shelf. cols = number of facings on that
+// shelf; the `category` rule gates the win (a jar must land on the jars shelf),
+// and the per-shelf `planogram` (ordered product image keys) drives the ghost
+// silhouettes that show players precisely what to stock where. All prefs are
+// cold-free/shelf-only via pantryPrefs so every level always solves.
+function buildRestockLevel({
   id,
   phase,
   title,
@@ -499,18 +504,45 @@ function buildPantryLevel({
   harmonyGold = 320,
   harmonyPerfect = 400,
   copy,
-  items = [],
-  shelves = null,
+  shelves = [],
 }) {
-  const loose = items.filter((it) => !it.fixed);
-  const count = loose.length;
-  const row1Count = Math.ceil(count / 2);
-  let looseIndex = 0;
-  // Apply the per-level shelf→category map (indexed by tier 0..3) onto the slots
-  // so the category-sorting rule knows which shelf accepts which goods.
-  const slots = structuredClone(PANTRY_SLOTS).map((slot) =>
-    shelves && shelves[slot.tier] ? { ...slot, category: shelves[slot.tier] } : slot,
-  );
+  // Map each shelf blueprint (indexed by tier 0=top..3) onto a slot: give it the
+  // category label and one column per facing so products sit side by side.
+  const slots = structuredClone(PANTRY_SLOTS).map((slot) => {
+    const shelf = shelves[slot.tier];
+    if (!shelf) return { ...slot, cols: 1, empty: true };
+    const cols = shelf.products.length;
+    return { ...slot, category: shelf.category, cols, w: cols >= 3 ? 336 : 240 };
+  });
+  // Planogram: for each stocked shelf, the ordered image keys of its facings so
+  // the scene can draw a faint ghost of each product in its empty facing.
+  const planogram = shelves
+    .map((shelf, tier) => ({
+      slotId: PANTRY_SLOTS[tier].id,
+      products: shelf.products.map((key) => ITEM_LIBRARY[key]?.image || key),
+    }))
+    .filter(Boolean);
+  // Flatten every facing into one tray item.
+  const flat = [];
+  shelves.forEach((shelf, tier) => {
+    shelf.products.forEach((key, i) => flat.push({ key, category: shelf.category, tier, i }));
+  });
+  const count = flat.length;
+  const twoRows = count > 6;
+  const perRow = twoRows ? Math.ceil(count / 2) : count;
+  const items = flat.map((f, index) => {
+    const row = Math.floor(index / perRow);
+    const colInRow = index % perRow;
+    const rowsTotal = twoRows ? 2 : 1;
+    const thisRowCount = row === rowsTotal - 1 ? count - perRow * row : perRow;
+    const rowStart = 375 - ((thisRowCount - 1) * 92) / 2;
+    return buildItem(f.key, {
+      id: `${f.key}_${f.tier}_${f.i}`,
+      trayX: rowStart + colInRow * 92,
+      trayY: twoRows ? (row === 0 ? 1118 : 1206) : 1162,
+      prefs: pantryPrefs({ category: f.category }),
+    });
+  });
   return {
     id,
     revision: 1,
@@ -524,22 +556,8 @@ function buildPantryLevel({
     stage: structuredClone(PANTRY_STAGE),
     fronts: [],
     slots,
-    items: items.map((item) => {
-      if (item.fixed) {
-        return buildItem(item.key, { fixed: true, slot: item.slot, id: item.id || item.key, prefs: pantryPrefs(item.prefs) });
-      }
-      const index = looseIndex++;
-      const inFirstRow = index < row1Count;
-      const rowCount = inFirstRow ? row1Count : count - row1Count;
-      const rowStart = 375 - ((rowCount - 1) * 100) / 2;
-      const col = inFirstRow ? index : index - row1Count;
-      return buildItem(item.key, {
-        id: item.id || `${item.key}_${index + 1}`,
-        trayX: rowStart + col * 100,
-        trayY: inFirstRow ? 1140 : 1200,
-        prefs: pantryPrefs(item.prefs),
-      });
-    }),
+    planogram,
+    items,
   };
 }
 
@@ -563,153 +581,118 @@ function buildPantryLevel({
 // Dry-goods roster: jars/cans/tubes are narrow [1,1], boxes/packs are wide [2,1]
 // (a wide fills a whole 2-column shelf). Every blueprint below has a verified
 // solution; difficulty grows by how many mechanics stack at once.
+// RESTOCK MODEL — each level is a supermarket gondola to fill. A shelf lists the
+// facings (identical products lined up left→right) it needs stocked; players drag
+// matching goods from the floor tray onto the shelf until every facing is full.
+// Only narrow [1,1] goods are used as facings so a row of 2–3 reads as a tidy,
+// fully-faced shelf. Difficulty rises via shelf count, facings per shelf, and
+// how many similar products share the tray (so you must read the ghost plan).
 const PANTRY_BLUEPRINTS = [
-  // L1 — CATEGORY only, 2 categories. Learn "each shelf has a home".
+  // L1 — one product per shelf, 2 facings each. Learn "line them up to fill".
   {
     tier: "Easy",
-    goal: "Sort each item onto its labelled shelf.",
+    goal: "Stock each shelf — line the products up.",
     reward: 110,
     harmony: 200,
-    shelves: ["jars", "cans", null, null],
-    items: [
-      { key: "jam", prefs: { category: "jars", likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { category: "jars", likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { category: "cans", likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { category: "cans", likesNeighbors: ["coffee"] } },
+    shelves: [
+      { category: "jars", products: ["jam", "jam"] },
+      { category: "cans", products: ["coffee", "coffee"] },
     ],
   },
-  // L2 — CATEGORY, 3 categories.
+  // L2 — 3 facings per shelf. A fuller, more satisfying face-up.
   {
     tier: "Easy",
-    goal: "Match every jar, can and snack to its shelf.",
+    goal: "Fill both shelves front to back.",
     reward: 115,
     harmony: 210,
-    shelves: ["jars", "cans", "snacks", null],
-    items: [
-      { key: "jam", prefs: { category: "jars", likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { category: "jars", likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { category: "cans", likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { category: "cans", likesNeighbors: ["coffee"] } },
-      { key: "chips", prefs: { category: "snacks" } },
+    shelves: [
+      { category: "jars", products: ["honey", "honey", "honey"] },
+      { category: "cans", products: ["beans", "beans", "beans"] },
     ],
   },
-  // L3 — CATEGORY, all 4 shelves labelled, wide items included.
+  // L3 — three shelves, 2 facings each. Adds the snacks aisle.
   {
     tier: "Easy",
-    goal: "Fill all four labelled shelves.",
+    goal: "Stock jars, cans and snacks.",
     reward: 120,
-    harmony: 220,
-    shelves: ["snacks", "jars", "cans", "grains"],
-    items: [
-      { key: "cookies", prefs: { category: "snacks" } },
-      { key: "jam", prefs: { category: "jars", likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { category: "jars", likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { category: "cans", likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { category: "cans", likesNeighbors: ["coffee"] } },
-      { key: "pasta", prefs: { category: "grains" } },
+    harmony: 225,
+    shelves: [
+      { category: "jars", products: ["jam", "jam"] },
+      { category: "cans", products: ["coffee", "coffee"] },
+      { category: "snacks", products: ["chips", "chips"] },
     ],
   },
-  // L4 — WEIGHT gravity only. Heavy sinks, light rises.
+  // L4 — mixed facings on one shelf: read the plan (jam + honey jars).
   {
     tier: "Normal",
-    goal: "Heavy goods down low, light goods up high.",
+    goal: "Match the shelf plan exactly.",
     reward: 130,
-    harmony: 240,
-    items: [
-      { key: "crackers", prefs: { weight: "heavy" } },
-      { key: "pasta", prefs: { weight: "heavy" } },
-      { key: "chips", prefs: { weight: "light" } },
-      { key: "jam", prefs: { weight: "light", likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { weight: "light", likesNeighbors: ["jam"] } },
+    harmony: 245,
+    shelves: [
+      { category: "jars", products: ["jam", "honey", "peanut"] },
+      { category: "cans", products: ["coffee", "beans"] },
     ],
   },
-  // L5 — WEIGHT plus a keep-apart pair.
+  // L5 — three shelves, 3 facings each. A full gondola.
   {
     tier: "Normal",
-    goal: "Balance the weight and keep chips off the jam.",
+    goal: "Face up all three shelves.",
     reward: 140,
-    harmony: 255,
-    items: [
-      { key: "crackers", prefs: { weight: "heavy" } },
-      { key: "pasta", prefs: { weight: "heavy" } },
-      { key: "chips", prefs: { weight: "light", hatesNeighbors: ["jam"] } },
-      { key: "honey", prefs: { weight: "light" } },
-      { key: "jam", prefs: { weight: "light", hatesNeighbors: ["chips"] } },
-      { key: "peanut", prefs: { weight: "light" } },
+    harmony: 265,
+    shelves: [
+      { category: "jars", products: ["honey", "honey", "honey"] },
+      { category: "cans", products: ["beans", "beans", "beans"] },
+      { category: "snacks", products: ["chips", "chips", "chips"] },
     ],
   },
-  // L6 — WEIGHT + CATEGORY aligned (light jars up, heavy cans down).
+  // L6 — mixed jars + mixed cans; the tray tempts you with lookalikes.
   {
     tier: "Normal",
-    goal: "Jars up top, cans down low.",
+    goal: "Stock every facing to its plan.",
     reward: 150,
-    harmony: 270,
-    shelves: ["jars", "jars", "cans", "cans"],
-    items: [
-      { key: "jam", prefs: { category: "jars", weight: "light", likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { category: "jars", weight: "light", likesNeighbors: ["jam"] } },
-      { key: "peanut", prefs: { category: "jars", weight: "light" } },
-      { key: "coffee", prefs: { category: "cans", weight: "heavy", likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { category: "cans", weight: "heavy", likesNeighbors: ["coffee"] } },
+    harmony: 285,
+    shelves: [
+      { category: "jars", products: ["jam", "honey", "peanut"] },
+      { category: "cans", products: ["coffee", "beans", "coffee"] },
+      { category: "snacks", products: ["chips", "chips"] },
     ],
   },
-  // L7 — CATEGORY + strict NEIGHBORS (pairs must share a shelf).
+  // L7 — three shelves, mixed on two of them.
   {
     tier: "Hard",
-    goal: "Keep each pair together on its shelf.",
-    reward: 160,
-    harmony: 290,
-    shelves: ["jars", "cans", "snacks", null],
-    items: [
-      { key: "jam", prefs: { category: "jars", mustNeighbors: ["honey"] } },
-      { key: "honey", prefs: { category: "jars", mustNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { category: "cans", mustNeighbors: ["beans"] } },
-      { key: "beans", prefs: { category: "cans", mustNeighbors: ["coffee"] } },
-      { key: "chips", prefs: { category: "snacks" } },
-    ],
-  },
-  // L8 — WEIGHT + strict NEIGHBORS (two must-pairs, two heavy wides).
-  {
-    tier: "Hard",
-    goal: "Pair up the light goods, sink the heavy packs.",
-    reward: 170,
+    goal: "Read each plan and stock it right.",
+    reward: 165,
     harmony: 305,
-    items: [
-      { key: "crackers", prefs: { weight: "heavy" } },
-      { key: "pasta", prefs: { weight: "heavy" } },
-      { key: "jam", prefs: { weight: "light", mustNeighbors: ["honey"] } },
-      { key: "honey", prefs: { weight: "light", mustNeighbors: ["jam"] } },
-      { key: "chips", prefs: { weight: "light", mustNeighbors: ["peanut"] } },
-      { key: "peanut", prefs: { weight: "light", mustNeighbors: ["chips"] } },
+    shelves: [
+      { category: "jars", products: ["peanut", "jam", "honey"] },
+      { category: "cans", products: ["beans", "coffee", "beans"] },
+      { category: "snacks", products: ["chips", "chips", "chips"] },
     ],
   },
-  // L9 — ALL THREE at once. Category + weight + strict neighbors.
+  // L8 — the big restock: three full, mixed shelves.
   {
     tier: "Hard",
-    goal: "Sort, balance and pair the whole pantry.",
+    goal: "Fill the whole aisle to plan.",
     reward: 180,
-    harmony: 320,
-    shelves: ["jars", "cans", "snacks", "grains"],
-    items: [
-      { key: "jam", prefs: { category: "jars", weight: "light", mustNeighbors: ["honey"] } },
-      { key: "honey", prefs: { category: "jars", weight: "light", mustNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { category: "cans", mustNeighbors: ["beans"] } },
-      { key: "beans", prefs: { category: "cans", mustNeighbors: ["coffee"] } },
-      { key: "crackers", prefs: { category: "snacks", weight: "heavy" } },
-      { key: "pasta", prefs: { category: "grains", weight: "heavy" } },
+    harmony: 325,
+    shelves: [
+      { category: "jars", products: ["honey", "peanut", "jam"] },
+      { category: "cans", products: ["coffee", "beans", "coffee"] },
+      { category: "snacks", products: ["chips", "chips", "chips"] },
     ],
   },
 ];
 
 const PANTRY_LEVELS = PANTRY_BLUEPRINTS.map((bp, i) =>
-  buildPantryLevel({
+  buildRestockLevel({
     id: `pantry-${i + 1}`,
+    title: "Restock the Aisle",
+    subtitle: "Drag goods from the floor onto the matching shelf.",
     reward: bp.reward,
     harmonyTarget: bp.harmony,
     harmonyGold: Math.round(bp.harmony * 1.3),
     harmonyPerfect: Math.round(bp.harmony * 1.65),
     copy: pantryCopy({ difficulty: bp.tier, goal: bp.goal }),
-    items: bp.items,
     shelves: bp.shelves,
   })
 );
