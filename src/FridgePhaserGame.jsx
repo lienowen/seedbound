@@ -7,6 +7,8 @@ import { createI18n, localizeCampaign, localizeLevel } from "./i18n/index.js";
 import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progressStorageKey, switchLocaleHref, writeLocalePreference } from "./i18n/locale.js";
 import { MetaLayer } from "./components/MetaLayer.jsx";
 import { HomeScreen, LevelMapScreen, SettingsScreen, HelpScreen } from "./components/NavScreens.jsx";
+import { ChapterCutscene } from "./components/ChapterCutscene.jsx";
+import { CAMPAIGN_CHAPTERS } from "./i18n/campaign.js";
 import { readMeta, writeMeta, discoverItem, bumpStreak, skinById, setMuted as setMetaMuted, dailyStatus } from "./meta/metaProgress.js";
 import { initCrazyGames, cgLoadingStart, cgLoadingStop, cgGameplayStart, cgGameplayStop, cgHappytime, cgMidgameAd } from "./crazygames.js";
 import "./meta.css";
@@ -75,6 +77,25 @@ function writeProgress(locale, progress) {
   }
 }
 
+// Which story chapters the player has already watched, so each cutscene only
+// interrupts once (on first arrival at that chapter's starting level).
+const CHAPTERS_SEEN_KEY = "cozyshelf.chapters.seen";
+function readSeenChapters() {
+  try {
+    const raw = localStorage.getItem(CHAPTERS_SEEN_KEY);
+    return new Set(Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+function writeSeenChapters(set) {
+  try {
+    localStorage.setItem(CHAPTERS_SEEN_KEY, JSON.stringify([...set]));
+  } catch {
+    // Non-critical.
+  }
+}
+
 export function FridgePhaserGame() {
   const mount = useRef(null);
   const sceneRef = useRef(null);
@@ -105,6 +126,10 @@ export function FridgePhaserGame() {
   const [lastStars, setLastStars] = useState(0);
   const [meta, setMeta] = useState(() => readMeta());
   const [discovery, setDiscovery] = useState(null);
+  // Story chapter cutscene currently on screen (or null), plus the set of
+  // chapters already watched so each only plays once.
+  const [cutscene, setCutscene] = useState(null);
+  const seenChaptersRef = useRef(readSeenChapters());
   // Do NOT auto-pop the daily gift on cold start — CrazyGames QA requires
   // players to land directly in a playable state with nothing blocking the
   // screen. The gift stays reachable via the menu button (badged when ready).
@@ -149,6 +174,26 @@ export function FridgePhaserGame() {
   useEffect(() => {
     document.documentElement.lang = htmlLang(locale);
   }, [locale]);
+
+  // Show a story cutscene the first time the player reaches a chapter's starting
+  // level (only in the real campaign, on the game screen, once per chapter).
+  useEffect(() => {
+    if (standalone || editMode) return;
+    if (screen !== "game") return;
+    const chapter = CAMPAIGN_CHAPTERS.find((c) => c.startLevelId === level?.id);
+    if (!chapter || seenChaptersRef.current.has(chapter.id)) return;
+    setCutscene(chapter);
+  }, [screen, level?.id, standalone, editMode]);
+
+  function dismissCutscene() {
+    setCutscene((current) => {
+      if (current) {
+        seenChaptersRef.current.add(current.id);
+        writeSeenChapters(seenChaptersRef.current);
+      }
+      return null;
+    });
+  }
 
   function buildUiState(nextLevel = level, nextProgress = progress) {
     const movable = nextLevel.items.filter((item) => !item.fixed);
@@ -277,6 +322,10 @@ export function FridgePhaserGame() {
     if (standalone) return;
     soundRef.current?.miss();
     for (const entry of FRIDGE_BR_CAMPAIGN) localStorage.removeItem(`cozyshelf.storage.${entry.id}`);
+    // Replay the story from the top on a fresh campaign.
+    seenChaptersRef.current = new Set();
+    writeSeenChapters(seenChaptersRef.current);
+    setCutscene(null);
     updateProgress({ unlocked: 1, coins: 125, current: 0, stars: {} });
     setComplete(false);
     setLastReward(0);
@@ -843,6 +892,9 @@ export function FridgePhaserGame() {
           <p>{level.copy?.intro || i18n.ui.dragHint}</p>
         </div>
       </div>}
+      {showGame && cutscene && (
+        <ChapterCutscene chapter={cutscene} locale={locale} onDismiss={dismissCutscene} />
+      )}
       {showGame && complete && (
         <section className="fridge-result fridge-result--celebrate">
           <div className="fridge-result-sparkles" aria-hidden="true">
