@@ -29,6 +29,39 @@ button { font: inherit; }
   touch-action: none;
   user-select: none;
   align-self: center;
+  /* Establish a size container so the fixed-px DOM chrome (home button, meta
+     toolbar, streak) can scale in lockstep with the Phaser board whenever the
+     shell shrinks — e.g. short landscape windows (821x462) where an unscaled
+     toolbar would otherwise overrun the in-canvas HUD pills and title. */
+  container-type: inline-size;
+  container-name: shell;
+}
+
+/* Scale the fixed-px DOM chrome down in step with the shrinking board so it
+   never overruns the in-canvas HUD. Each element is pinned to its own corner
+   via transform-origin so scaling keeps it tucked against the edge. Breakpoints
+   track the shell width (430px at full size → progressively smaller). */
+@container shell (max-width: 384px) {
+  .fridge-home-btn { transform: scale(0.84); transform-origin: top left; }
+  .meta-toolbar { transform: scale(0.84); transform-origin: top right; }
+  .fridge-lang-switch { transform: scale(0.84); transform-origin: top right; }
+  .meta-streak { transform: translateX(-50%) scale(0.84); transform-origin: top center; }
+}
+@container shell (max-width: 320px) {
+  .fridge-home-btn { transform: scale(0.68); }
+  .meta-toolbar { transform: scale(0.68); }
+  .fridge-lang-switch { transform: scale(0.68); }
+  .meta-streak { transform: translateX(-50%) scale(0.68); top: 58px; }
+  .fridge-quick-pill { height: 46px; }
+  .fridge-quick-btn { height: 46px; }
+}
+@container shell (max-width: 268px) {
+  .fridge-home-btn { transform: scale(0.56); }
+  .meta-toolbar { transform: scale(0.56); }
+  .fridge-lang-switch { transform: scale(0.56); }
+  .meta-streak { transform: translateX(-50%) scale(0.56); top: 50px; }
+  .fridge-quick-pill { height: 42px; }
+  .fridge-quick-btn { height: 42px; }
 }
 
 .fridge-boot-shell {
