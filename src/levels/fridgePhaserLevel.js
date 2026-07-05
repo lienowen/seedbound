@@ -1434,17 +1434,12 @@ const FRIDGE_LEVELS = [
 // Difficulty rises with campaign depth (the pantry blueprints are ordered
 // easy -> hard) so the cupboard beats always feel fresh and relaxing rather
 // than the old grid-packing pressure.
-const PANTRY_INSERTS = {
-  "fridge-br-2": [PANTRY_LEVELS[0]],
-  "fridge-br-4": [PANTRY_LEVELS[1]],
-  "fridge-br-6": [PANTRY_LEVELS[2]],
-  "fridge-br-8": [PANTRY_LEVELS[3]],
-  "fridge-br-10": [PANTRY_LEVELS[4]],
-  "fridge-br-12": [PANTRY_LEVELS[5]],
-  "fridge-br-14": [PANTRY_LEVELS[6]],
-  "fridge-br-16": [PANTRY_LEVELS[7]],
-  "fridge-br-18": [PANTRY_LEVELS[8]],
-};
+// Interleave each restock level after an even-numbered fridge beat. Built from
+// the actual PANTRY_LEVELS length so it never references a level that no longer
+// exists (guards against off-by-one when the blueprint count changes).
+const PANTRY_INSERTS = Object.fromEntries(
+  PANTRY_LEVELS.map((level, i) => [`fridge-br-${(i + 1) * 2}`, [level]]),
+);
 
 function assembleCampaign() {
   const out = [];
