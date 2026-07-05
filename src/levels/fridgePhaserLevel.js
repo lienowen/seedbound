@@ -383,12 +383,14 @@ function buildPackingLevel(config) {
 // layer heights. Each entry is the game-y of a plank's TOP surface — an item's
 // base rests exactly here. Four generously spaced shelves (gap 160) give tall,
 // cozy bays like a supermarket gondola.
-const PANTRY_SHELF_Y = [430, 590, 750, 910];
+const PANTRY_SHELF_Y = [500, 648, 796, 944];
 const PANTRY_UNIT = { x: 190, w: 370 }; // shelf unit frame (centered on x=375)
 
 function buildPantryStageShapes() {
   const { x: ux, w: uw } = PANTRY_UNIT;
-  const frameTop = 348;
+  // Header valance sits well above the first shelf (~150px) so tall jars/cans on
+  // the top shelf clear the signboard instead of colliding with it.
+  const frameTop = 352;
   const frameBottom = PANTRY_SHELF_Y[PANTRY_SHELF_Y.length - 1] + 74;
   const shapes = [
     // Warm store wall + floor filling the whole stage.
