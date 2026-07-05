@@ -400,8 +400,10 @@ function buildPantryStageShapes() {
     { kind: "rect", x: 0, y: 744, w: 750, h: 10, fill: 0xf3e2b8, alpha: 0.5 },
     // A soft grounding shadow so the shelf unit reads as sitting on the floor.
     { kind: "roundedRect", x: ux - 14, y: frameBottom - 6, w: uw + 28, h: 46, r: 22, fill: 0x3a2410, alpha: 0.12 },
-    // Gondola back panel (soft pegboard) + side posts + header valance.
-    { kind: "roundedRect", x: ux, y: frameTop, w: uw, h: frameBottom - frameTop, r: 22, fill: 0xfbf3e2, alpha: 0.97, line: { width: 3, color: 0xffffff, alpha: 0.6 } },
+    // Gondola back panel (soft solid pegboard) + inner shading so stocked
+    // products pop against it, + side posts + header valance.
+    { kind: "roundedRect", x: ux, y: frameTop, w: uw, h: frameBottom - frameTop, r: 22, fill: 0xf3e6cb, line: { width: 3, color: 0xffffff, alpha: 0.55 } },
+    { kind: "roundedRect", x: ux + 20, y: frameTop + 14, w: uw - 40, h: frameBottom - frameTop - 28, r: 14, fill: 0xe9d6b2, alpha: 0.55 },
     { kind: "roundedRect", x: ux + 4, y: frameTop + 8, w: 14, h: frameBottom - frameTop - 16, r: 7, fill: 0xd8a86c },
     { kind: "roundedRect", x: ux + uw - 18, y: frameTop + 8, w: 14, h: frameBottom - frameTop - 16, r: 7, fill: 0xd8a86c },
     { kind: "roundedRect", x: ux - 6, y: frameTop - 34, w: uw + 12, h: 42, r: 16, fill: 0xe7a95f, line: { width: 3, color: 0xfbe6c8, alpha: 0.7 } },
