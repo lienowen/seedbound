@@ -703,13 +703,10 @@ export function FridgePhaserGame() {
           nav={nav}
           muted={!!meta.settings?.muted}
           onToggleSound={toggleSound}
-          locale={locale}
-          onSetLocale={(code) => changeLocale(code, { preventDefault() {} })}
           onReset={() => {
             if (window.confirm(nav.resetConfirm)) resetCampaign();
           }}
           onBack={goHome}
-          langLabels={{ pt: i18n.ui.langPt, en: i18n.ui.langEn, cn: i18n.ui.langCn }}
         />
       )}
       {!standalone && !editMode && screen === "help" && (

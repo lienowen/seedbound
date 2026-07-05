@@ -373,7 +373,7 @@ export function LevelMapScreen({ nav, coins, campaign, unlockedCount, starsById,
 }
 
 /* ---------------------------------------------------------------- Settings */
-export function SettingsScreen({ nav, muted, onToggleSound, locale, onSetLocale, onReset, onBack, langLabels }) {
+export function SettingsScreen({ nav, muted, onToggleSound, onReset, onBack }) {
   return (
     <section className="nav-screen nav-settings" aria-label={nav.settingsTitle}>
       <header className="nav-bar">
@@ -397,22 +397,6 @@ export function SettingsScreen({ nav, muted, onToggleSound, locale, onSetLocale,
             <span className="nav-toggle-knob" />
             <span className="nav-toggle-text">{muted ? nav.soundOff : nav.soundOn}</span>
           </button>
-        </div>
-
-        <div className="nav-setting-row nav-setting-row--stack">
-          <span className="nav-setting-label">{nav.language}</span>
-          <div className="nav-lang-group" role="group" aria-label={nav.language}>
-            {["pt", "en", "cn"].map((code) => (
-              <button
-                key={code}
-                type="button"
-                className={`nav-lang-btn${locale === code ? " is-active" : ""}`}
-                onClick={() => onSetLocale(code)}
-              >
-                {langLabels[code]}
-              </button>
-            ))}
-          </div>
         </div>
 
         <button type="button" className="nav-btn nav-btn--danger" onClick={onReset}>
