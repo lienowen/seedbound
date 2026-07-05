@@ -403,12 +403,14 @@ const PANTRY_ASSETS = {
 // cabinet floor, giving four resting surfaces. Their top surfaces (game-y),
 // measured from the art via in-browser luminance band detection at size 720 /
 // centerY 640: plank1 449, plank2 608, plank3 759, floor 890.
-const PANTRY_ALLOW = ["carton", "dairy", "box", "bottle", "food"];
+const PANTRY_ALLOW = ["carton", "dairy", "box", "bottle", "food", "jar", "can", "tube"];
+// tier is the shelf height index (0 = top … 3 = bottom) used by the weight-gravity
+// rule: "heavy" goods must sit on tier >= 2, "light" goods on tier <= 1.
 const PANTRY_SLOTS = [
-  { id: "pantry_top", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 449, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
-  { id: "pantry_up", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 608, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
-  { id: "pantry_low", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 759, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
-  { id: "pantry_base", zone: "shelf", allow: PANTRY_ALLOW, x: 375, y: 890, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
+  { id: "pantry_top", zone: "shelf", tier: 0, allow: PANTRY_ALLOW, x: 375, y: 449, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
+  { id: "pantry_up", zone: "shelf", tier: 1, allow: PANTRY_ALLOW, x: 375, y: 608, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
+  { id: "pantry_low", zone: "shelf", tier: 2, allow: PANTRY_ALLOW, x: 375, y: 759, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
+  { id: "pantry_base", zone: "shelf", tier: 3, allow: PANTRY_ALLOW, x: 375, y: 890, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
 ];
 
 // The cupboard has no cold zone, so any "needsCold" preference would be
@@ -447,11 +449,17 @@ function buildPantryLevel({
   harmonyPerfect = 400,
   copy,
   items = [],
+  shelves = null,
 }) {
   const loose = items.filter((it) => !it.fixed);
   const count = loose.length;
   const row1Count = Math.ceil(count / 2);
   let looseIndex = 0;
+  // Apply the per-level shelf→category map (indexed by tier 0..3) onto the slots
+  // so the category-sorting rule knows which shelf accepts which goods.
+  const slots = structuredClone(PANTRY_SLOTS).map((slot) =>
+    shelves && shelves[slot.tier] ? { ...slot, category: shelves[slot.tier] } : slot,
+  );
   return {
     id,
     revision: 1,
@@ -464,7 +472,7 @@ function buildPantryLevel({
     tuning: { magnetPreviewDistance: 132, snapDistance: 88, snapDuration: 280 },
     stage: structuredClone(PANTRY_STAGE),
     fronts: [],
-    slots: structuredClone(PANTRY_SLOTS),
+    slots,
     items: items.map((item) => {
       if (item.fixed) {
         return buildItem(item.key, { fixed: true, slot: item.slot, id: item.id || item.key, prefs: pantryPrefs(item.prefs) });
@@ -490,138 +498,154 @@ function buildPantryLevel({
 // Difficulty grows by item count and by how many light prefs are in play
 // (topShelf / likesNeighbors / hatesNeighbors) — never by fit pressure. Max 8
 // pockets means a roster never exceeds 8 loose items.
-// Dry-goods roster only — jars/cans/tubes are narrow [1,1] uprights, boxes/packs
-// are wide [2,1]. Capacity model on the 4 shelves × 2 columns: a wide item fills
-// a whole shelf, a narrow takes one column, so shelves_used = (#wide) +
-// ceil(#narrow / 2) must be ≤ 4. At most ONE top-shelf-filling wide per level
-// (pantry_top has 2 columns, a wide occupies both). `likesNeighbors` is a soft
-// harmony bonus; only `topShelf` and `hatesNeighbors` are hard gates, and hate
-// pairs here always sit in different shelf-pairs so every level stays solvable.
+//
+// PANTRY PUZZLE MODEL — three deductive mechanics, layered in across the arc so
+// the cupboard is a real sorting puzzle instead of "drop anything anywhere":
+//   1. CATEGORY  — each shelf is labelled (jars/cans/snacks/grains) via `shelves`
+//      (indexed by tier 0=top..3=bottom); an item with prefs.category must land
+//      on the matching shelf.
+//   2. WEIGHT    — prefs.weight "heavy" must ride a lower shelf (tier >= 2),
+//      "light" an upper shelf (tier <= 1).
+//   3. NEIGHBORS — prefs.mustNeighbors is a HARD "keep us together" rule (friends
+//      can only be adjacent within the same shelf); hatesNeighbors keeps a pair
+//      apart. (likesNeighbors stays a soft harmony bonus.)
+// Dry-goods roster: jars/cans/tubes are narrow [1,1], boxes/packs are wide [2,1]
+// (a wide fills a whole 2-column shelf). Every blueprint below has a verified
+// solution; difficulty grows by how many mechanics stack at once.
 const PANTRY_BLUEPRINTS = [
+  // L1 — CATEGORY only, 2 categories. Learn "each shelf has a home".
   {
     tier: "Easy",
-    goal: "Guarde os mantimentos nas prateleiras.",
+    goal: "Sort each item onto its labelled shelf.",
     reward: 110,
     harmony: 200,
+    shelves: ["jars", "cans", null, null],
     items: [
-      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
+      { key: "jam", prefs: { category: "jars", likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { category: "jars", likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { category: "cans", likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { category: "cans", likesNeighbors: ["coffee"] } },
     ],
   },
+  // L2 — CATEGORY, 3 categories.
   {
     tier: "Easy",
-    goal: "Arrume a despensa com calma.",
+    goal: "Match every jar, can and snack to its shelf.",
     reward: 115,
     harmony: 210,
+    shelves: ["jars", "cans", "snacks", null],
     items: [
-      { key: "pasta", prefs: {} },
-      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
+      { key: "jam", prefs: { category: "jars", likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { category: "jars", likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { category: "cans", likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { category: "cans", likesNeighbors: ["coffee"] } },
+      { key: "chips", prefs: { category: "snacks" } },
     ],
   },
+  // L3 — CATEGORY, all 4 shelves labelled, wide items included.
   {
     tier: "Easy",
-    goal: "Coloque cada item numa prateleira.",
+    goal: "Fill all four labelled shelves.",
     reward: 120,
     harmony: 220,
+    shelves: ["snacks", "jars", "cans", "grains"],
     items: [
-      { key: "crackers", prefs: { topShelf: true, likesVisible: true } },
-      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
-      { key: "peanut", prefs: { likesNeighbors: ["jam"] } },
-      { key: "chips", prefs: {} },
+      { key: "cookies", prefs: { category: "snacks" } },
+      { key: "jam", prefs: { category: "jars", likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { category: "jars", likesNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { category: "cans", likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { category: "cans", likesNeighbors: ["coffee"] } },
+      { key: "pasta", prefs: { category: "grains" } },
     ],
   },
+  // L4 — WEIGHT gravity only. Heavy sinks, light rises.
   {
     tier: "Normal",
-    goal: "Organize a despensa com capricho.",
+    goal: "Heavy goods down low, light goods up high.",
     reward: 130,
     harmony: 240,
     items: [
-      { key: "cookies", prefs: { topShelf: true, likesVisible: true } },
-      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
-      { key: "chips", prefs: {} },
+      { key: "crackers", prefs: { weight: "heavy" } },
+      { key: "pasta", prefs: { weight: "heavy" } },
+      { key: "chips", prefs: { weight: "light" } },
+      { key: "jam", prefs: { weight: "light", likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { weight: "light", likesNeighbors: ["jam"] } },
     ],
   },
+  // L5 — WEIGHT plus a keep-apart pair.
   {
     tier: "Normal",
-    goal: "Deixe a despensa nos trinques.",
+    goal: "Balance the weight and keep chips off the jam.",
     reward: 140,
     harmony: 255,
     items: [
-      { key: "crackers", prefs: { topShelf: true, likesVisible: true } },
-      { key: "pasta", prefs: {} },
-      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
+      { key: "crackers", prefs: { weight: "heavy" } },
+      { key: "pasta", prefs: { weight: "heavy" } },
+      { key: "chips", prefs: { weight: "light", hatesNeighbors: ["jam"] } },
+      { key: "honey", prefs: { weight: "light" } },
+      { key: "jam", prefs: { weight: "light", hatesNeighbors: ["chips"] } },
+      { key: "peanut", prefs: { weight: "light" } },
     ],
   },
+  // L6 — WEIGHT + CATEGORY aligned (light jars up, heavy cans down).
   {
     tier: "Normal",
-    goal: "Arrume os mantimentos com carinho.",
+    goal: "Jars up top, cans down low.",
     reward: 150,
     harmony: 270,
+    shelves: ["jars", "jars", "cans", "cans"],
     items: [
-      { key: "cookies", prefs: { topShelf: true, likesVisible: true } },
-      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
-      { key: "peanut", prefs: { likesNeighbors: ["chips"] } },
-      { key: "chips", prefs: { likesNeighbors: ["peanut"] } },
+      { key: "jam", prefs: { category: "jars", weight: "light", likesNeighbors: ["honey"] } },
+      { key: "honey", prefs: { category: "jars", weight: "light", likesNeighbors: ["jam"] } },
+      { key: "peanut", prefs: { category: "jars", weight: "light" } },
+      { key: "coffee", prefs: { category: "cans", weight: "heavy", likesNeighbors: ["beans"] } },
+      { key: "beans", prefs: { category: "cans", weight: "heavy", likesNeighbors: ["coffee"] } },
     ],
   },
+  // L7 — CATEGORY + strict NEIGHBORS (pairs must share a shelf).
   {
     tier: "Hard",
-    goal: "Encaixe toda a despensa com carinho.",
+    goal: "Keep each pair together on its shelf.",
     reward: 160,
     harmony: 290,
+    shelves: ["jars", "cans", "snacks", null],
     items: [
-      { key: "crackers", prefs: { topShelf: true, likesVisible: true } },
-      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { likesNeighbors: ["coffee"], hatesNeighbors: ["chips"] } },
-      { key: "peanut", prefs: { likesNeighbors: ["chips"] } },
-      { key: "chips", prefs: { likesNeighbors: ["peanut"], hatesNeighbors: ["beans"] } },
+      { key: "jam", prefs: { category: "jars", mustNeighbors: ["honey"] } },
+      { key: "honey", prefs: { category: "jars", mustNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { category: "cans", mustNeighbors: ["beans"] } },
+      { key: "beans", prefs: { category: "cans", mustNeighbors: ["coffee"] } },
+      { key: "chips", prefs: { category: "snacks" } },
     ],
   },
+  // L8 — WEIGHT + strict NEIGHBORS (two must-pairs, two heavy wides).
   {
     tier: "Hard",
-    goal: "Organize a despensa cheia.",
+    goal: "Pair up the light goods, sink the heavy packs.",
     reward: 170,
     harmony: 305,
     items: [
-      { key: "pasta", prefs: { topShelf: true } },
-      { key: "jam", prefs: { likesNeighbors: ["honey"], hatesNeighbors: ["coffee"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"] } },
-      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
-      { key: "peanut", prefs: { likesNeighbors: ["chips"] } },
-      { key: "chips", prefs: { likesNeighbors: ["peanut"] } },
+      { key: "crackers", prefs: { weight: "heavy" } },
+      { key: "pasta", prefs: { weight: "heavy" } },
+      { key: "jam", prefs: { weight: "light", mustNeighbors: ["honey"] } },
+      { key: "honey", prefs: { weight: "light", mustNeighbors: ["jam"] } },
+      { key: "chips", prefs: { weight: "light", mustNeighbors: ["peanut"] } },
+      { key: "peanut", prefs: { weight: "light", mustNeighbors: ["chips"] } },
     ],
   },
+  // L9 — ALL THREE at once. Category + weight + strict neighbors.
   {
     tier: "Hard",
-    goal: "Capriche na despensa inteira.",
+    goal: "Sort, balance and pair the whole pantry.",
     reward: 180,
     harmony: 320,
+    shelves: ["jars", "cans", "snacks", "grains"],
     items: [
-      { key: "cookies", prefs: { topShelf: true, likesVisible: true } },
-      { key: "jam", prefs: { likesNeighbors: ["honey"] } },
-      { key: "honey", prefs: { likesNeighbors: ["jam"], hatesNeighbors: ["chips"] } },
-      { key: "coffee", prefs: { likesNeighbors: ["beans"] } },
-      { key: "beans", prefs: { likesNeighbors: ["coffee"] } },
-      { key: "peanut", prefs: { likesNeighbors: ["jam"], hatesNeighbors: ["coffee"] } },
-      { key: "chips", prefs: { likesNeighbors: ["peanut"] } },
+      { key: "jam", prefs: { category: "jars", weight: "light", mustNeighbors: ["honey"] } },
+      { key: "honey", prefs: { category: "jars", weight: "light", mustNeighbors: ["jam"] } },
+      { key: "coffee", prefs: { category: "cans", mustNeighbors: ["beans"] } },
+      { key: "beans", prefs: { category: "cans", mustNeighbors: ["coffee"] } },
+      { key: "crackers", prefs: { category: "snacks", weight: "heavy" } },
+      { key: "pasta", prefs: { category: "grains", weight: "heavy" } },
     ],
   },
 ];
@@ -635,6 +659,7 @@ const PANTRY_LEVELS = PANTRY_BLUEPRINTS.map((bp, i) =>
     harmonyPerfect: Math.round(bp.harmony * 1.65),
     copy: pantryCopy({ difficulty: bp.tier, goal: bp.goal }),
     items: bp.items,
+    shelves: bp.shelves,
   })
 );
 

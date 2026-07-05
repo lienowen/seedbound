@@ -212,6 +212,20 @@ export class StorageEngine {
       reasons.push("visible");
     }
 
+    // 4b. Pantry category sorting (hard rule, mirrored here for mood/hints).
+    if (prefs.category) {
+      if (slot.category === prefs.category) { score += 22; reasons.push("category"); }
+      else { score -= 15; reasons.push("wrongCategory"); }
+    }
+    // 4c. Pantry weight gravity (hard rule, mirrored here).
+    if (prefs.weight === "heavy") {
+      if ((slot.tier ?? 0) >= 2) { score += 15; reasons.push("heavy"); }
+      else { score -= 15; reasons.push("tooHigh"); }
+    } else if (prefs.weight === "light") {
+      if ((slot.tier ?? 0) <= 1) { score += 15; reasons.push("light"); }
+      else { score -= 15; reasons.push("tooLow"); }
+    }
+
     // 5. Neighbor preferences
     const packedById = this.packedItemsById(candidate);
     const occupancy = this.buildOccupancy(candidate, itemId);
@@ -232,16 +246,26 @@ export class StorageEngine {
       }
     }
 
+    let mustNeighborMet = false;
     for (const nid of neighborIds) {
       const nKey = this.itemDef(nid)?.image || nid;
       if (prefs.likesNeighbors?.includes(nKey)) {
         score += 12;
         reasons.push(`likes_${nKey}`);
       }
+      if (prefs.mustNeighbors?.includes(nKey)) {
+        mustNeighborMet = true;
+      }
       if (prefs.hatesNeighbors?.includes(nKey)) {
         score -= 20;
         reasons.push(`hates_${nKey}`);
       }
+    }
+    // Strict-neighbor rule mirrored into the score so the hint system steers the
+    // item toward a shelf where a required friend already sits.
+    if (prefs.mustNeighbors?.length) {
+      if (mustNeighborMet) { score += 18; reasons.push("mustNeighbor"); }
+      else { score -= 15; reasons.push("needsFriend"); }
     }
 
     const clamped = Math.max(0, Math.min(100, score));
@@ -279,6 +303,19 @@ export class StorageEngine {
     // "Up high" — light/showy foods that want a top shelf or the top of the door.
     // Top cells are warm, so this only applies when it doesn't fight the cold rule.
     if (prefs.topShelf && !prefs.needsCold) list.push({ type: "topShelf" });
+    // ---- PANTRY MECHANICS (opt-in; fridge items never set these prefs) ------
+    // Category sorting: the item belongs to a labelled shelf (jars/cans/snacks/…)
+    // and must sit on the matching shelf. This turns "put it anywhere" into a
+    // deductive sort. Satisfied when slot.category === prefs.category.
+    if (prefs.category) list.push({ type: "category", category: prefs.category });
+    // Weight gravity: heavy/bulky goods must ride the lower shelves, light/airy
+    // ones the upper shelves. Uses the shelf's tier index (0 = top).
+    if (prefs.weight === "heavy") list.push({ type: "heavy" });
+    else if (prefs.weight === "light") list.push({ type: "light" });
+    // Strict neighbors: unlike the soft likesNeighbors bonus, mustNeighbors is a
+    // HARD rule — the item must end up next to at least one of the listed friends
+    // (they can only be adjacent within the same shelf).
+    if (prefs.mustNeighbors?.length) list.push({ type: "mustNeighbor", keys: prefs.mustNeighbors });
     // Exclusion ("don't sit next to X") is a hard rule.
     if (prefs.hatesNeighbors?.length) list.push({ type: "hates", keys: prefs.hatesNeighbors });
     // Visibility is hard, but only when it doesn't fight the cold requirement.
@@ -336,6 +373,10 @@ export class StorageEngine {
       else if (c.type === "topShelf") satisfied = typeof slot.id === "string" && slot.id.includes("top");
       else if (c.type === "zone") satisfied = slot.zone === c.zone;
       else if (c.type === "visible") satisfied = slot.zone === "shelf" || slot.zone === "door";
+      else if (c.type === "category") satisfied = slot.category === c.category;
+      else if (c.type === "heavy") satisfied = (slot.tier ?? 0) >= 2;
+      else if (c.type === "light") satisfied = (slot.tier ?? 0) <= 1;
+      else if (c.type === "mustNeighbor") satisfied = c.keys.some((k) => neighborKeys.has(k));
       else if (c.type === "likes") satisfied = c.keys.some((k) => neighborKeys.has(k));
       else if (c.type === "hates") satisfied = !c.keys.some((k) => neighborKeys.has(k));
       return { ...c, satisfied };
