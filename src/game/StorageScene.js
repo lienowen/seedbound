@@ -303,6 +303,12 @@ export class StorageScene extends Phaser.Scene {
       if (this.skinLiners) for (const img of this.skinLiners) img.destroy();
       this.skinLiners = [];
     };
+    // The market shelf (pantry) is fully self-styled and its liner regions are
+    // fridge-specific, so skip the wallpaper liners there entirely.
+    if (this.level?.theme?.key === "pantry") {
+      clearLiners();
+      return;
+    }
     const place = (key) => {
       clearLiners();
       this.skinLiners = SKIN_LINER_REGIONS.map((r) => {
@@ -350,18 +356,6 @@ export class StorageScene extends Phaser.Scene {
     const g = this.add.graphics();
     if (this.level.assets?.back) {
       const back = this.level.assets.back;
-      // Warm backdrop fill behind transparent-background stage art (e.g. the
-      // market shelf), so the aisle reads as a store wall + floor.
-      if (back.bg != null) {
-        const sw = this.level.stage.width, sh = this.level.stage.height;
-        g.fillStyle(back.bg, 1);
-        g.fillRect(0, 0, sw, sh);
-        if (back.bgFloor != null) {
-          const floorY = (back.y ?? 667) + (back.size || sw) * 0.32;
-          g.fillStyle(back.bgFloor, 1);
-          g.fillRect(0, floorY, sw, sh - floorY);
-        }
-      }
       if (back.contain) {
         // Preserve the square aspect of a top-down illustration (e.g. the
         // picnic basket) instead of stretching it to the portrait stage.
@@ -957,13 +951,15 @@ export class StorageScene extends Phaser.Scene {
     for (const slot of this.slots) {
       if (!slot.category) continue;
       const name = names[slot.category] || slot.category;
-      const tag = this.add.text(slot.x - slot.w / 2 + 6, slot.y - slot.h / 2 + 2, name, {
+      // Sit the label on the shelf's cream price-tag rail (drawn just below the
+      // plank top at slot.y + 16), like a real supermarket shelf-edge label.
+      const tag = this.add.text(slot.x - slot.w / 2 + 4, slot.y + 15, name.toUpperCase(), {
         fontFamily: "Baloo 2, sans-serif",
-        fontSize: 20,
+        fontSize: 15,
         fontStyle: "bold",
-        color: "#7a4a1c",
-        backgroundColor: "rgba(255, 241, 214, 0.92)",
-        padding: { x: 10, y: 4 },
+        color: "#8a5220",
+        backgroundColor: "rgba(255, 247, 232, 0.95)",
+        padding: { x: 8, y: 2 },
       }).setOrigin(0, 0).setDepth(62);
       this.categoryTags.push(tag);
     }

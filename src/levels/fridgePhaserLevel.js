@@ -378,18 +378,47 @@ function buildPackingLevel(config) {
 // The cabinet art is drawn `contain` (square) in the upper stage so the loose
 // tray still has room below. Slots are aligned to the art's shelf planks.
 // ===========================================================================
-const PANTRY_STAGE = { width: 750, height: 1334, shapes: [] };
+// The market shelf is drawn programmatically (not from a PNG) so the shelf
+// planks line up pixel-perfectly with the placement slots and we control the
+// layer heights. Each entry is the game-y of a plank's TOP surface — an item's
+// base rests exactly here. Four generously spaced shelves (gap 160) give tall,
+// cozy bays like a supermarket gondola.
+const PANTRY_SHELF_Y = [430, 590, 750, 910];
+const PANTRY_UNIT = { x: 190, w: 370 }; // shelf unit frame (centered on x=375)
+
+function buildPantryStageShapes() {
+  const { x: ux, w: uw } = PANTRY_UNIT;
+  const frameTop = 348;
+  const frameBottom = PANTRY_SHELF_Y[PANTRY_SHELF_Y.length - 1] + 74;
+  const shapes = [
+    // Warm store wall + floor filling the whole stage.
+    { kind: "rect", x: 0, y: 0, w: 750, h: 1334, fill: 0xf3e6cb },
+    { kind: "rect", x: 0, y: frameBottom + 8, w: 750, h: 1334 - (frameBottom + 8), fill: 0xe8d3ad },
+    { kind: "rect", x: 0, y: frameBottom + 4, w: 750, h: 6, fill: 0xf7ead0, alpha: 0.7 },
+    // Gondola back panel (soft pegboard) + side posts + header valance.
+    { kind: "roundedRect", x: ux, y: frameTop, w: uw, h: frameBottom - frameTop, r: 22, fill: 0xf7edd8, line: { width: 3, color: 0xffffff, alpha: 0.55 } },
+    { kind: "roundedRect", x: ux + 4, y: frameTop + 8, w: 14, h: frameBottom - frameTop - 16, r: 7, fill: 0xdcae74 },
+    { kind: "roundedRect", x: ux + uw - 18, y: frameTop + 8, w: 14, h: frameBottom - frameTop - 16, r: 7, fill: 0xdcae74 },
+    { kind: "roundedRect", x: ux - 6, y: frameTop - 34, w: uw + 12, h: 42, r: 16, fill: 0xe7a95f, line: { width: 3, color: 0xfbe6c8, alpha: 0.7 } },
+  ];
+  for (const y of PANTRY_SHELF_Y) {
+    // soft contact shadow, plank body, then the cream price-tag rail below it.
+    shapes.push({ kind: "roundedRect", x: ux + 8, y: y + 15, w: uw - 16, h: 22, r: 8, fill: 0x3a2410, alpha: 0.08 });
+    shapes.push({ kind: "roundedRect", x: ux + 6, y, w: uw - 12, h: 16, r: 6, fill: 0xe6c08b, line: { width: 2, color: 0xf7e2bd, alpha: 0.85 } });
+    shapes.push({ kind: "roundedRect", x: ux + 10, y: y + 16, w: uw - 20, h: 15, r: 6, fill: 0xfff7e8, line: { width: 1.5, color: 0xe8cfa0, alpha: 0.7 } });
+  }
+  return shapes;
+}
+
+const PANTRY_STAGE = { width: 750, height: 1334, shapes: buildPantryStageShapes() };
 
 // The cupboard art is square (1024²); it is drawn `contain` sized to the stage
 // width and centered low so its shelves fill the play area (spans game-y
 // ~192–984) with the loose tray sitting just below. Values were tuned against
 // the art's actual shelf planks (measured via luminance profiling in-browser).
-const PANTRY_ASSETS = {
-  // The shelf art already carries its own opaque warm wall + floor. bg simply
-  // continues that wall color to the stage edges (the art is square/contained,
-  // so there is empty canvas above & below it on the portrait stage).
-  back: { key: "market-shelf-board", file: "market-shelf-board.png", contain: true, size: 760, y: 632, bg: 0xf3e6cb },
-};
+// The market shelf is fully drawn from PANTRY_STAGE.shapes, so no backdrop image
+// is needed. Keeping this empty avoids loading a board texture.
+const PANTRY_ASSETS = {};
 
 // One wide placement bay per shelf (cols:2 => two items side-by-side, exactly
 // like the fridge shelves), across the art's four upper plank surfaces. This
@@ -409,16 +438,23 @@ const PANTRY_ASSETS = {
 const PANTRY_ALLOW = ["carton", "dairy", "box", "bottle", "food", "jar", "can", "tube"];
 // tier is the shelf height index (0 = top … 3 = bottom) used by the weight-gravity
 // rule: "heavy" goods must sit on tier >= 2, "light" goods on tier <= 1.
-// Shelf-top game-y values re-measured against the market-shelf art (contain
-// size 760 / centerY 632) via in-browser luminance band detection: the four
-// gondola shelf surfaces resolve to ~434, 521, 620, 815 (the last being the
-// solid base platform).
-const PANTRY_SLOTS = [
-  { id: "pantry_top", zone: "shelf", tier: 0, allow: PANTRY_ALLOW, x: 375, y: 434, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
-  { id: "pantry_up", zone: "shelf", tier: 1, allow: PANTRY_ALLOW, x: 375, y: 521, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 130 },
-  { id: "pantry_low", zone: "shelf", tier: 2, allow: PANTRY_ALLOW, x: 375, y: 620, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 150 },
-  { id: "pantry_base", zone: "shelf", tier: 3, allow: PANTRY_ALLOW, x: 375, y: 815, w: 300, h: 120, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 170 },
-];
+// Each slot's y is a plank-top surface from PANTRY_SHELF_Y, so items seat exactly
+// on the programmatically drawn shelves.
+const PANTRY_SLOTS = PANTRY_SHELF_Y.map((y, tier) => ({
+  id: ["pantry_top", "pantry_up", "pantry_low", "pantry_base"][tier],
+  zone: "shelf",
+  tier,
+  allow: PANTRY_ALLOW,
+  x: 375,
+  y,
+  w: 300,
+  h: 120,
+  cols: 2,
+  rows: 1,
+  stackLayers: 1,
+  baseline: 0.5,
+  depth: 110 + tier * 20,
+}));
 
 // The cupboard has no cold zone, so any "needsCold" preference would be
 // unsatisfiable and the level unwinnable. This strips temperature rules and
