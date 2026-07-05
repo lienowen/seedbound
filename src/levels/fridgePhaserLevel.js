@@ -393,14 +393,17 @@ function buildPantryStageShapes() {
   const frameTop = 352;
   const frameBottom = PANTRY_SHELF_Y[PANTRY_SHELF_Y.length - 1] + 74;
   const shapes = [
-    // Warm store wall + floor filling the whole stage.
-    { kind: "rect", x: 0, y: 0, w: 750, h: 1334, fill: 0xf3e6cb },
-    { kind: "rect", x: 0, y: frameBottom + 8, w: 750, h: 1334 - (frameBottom + 8), fill: 0xe8d3ad },
-    { kind: "rect", x: 0, y: frameBottom + 4, w: 750, h: 6, fill: 0xf7ead0, alpha: 0.7 },
+    // Store floor continues below the supermarket-aisle backdrop image (which is
+    // fit to the stage width and ends around y=748) so the gondola stands on a
+    // seamless floor down to the tray area.
+    { kind: "rect", x: 0, y: 744, w: 750, h: 1334 - 744, fill: 0xe7cea0 },
+    { kind: "rect", x: 0, y: 744, w: 750, h: 10, fill: 0xf3e2b8, alpha: 0.5 },
+    // A soft grounding shadow so the shelf unit reads as sitting on the floor.
+    { kind: "roundedRect", x: ux - 14, y: frameBottom - 6, w: uw + 28, h: 46, r: 22, fill: 0x3a2410, alpha: 0.12 },
     // Gondola back panel (soft pegboard) + side posts + header valance.
-    { kind: "roundedRect", x: ux, y: frameTop, w: uw, h: frameBottom - frameTop, r: 22, fill: 0xf7edd8, line: { width: 3, color: 0xffffff, alpha: 0.55 } },
-    { kind: "roundedRect", x: ux + 4, y: frameTop + 8, w: 14, h: frameBottom - frameTop - 16, r: 7, fill: 0xdcae74 },
-    { kind: "roundedRect", x: ux + uw - 18, y: frameTop + 8, w: 14, h: frameBottom - frameTop - 16, r: 7, fill: 0xdcae74 },
+    { kind: "roundedRect", x: ux, y: frameTop, w: uw, h: frameBottom - frameTop, r: 22, fill: 0xfbf3e2, alpha: 0.97, line: { width: 3, color: 0xffffff, alpha: 0.6 } },
+    { kind: "roundedRect", x: ux + 4, y: frameTop + 8, w: 14, h: frameBottom - frameTop - 16, r: 7, fill: 0xd8a86c },
+    { kind: "roundedRect", x: ux + uw - 18, y: frameTop + 8, w: 14, h: frameBottom - frameTop - 16, r: 7, fill: 0xd8a86c },
     { kind: "roundedRect", x: ux - 6, y: frameTop - 34, w: uw + 12, h: 42, r: 16, fill: 0xe7a95f, line: { width: 3, color: 0xfbe6c8, alpha: 0.7 } },
   ];
   for (const y of PANTRY_SHELF_Y) {
@@ -414,13 +417,14 @@ function buildPantryStageShapes() {
 
 const PANTRY_STAGE = { width: 750, height: 1334, shapes: buildPantryStageShapes() };
 
-// The cupboard art is square (1024²); it is drawn `contain` sized to the stage
-// width and centered low so its shelves fill the play area (spans game-y
-// ~192–984) with the loose tray sitting just below. Values were tuned against
-// the art's actual shelf planks (measured via luminance profiling in-browser).
-// The market shelf is fully drawn from PANTRY_STAGE.shapes, so no backdrop image
-// is needed. Keeping this empty avoids loading a board texture.
-const PANTRY_ASSETS = {};
+// Supermarket-aisle backdrop (opaque cartoon store interior with stocked side
+// shelves, receding floor and ceiling lights). It is square (1024²); `coverTop`
+// fits it to the stage width, anchors it to the top, and lets the programmatic
+// floor rect (see buildPantryStageShapes) continue the floor below it. The
+// gondola shelf is drawn on top so it reads as a shelf inside the store.
+const PANTRY_ASSETS = {
+  back: { key: "market-aisle-bg", file: "market-aisle-bg.png", coverTop: true, floorFill: 0xe7cea0 },
+};
 
 // One wide placement bay per shelf (cols:2 => two items side-by-side, exactly
 // like the fridge shelves), across the art's four upper plank surfaces. This

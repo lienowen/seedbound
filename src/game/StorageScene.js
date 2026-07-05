@@ -356,7 +356,26 @@ export class StorageScene extends Phaser.Scene {
     const g = this.add.graphics();
     if (this.level.assets?.back) {
       const back = this.level.assets.back;
-      if (back.contain) {
+      if (back.coverTop) {
+        // Fit a (square) backdrop illustration to the stage width and anchor it
+        // to the top; a floor-color fill covers whatever remains below it so the
+        // scene reads as a continuous store interior (see the pantry level's
+        // floor rect). Used by the supermarket-aisle backdrop.
+        const sw = this.level.stage.width, sh = this.level.stage.height;
+        const src = this.textures.get(back.key).getSourceImage();
+        const dispW = sw;
+        const dispH = src && src.width ? (src.height * sw) / src.width : sh;
+        if (back.floorFill != null) {
+          g.fillStyle(back.floorFill, 1);
+          g.fillRect(0, Math.max(0, dispH - 2), sw, sh - Math.max(0, dispH - 2));
+        }
+        // Depth -10 keeps the backdrop behind the shapes graphics (depth 0),
+        // which is where the gondola shelf is drawn.
+        this.add.image(sw / 2, 0, back.key)
+          .setOrigin(0.5, 0)
+          .setDisplaySize(dispW, dispH)
+          .setDepth(-10);
+      } else if (back.contain) {
         // Preserve the square aspect of a top-down illustration (e.g. the
         // picnic basket) instead of stretching it to the portrait stage.
         const size = back.size || this.level.stage.width;
