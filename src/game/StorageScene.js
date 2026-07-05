@@ -1465,6 +1465,9 @@ export class StorageScene extends Phaser.Scene {
   }
 
   displayScaleFor(item, entry) {
+    // Defensive: non-item sprites (ghosts/decorations) have no scale of their
+    // own. Never throw here — a crash in create() would freeze the whole scene.
+    if (!item) return 1;
     if (this.topDown) return this.topDownScale(item, entry);
     if (entry?.status === "outside") {
       return Number((item.scale * 1.08).toFixed(3));
@@ -2816,6 +2819,10 @@ export class StorageScene extends Phaser.Scene {
       }
       const home = child.getData("home");
       const item = child.getData("item");
+      // Facing ghosts / decorative sprites live in itemLayer without "item"
+      // data. They must never be size/depth-sorted as goods (and calling
+      // displayScaleFor on them throws), so skip them like the preview sprite.
+      if (!item) continue;
       const targetScale = this.displayScaleFor(item, home);
       if (child !== this.previewSprite && child.getData("item")?.id !== this.remainingSpotlightId) {
         child.clearTint();
