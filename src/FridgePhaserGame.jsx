@@ -221,11 +221,15 @@ export function FridgePhaserGame() {
       total: movableTotal,
       title: nextLevel.theme.title,
       subtitle: nextLevel.theme.subtitle,
-      goal: nextLevel.packing
-        ? (nextLevel.copy?.goal || i18n.ui.packGoalDefault || i18n.ui.goalDefault)
-        : pickyTotal > 0
-          ? i18n.ui.constraintGoalText(pickyTotal)
-          : i18n.ui.goalDefault,
+      // Prefer the hand-written, story-specific goal for every level. Fall back
+      // to generic auto-generated text only when a level has no authored goal.
+      goal:
+        nextLevel.copy?.goal ||
+        (nextLevel.packing
+          ? i18n.ui.packGoalDefault || i18n.ui.goalDefault
+          : pickyTotal > 0
+            ? i18n.ui.constraintGoalText(pickyTotal)
+            : i18n.ui.goalDefault),
       toast: nextLevel.copy?.intro || i18n.ui.dragHint,
       currentIndex,
       unlockedCount,

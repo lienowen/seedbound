@@ -57,7 +57,7 @@ export const CAMPAIGN_I18N = {
     },
     "fridge-br-8": {
       title: "Meal Prep Week",
-      subtitle: "Five meal boxes need space.",
+      subtitle: "Two meal boxes hog the middle.",
       intro: "Two meal boxes already eat the whole middle.",
       goal: "When the center locks, win by splitting drinks, chill, and leftovers.",
       difficulty: "Cramped",
@@ -101,7 +101,7 @@ export const CAMPAIGN_I18N = {
       title: "Big Restock",
       subtitle: "Empty fridge, full cart.",
       intro: "The supplier dropped off everything at once. Make it work.",
-      goal: "Place eight items without wasting a corner.",
+      goal: "Place all seven items without wasting a corner.",
       difficulty: "Packed",
     },
     "fridge-br-15": {
@@ -261,7 +261,7 @@ export const CAMPAIGN_I18N = {
     },
     "fridge-br-8": {
       title: "一周便当",
-      subtitle: "五份便当很占地方。",
+      subtitle: "两个便当盒占满中层。",
       intro: "两个便当盒就能占满中层。",
       goal: "中层堵死后，靠饮料、低温区和剩菜分工取胜。",
       difficulty: "逼仄",
@@ -305,7 +305,7 @@ export const CAMPAIGN_I18N = {
       title: "大批补货",
       subtitle: "空冰箱，满推车。",
       intro: "供货商一次全送来了，想办法塞进去。",
-      goal: "八件物品，每个角落都要用上。",
+      goal: "七件物品，每个角落都要用上。",
       difficulty: "拥挤",
     },
     "fridge-br-15": {
