@@ -1,8 +1,10 @@
 export const LOCALES = ["pt", "en", "cn"];
 export const LOCALE_PREF_KEY = "cozyshelf.locale";
-const configuredReviewLocaleRaw = String(import.meta.env.VITE_REVIEW_LOCALE_LOCK ?? "en").trim().toLowerCase();
-const configuredReviewLocale = configuredReviewLocaleRaw === "off" ? "" : configuredReviewLocaleRaw;
-export const REVIEW_LOCALE_LOCK = LOCALES.includes(configuredReviewLocale) ? configuredReviewLocale : "en";
+// English-only release: the locale is permanently locked to English. The pt/cn
+// translation data is kept in the bundle but never surfaced, and the language
+// switcher stays hidden. To re-open multi-language later, revert this to read
+// from VITE_REVIEW_LOCALE_LOCK.
+export const REVIEW_LOCALE_LOCK = "en";
 const MULTILANG_QUERY_KEY = "multilang";
 
 export function effectiveLocale(locale) {
