@@ -12,7 +12,7 @@ const PREVIEW_COLORS = {
 // The order in which an item's hard requirements are surfaced (bubble + badge).
 // Only these gate the win — "likesNeighbors" is a soft bonus and never shown as
 // a requirement, so we no longer nag the player to "put me next to X".
-const NEED_PRIORITY = ["cold", "warm", "topShelf", "zone", "visible", "hates"];
+const NEED_PRIORITY = ["cold", "warm", "topShelf", "category", "heavy", "light", "zone", "visible", "mustNeighbor", "hates"];
 // Inner-wall regions where the shop skin "liner" wallpaper is tiled. Tuned to
 // the realistic fridge board: the main cabinet (shelves/drawers) and the door.
 const SKIN_LINER_REGIONS = [
@@ -930,7 +930,31 @@ export class StorageScene extends Phaser.Scene {
       this.syncSlotVisual(entry);
       return entry;
     });
+    this.buildShelfCategoryTags();
     if (this.editMode && this.slots.length) this.selectSlot(this.slots[0].id);
+  }
+
+  // Persistent shelf labels for the pantry category rule. Without a visible tag
+  // the "put jars on the jar shelf" rule would be guesswork, so each labelled
+  // shelf gets a small cozy pill on its left edge naming what it holds.
+  buildShelfCategoryTags() {
+    if (this.categoryTags) this.categoryTags.forEach((t) => t.destroy());
+    this.categoryTags = [];
+    if (this.editMode) return;
+    const names = this.i18n?.ui?.shelfCategory || {};
+    for (const slot of this.slots) {
+      if (!slot.category) continue;
+      const name = names[slot.category] || slot.category;
+      const tag = this.add.text(slot.x - slot.w / 2 + 6, slot.y - slot.h / 2 + 2, name, {
+        fontFamily: "Baloo 2, sans-serif",
+        fontSize: 20,
+        fontStyle: "bold",
+        color: "#7a4a1c",
+        backgroundColor: "rgba(255, 241, 214, 0.92)",
+        padding: { x: 10, y: 4 },
+      }).setOrigin(0, 0).setDepth(62);
+      this.categoryTags.push(tag);
+    }
   }
 
   buildItems() {
@@ -1584,6 +1608,17 @@ export class StorageScene extends Phaser.Scene {
     if (primary.type === "visible") return { kind: "visible", need: "visible", text: w.wishVisible };
     if (primary.type === "zone") {
       return { kind: "zone", need: "zone", zone: primary.zone, text: w.wishZone?.[primary.zone] || w.wishVisible };
+    }
+    if (primary.type === "category") {
+      const label = w.shelfCategory?.[primary.category] || "";
+      const text = label ? `${w.wishCategory} (${label})` : w.wishCategory;
+      return { kind: "category", need: "category", category: primary.category, text };
+    }
+    if (primary.type === "heavy") return { kind: "heavy", need: "heavy", text: w.wishHeavy };
+    if (primary.type === "light") return { kind: "light", need: "light", text: w.wishLight };
+    if (primary.type === "mustNeighbor") {
+      const pal = primary.keys.find((k) => this.textures.exists(k)) || primary.keys[0];
+      return { kind: "mustNeighbor", need: "mustNeighbor", text: w.wishMustNeighbor, friendKey: pal };
     }
     if (primary.type === "hates") {
       const foe = primary.keys.find((k) => this.textures.exists(k)) || primary.keys[0];
@@ -2783,6 +2818,57 @@ export class StorageScene extends Phaser.Scene {
       g.beginPath();
       g.moveTo(-4.9, -4.9);
       g.lineTo(4.9, 4.9);
+      g.strokePath();
+      return;
+    }
+    if (desc.need === "category") {
+      // A little tag/label: rounded box with a punch hole — "this has a home".
+      g.strokeRoundedRect(-7, -5, 13, 10, 2.5);
+      g.strokeCircle(-4, 0, 1.4);
+      return;
+    }
+    if (desc.need === "heavy") {
+      // Down-chevron over a baseline — "keep me low".
+      g.beginPath();
+      g.moveTo(-6, -6);
+      g.lineTo(6, -6);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(-5, 0.5);
+      g.lineTo(0, 6);
+      g.lineTo(5, 0.5);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(0, 6);
+      g.lineTo(0, -3);
+      g.strokePath();
+      return;
+    }
+    if (desc.need === "light") {
+      // Up-chevron over a baseline — "keep me high" (mirror of heavy).
+      g.beginPath();
+      g.moveTo(-6, 6);
+      g.lineTo(6, 6);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(-5, -0.5);
+      g.lineTo(0, -6);
+      g.lineTo(5, -0.5);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(0, -6);
+      g.lineTo(0, 3);
+      g.strokePath();
+      return;
+    }
+    if (desc.need === "mustNeighbor") {
+      // Two linked dots — "stay paired".
+      g.fillStyle(ink, 1);
+      g.fillCircle(-4, 0, 2.2);
+      g.fillCircle(4, 0, 2.2);
+      g.beginPath();
+      g.moveTo(-2, 0);
+      g.lineTo(2, 0);
       g.strokePath();
       return;
     }
