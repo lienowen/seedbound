@@ -1,27 +1,77 @@
 import { ITEM_RENDER_PROFILES } from "./itemRenderProfiles.js";
 
-const FRIDGE_STAGE = {
-  width: 750,
-  height: 1334,
-  shapes: [
-    { kind: "roundedRect", x: 160, y: 798, w: 292, h: 152, r: 24, fill: 0xf8f4ee, alpha: 0.94, line: { width: 3, color: 0xf2fbf8, alpha: 0.6 } },
-    { kind: "roundedRect", x: 176, y: 816, w: 260, h: 116, r: 18, fill: 0xfffcf7, alpha: 0.96, line: { width: 2, color: 0xffffff, alpha: 0.8 } },
-    { kind: "roundedRect", x: 68, y: 1040, w: 614, h: 142, r: 38, fill: 0xfff0ce, alpha: 0.84, line: { width: 3, color: 0xffffff, alpha: 0.62 } },
-    { kind: "roundedRect", x: 94, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
-    { kind: "roundedRect", x: 188, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
-    { kind: "roundedRect", x: 282, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
-    { kind: "roundedRect", x: 376, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
-    { kind: "roundedRect", x: 470, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
-    { kind: "roundedRect", x: 564, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.38, line: { width: 2, color: 0xf3cf94, alpha: 0.34 } },
-  ],
-};
+// ---- SUPERMARKET COOLER FIXTURE (fully procedural) -------------------------
+// The cooler cabinet, glass shelves, crisper drawer and open door rack are all
+// DRAWN from these coordinates rather than baked into a background image. This
+// guarantees pixel-perfect alignment with FRIDGE_SLOTS forever (a generated
+// illustration could never match the hardcoded slot pixels, which caused the
+// items to float and the door rack to sit empty). The backdrop is now just the
+// shared, non-stretched supermarket environment used by the shelf levels.
+const COOLER_SHELF_Y = [425, 575, 735]; // glass shelf surfaces (match shelf_* slots)
+const COOLER_DRAWER_Y = 890; // crisper drawer center (match drawer_* slots)
+const COOLER_DOOR_Y = [404, 583, 762, 971]; // door-rack pockets (match door_* slots)
+const COOLER_BODY = { x: 80, y: 330, w: 432, h: 704 }; // outer cabinet body (left)
+const COOLER_INNER = { x: 108, y: 356, w: 380, h: 650 }; // interior back wall
+const COOLER_DOOR = { x: 506, y: 342, w: 214, h: 688 }; // open door panel (right)
+
+function buildCoolerStageShapes() {
+  const b = COOLER_BODY;
+  const inner = COOLER_INNER;
+  const door = COOLER_DOOR;
+  const shapes = [
+    // Soft grounding shadow so the whole unit reads as standing on the floor.
+    { kind: "roundedRect", x: b.x - 4, y: b.y + b.h - 6, w: door.x + door.w - b.x + 4, h: 46, r: 24, fill: 0x2a1c0f, alpha: 0.12 },
+    // Open door panel (right) — drawn first so the body slightly overlaps its hinge.
+    { kind: "roundedRect", x: door.x, y: door.y, w: door.w, h: door.h, r: 26, fill: 0xf6f1ea, line: { width: 3, color: 0xffffff, alpha: 0.6 } },
+    { kind: "roundedRect", x: door.x + 14, y: door.y + 16, w: door.w - 28, h: door.h - 32, r: 18, fill: 0xdcebe6, alpha: 0.55, line: { width: 2, color: 0xffffff, alpha: 0.5 } },
+    // Cabinet body (left) + cool interior back wall + a bright top light strip.
+    { kind: "roundedRect", x: b.x, y: b.y, w: b.w, h: b.h, r: 30, fill: 0xf6f1ea, line: { width: 4, color: 0xffffff, alpha: 0.65 } },
+    { kind: "roundedRect", x: inner.x, y: inner.y, w: inner.w, h: inner.h, r: 18, fill: 0xeaf2ef, line: { width: 2, color: 0xffffff, alpha: 0.4 } },
+    { kind: "roundedRect", x: inner.x + 10, y: inner.y + 8, w: inner.w - 20, h: 24, r: 12, fill: 0xffffff, alpha: 0.5 },
+    // Inner side posts + hinge strip joining body to the open door.
+    { kind: "roundedRect", x: inner.x - 2, y: inner.y + 4, w: 12, h: inner.h - 8, r: 6, fill: 0xe4d9c8, alpha: 0.7 },
+    { kind: "roundedRect", x: inner.x + inner.w - 10, y: inner.y + 4, w: 12, h: inner.h - 8, r: 6, fill: 0xe4d9c8, alpha: 0.7 },
+    { kind: "roundedRect", x: b.x + b.w - 8, y: door.y + 10, w: 18, h: door.h - 24, r: 8, fill: 0xe4d9c8, alpha: 0.85 },
+  ];
+  // Glass shelves inside the body (contact shadow + translucent slab).
+  for (const y of COOLER_SHELF_Y) {
+    shapes.push({ kind: "roundedRect", x: inner.x + 4, y: y + 14, w: inner.w - 8, h: 12, r: 6, fill: 0x2a3a36, alpha: 0.1 });
+    shapes.push({ kind: "roundedRect", x: inner.x + 2, y, w: inner.w - 4, h: 13, r: 6, fill: 0xcfe6df, alpha: 0.6, line: { width: 1.5, color: 0xffffff, alpha: 0.7 } });
+  }
+  // Crisper drawer at the bottom of the body.
+  shapes.push({ kind: "roundedRect", x: inner.x + 18, y: COOLER_DRAWER_Y - 76, w: inner.w - 36, h: 152, r: 20, fill: 0xf1f6f4, alpha: 0.92, line: { width: 2, color: 0xffffff, alpha: 0.7 } });
+  shapes.push({ kind: "roundedRect", x: inner.x + 32, y: COOLER_DRAWER_Y - 60, w: inner.w - 64, h: 118, r: 14, fill: 0xe3efeb, alpha: 0.7 });
+  shapes.push({ kind: "roundedRect", x: 375 - 34, y: COOLER_DRAWER_Y - 70, w: 68, h: 10, r: 5, fill: 0xffffff, alpha: 0.5 });
+  // Door-rack pockets: a ledge each bottle stands on, keyed to the door slots.
+  for (const dy of COOLER_DOOR_Y) {
+    shapes.push({ kind: "roundedRect", x: door.x + 16, y: dy + 50, w: door.w - 32, h: 16, r: 7, fill: 0xe0ece7, alpha: 0.95, line: { width: 1.5, color: 0xffffff, alpha: 0.6 } });
+    shapes.push({ kind: "roundedRect", x: door.x + 16, y: dy + 64, w: door.w - 32, h: 9, r: 5, fill: 0x2a3a36, alpha: 0.08 });
+  }
+  // Delivery crate on the store floor where incoming goods wait (the tray).
+  shapes.push({ kind: "roundedRect", x: 68, y: 1040, w: 614, h: 142, r: 38, fill: 0xfff0ce, alpha: 0.92, line: { width: 3, color: 0xffffff, alpha: 0.62 } });
+  for (let i = 0; i < 6; i += 1) {
+    shapes.push({ kind: "roundedRect", x: 94 + i * 94, y: 1068, w: 82, h: 76, r: 20, fill: 0xffffff, alpha: 0.42, line: { width: 2, color: 0xf3cf94, alpha: 0.4 } });
+  }
+  return shapes;
+}
+
+const FRIDGE_STAGE = { width: 750, height: 1334, shapes: buildCoolerStageShapes() };
 
 const FRIDGE_FRONTS = [
-  { kind: "roundedRect", x: 132, y: 425, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.32, depth: 340, line: { width: 1, color: 0xffffff, alpha: 0.35 } },
-  { kind: "roundedRect", x: 132, y: 575, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.32, depth: 360, line: { width: 1, color: 0xffffff, alpha: 0.35 } },
-  { kind: "roundedRect", x: 132, y: 735, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.32, depth: 380, line: { width: 1, color: 0xffffff, alpha: 0.35 } },
-  { kind: "roundedRect", x: 132, y: 846, w: 348, h: 10, r: 5, fill: 0xbcded5, alpha: 0.42, depth: 400, line: { width: 1, color: 0xffffff, alpha: 0.44 } },
+  // Shelf front lips (sit on the front edge of each drawn glass shelf).
+  { kind: "roundedRect", x: 132, y: 425, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.38, depth: 340, line: { width: 1, color: 0xffffff, alpha: 0.4 } },
+  { kind: "roundedRect", x: 132, y: 575, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.38, depth: 360, line: { width: 1, color: 0xffffff, alpha: 0.4 } },
+  { kind: "roundedRect", x: 132, y: 735, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.38, depth: 380, line: { width: 1, color: 0xffffff, alpha: 0.4 } },
+  { kind: "roundedRect", x: 132, y: 846, w: 348, h: 10, r: 5, fill: 0xbcded5, alpha: 0.46, depth: 400, line: { width: 1, color: 0xffffff, alpha: 0.5 } },
+  // Door-rack retaining rails (bottles tuck behind these low front bars).
+  ...COOLER_DOOR_Y.map((dy) => ({ kind: "roundedRect", x: COOLER_DOOR.x + 16, y: dy + 36, w: COOLER_DOOR.w - 32, h: 11, r: 6, fill: 0xcfe0da, alpha: 0.6, depth: 350, line: { width: 1, color: 0xffffff, alpha: 0.5 } })),
 ];
+
+const FRIDGE_ASSETS = {
+  // Shared supermarket-aisle backdrop, fit to width & anchored top (no stretch),
+  // with the store floor continuing below. The cooler stands in the aisle.
+  back: { key: "market-aisle-bg", file: "market-aisle-bg.png", coverTop: true, floorFill: 0xe7cea0 },
+};
 
 const FRIDGE_SLOTS = [
   { id: "shelf_top_1", zone: "shelf", allow: ["carton", "dairy", "box", "bottle", "food"], x: 247, y: 425, w: 160, h: 100, cols: 2, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 },
@@ -37,11 +87,6 @@ const FRIDGE_SLOTS = [
   { id: "door_mid_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 581, y: 762, w: 104, h: 104, cols: 1, rows: 1, baseline: 0.55, depth: 220 },
   { id: "door_low_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 589, y: 971, w: 118, h: 106, cols: 1, rows: 1, baseline: 0.58, depth: 230 },
 ];
-
-const FRIDGE_ASSETS = {
-  back: { key: "fridge-board", file: "cooler-cabinet.png" },
-  front: { key: "fridge-door-front", file: "fridge-door-front.webp", depth: 430 },
-};
 
 // ---- TOP-DOWN PACKING LEVELS -----------------------------------------------
 // Generic packing mode: fit differently shaped items into a single grid inside
