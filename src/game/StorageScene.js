@@ -158,7 +158,7 @@ export class StorageScene extends Phaser.Scene {
   // ---- FIRST-TIME COACHING ----
   hasOnboarded() {
     try {
-      return localStorage.getItem("seedbound_onboarded_v1") === "1";
+      return localStorage.getItem("cozyshelf_onboarded_v1") === "1";
     } catch {
       return false;
     }
@@ -166,7 +166,7 @@ export class StorageScene extends Phaser.Scene {
 
   markOnboarded() {
     try {
-      localStorage.setItem("seedbound_onboarded_v1", "1");
+      localStorage.setItem("cozyshelf_onboarded_v1", "1");
     } catch {
       /* storage blocked; coaching just won't persist */
     }

@@ -276,7 +276,7 @@ export function FridgePhaserGame() {
   function resetCampaign() {
     if (standalone) return;
     soundRef.current?.miss();
-    for (const entry of FRIDGE_BR_CAMPAIGN) localStorage.removeItem(`seedbound.storage.${entry.id}`);
+    for (const entry of FRIDGE_BR_CAMPAIGN) localStorage.removeItem(`cozyshelf.storage.${entry.id}`);
     updateProgress({ unlocked: 1, coins: 125, current: 0, stars: {} });
     setComplete(false);
     setLastReward(0);
@@ -820,7 +820,7 @@ export function FridgePhaserGame() {
       {showGame && <div className={`fridge-boot-overlay fridge-boot-overlay--${bootVariant}${booting ? " visible" : ""}`} aria-hidden={!booting}>
         <div className="fridge-boot-overlay__veil" />
         <div className="fridge-boot-overlay__card">
-          <div className="fridge-boot-badge">Seedbound</div>
+          <div className="fridge-boot-badge">Cozy Shelf</div>
           <div className="fridge-boot-portal" aria-hidden="true">
             <div className="fridge-boot-portal__glow" />
             <div className="fridge-boot-portal__frame">

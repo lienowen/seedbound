@@ -1,5 +1,5 @@
 export const LOCALES = ["pt", "en", "cn"];
-export const LOCALE_PREF_KEY = "seedbound.locale";
+export const LOCALE_PREF_KEY = "cozyshelf.locale";
 const configuredReviewLocaleRaw = String(import.meta.env.VITE_REVIEW_LOCALE_LOCK ?? "en").trim().toLowerCase();
 const configuredReviewLocale = configuredReviewLocaleRaw === "off" ? "" : configuredReviewLocaleRaw;
 export const REVIEW_LOCALE_LOCK = LOCALES.includes(configuredReviewLocale) ? configuredReviewLocale : "en";
@@ -121,10 +121,10 @@ export function localePath(locale) {
 }
 
 export function progressStorageKey(locale) {
-  if (REVIEW_LOCALE_LOCK) return "seedbound.en.progress";
-  if (locale === "en") return "seedbound.en.progress";
-  if (locale === "cn") return "seedbound.cn.progress";
-  return "seedbound.br.progress";
+  if (REVIEW_LOCALE_LOCK) return "cozyshelf.en.progress";
+  if (locale === "en") return "cozyshelf.en.progress";
+  if (locale === "cn") return "cozyshelf.cn.progress";
+  return "cozyshelf.br.progress";
 }
 
 export function htmlLang(locale) {

@@ -1,4 +1,4 @@
-// Meta-progression layer for Seedbound.
+// Meta-progression layer for Cozy Shelf.
 // A single localStorage-backed store powering four retention hooks:
 //   1. Food catalog   -> discovered items (collection book)
 //   2. Combo streak    -> consecutive level completions
@@ -8,7 +8,7 @@
 
 import { TIDY_BASE, SKINS_BASE } from "../assetBase.js";
 
-const STORE_KEY = "seedbound.meta.v1";
+const STORE_KEY = "cozyshelf.meta.v1";
 const ASSET_BASE = TIDY_BASE;
 
 // ---- Catalog metadata (localized names + flavor text) -----------------------

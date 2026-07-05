@@ -1,4 +1,4 @@
-const SAVE_PREFIX = "seedbound.storage.";
+const SAVE_PREFIX = "cozyshelf.storage.";
 
 function clone(value) {
   return structuredClone(value);

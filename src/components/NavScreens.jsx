@@ -259,7 +259,7 @@ export function HomeScreen({
 
       <div className="nav-home-hero">
         <img src={HOME_HERO_SRC} alt="" className="nav-home-art" />
-        <h1 className="nav-home-title">Seedbound</h1>
+        <h1 className="nav-home-title">Cozy Shelf</h1>
         <p className="nav-home-tagline">{nav.tagline}</p>
       </div>
 
