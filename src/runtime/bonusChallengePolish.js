@@ -4,6 +4,7 @@ import {
   createBonusChallengeState,
   recordBonusPlacement,
 } from "./bonusChallengeRules.js";
+import { applySkipConsistencyPolish } from "./skipConsistencyPolish.js";
 
 let applied = false;
 
@@ -34,6 +35,7 @@ function award(scene, state) {
 export function applyBonusChallengePolish() {
   if (applied) return;
   applied = true;
+  applySkipConsistencyPolish();
 
   const originalCreate = StorageScene.prototype.create;
   const originalDragEnd = StorageScene.prototype.onDragEnd;
