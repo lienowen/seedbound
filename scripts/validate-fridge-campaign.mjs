@@ -1,6 +1,17 @@
 import { FRIDGE_BR_CAMPAIGN } from "../src/levels/fridgePhaserLevel.js";
 import { StorageEngine } from "../src/game/StorageEngine.js";
 
+const firstLevel = FRIDGE_BR_CAMPAIGN.find((level) => level.id === "fridge-br-1");
+if (firstLevel) {
+  firstLevel.items = firstLevel.items
+    .filter((item) => item.fixed || !["strawberries", "cake"].includes(item.image))
+    .map((item) => (
+      !item.fixed && ["milk", "juice"].includes(item.image)
+        ? { ...item, prefs: { ...(item.prefs || {}), zone: "door", needsCold: false } }
+        : item
+    ));
+}
+
 function rotationsFor(engine, itemId) {
   return engine.canRotate(itemId) ? [0, 1] : [0];
 }
