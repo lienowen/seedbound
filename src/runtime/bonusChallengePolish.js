@@ -23,13 +23,13 @@ function stateFor(scene) {
 function award(scene, state) {
   if (!state.spec || state.completed) return;
   state.completed = true;
-  scene.engine.state = {
-    ...scene.engine.state,
-    chainBonus: Number(scene.engine.state.chainBonus || 0) + state.spec.bonus,
-  };
-  scene.engine.persist();
   scene.playCallout("SECRET BONUS!", "gold");
-  scene.setToastMessage(`+${state.spec.bonus} harmony bonus`);
+  scene.setToastMessage(`Secret bonus! +${state.spec.bonus} coins`);
+  scene.events.emit("shelf-clear", {
+    bonus: state.spec.bonus,
+    streak: 0,
+    source: "secret-challenge",
+  });
   scene.events.emit("bonus-challenge", { id: state.spec.id, bonus: state.spec.bonus });
 }
 
