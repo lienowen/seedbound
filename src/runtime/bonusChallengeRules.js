@@ -14,7 +14,7 @@ export const BONUS_CHALLENGES = {
 export function createBonusChallengeState(levelId) {
   return {
     spec: BONUS_CHALLENGES[levelId] || null,
-    startedAt: Date.now(),
+    startedAt: null,
     successCount: 0,
     misses: 0,
     happyStreak: 0,
@@ -25,7 +25,8 @@ export function createBonusChallengeState(levelId) {
   };
 }
 
-export function recordBonusPlacement(state, zone, score) {
+export function recordBonusPlacement(state, zone, score, now = Date.now()) {
+  if (state.startedAt == null) state.startedAt = now;
   state.successCount += 1;
   state.zones.add(zone || "unknown");
   state.recentZones.push(zone || "unknown");
@@ -47,7 +48,7 @@ export function bonusChallengeComplete(state, now = Date.now()) {
     return last.length === 3 && last[0] === "shelf" && last[1] === "shelf" && last[2] === "door";
   }
   if (spec.id === "calm-streak") return state.happyStreak >= 4;
-  if (spec.id === "quick-hands") return state.successCount >= 5 && state.misses <= 1 && now - state.startedAt <= spec.seconds * 1000;
+  if (spec.id === "quick-hands") return state.startedAt != null && state.successCount >= 5 && state.misses <= 1 && now - state.startedAt <= spec.seconds * 1000;
   if (spec.id === "grand-tour") return state.zones.size >= 4;
   return false;
 }
