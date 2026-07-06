@@ -4,6 +4,7 @@ import { applyEarlyCampaignLayoutPolish } from "./earlyCampaignLayoutPolish.js";
 import { applyEarlyCampaignCopyPolish } from "./earlyCampaignCopyPolish.js";
 import { applyEarlyCampaignCapacityPolish } from "./earlyCampaignCapacityPolish.js";
 import { applyDropRejectPolish } from "./dropRejectPolish.js";
+import { applyFinalBossPhasePolish } from "./finalBossPhasePolish.js";
 
 let applied = false;
 
@@ -21,6 +22,7 @@ export function applyDragSnapPolish() {
   applyEarlyCampaignLayoutPolish();
   applyEarlyCampaignCapacityPolish();
   applyEarlyCampaignCopyPolish();
+  applyFinalBossPhasePolish();
   applyDropRejectPolish();
 
   const start = StorageScene.prototype.onDragStart;
