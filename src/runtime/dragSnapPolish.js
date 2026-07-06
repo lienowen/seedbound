@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { StorageScene } from "../game/StorageScene.js";
 import { applyEarlyCampaignLayoutPolish } from "./earlyCampaignLayoutPolish.js";
 import { applyEarlyCampaignCopyPolish } from "./earlyCampaignCopyPolish.js";
+import { applyDropRejectPolish } from "./dropRejectPolish.js";
 
 let applied = false;
 
@@ -18,6 +19,7 @@ export function applyDragSnapPolish() {
   applied = true;
   applyEarlyCampaignLayoutPolish();
   applyEarlyCampaignCopyPolish();
+  applyDropRejectPolish();
 
   const start = StorageScene.prototype.onDragStart;
   const finish = StorageScene.prototype.onDragEnd;
