@@ -3,10 +3,12 @@ import { StorageEngine } from "../src/game/StorageEngine.js";
 import { applyCoreConsistencyPatches } from "../src/runtime/coreConsistencyBootstrap.js";
 import { applyEngineConsistency } from "../src/runtime/engineConsistency.js";
 import { applyEarlyCampaignLayoutPolish } from "../src/runtime/earlyCampaignLayoutPolish.js";
+import { applyEarlyCampaignCapacityPolish } from "../src/runtime/earlyCampaignCapacityPolish.js";
 
 applyCoreConsistencyPatches();
 applyEngineConsistency();
 applyEarlyCampaignLayoutPolish();
+applyEarlyCampaignCapacityPolish();
 
 const NON_BLOCKING = new Set(["mustNeighbor"]);
 let failed = false;
