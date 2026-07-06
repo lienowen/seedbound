@@ -75,6 +75,26 @@ export function applyDragSnapPolish() {
     }
 
     this.drawPlacementPreview(item, preview);
+    if (preview && this.previewSprite?.visible) {
+      const target = this.snapTargetPoint(item, preview);
+      if (target) {
+        const entry = {
+          status: "packed",
+          itemId: item.id,
+          slotId: preview.slotId,
+          col: preview.col,
+          row: preview.row,
+          layer: preview.layer,
+          rot: preview.rot,
+          x: preview.x,
+          y: preview.y,
+        };
+        this.previewSprite
+          .setPosition(target.x, target.y)
+          .setScale(this.displayScaleFor(item, entry))
+          .setAngle(this.topDown ? this.topDownAngle(entry) : this.restTiltFor(item, entry));
+      }
+    }
     this.refreshHoverZone(preview?.slotId || null, !!preview?.valid, preview?.score ?? 50);
     if (!this.topDown) this.updateWishBubble(obj, preview);
   };
