@@ -57,6 +57,20 @@ function buildCoolerStageShapes() {
 
 const FRIDGE_STAGE = { width: 750, height: 1334, shapes: buildCoolerStageShapes() };
 
+// Floor-only shapes for the real-art cooler levels: just the delivery crate the
+// loose goods wait in (the cooler itself is now a hand-drawn image fixture).
+function FRIDGE_FLOOR_SHAPES() {
+  const shapes = [
+    { kind: "roundedRect", x: 60, y: 862, w: 630, h: 300, r: 42, fill: 0xfff0ce, alpha: 0.92, line: { width: 3, color: 0xffffff, alpha: 0.62 } },
+  ];
+  for (let r = 0; r < 2; r += 1) {
+    for (let i = 0; i < 6; i += 1) {
+      shapes.push({ kind: "roundedRect", x: 88 + i * 94, y: 892 + r * 132, w: 82, h: 118, r: 20, fill: 0xffffff, alpha: 0.42, line: { width: 2, color: 0xf3cf94, alpha: 0.4 } });
+    }
+  }
+  return shapes;
+}
+
 const FRIDGE_FRONTS = [
   // Shelf front lips (sit on the front edge of each drawn glass shelf).
   { kind: "roundedRect", x: 132, y: 425, w: 348, h: 9, r: 5, fill: 0xb7d8ce, alpha: 0.38, depth: 340, line: { width: 1, color: 0xffffff, alpha: 0.4 } },
@@ -87,6 +101,68 @@ const FRIDGE_SLOTS = [
   { id: "door_mid_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 581, y: 762, w: 104, h: 104, cols: 1, rows: 1, baseline: 0.55, depth: 220 },
   { id: "door_low_1", zone: "door", allow: ["bottle", "dairy", "carton"], x: 589, y: 971, w: 118, h: 106, cols: 1, rows: 1, baseline: 0.58, depth: 230 },
 ];
+
+// ---- REAL MULTI-DOOR COOLER FIXTURES ---------------------------------------
+// Hand-drawn upright glass coolers replace the procedural cabinet. Each art is a
+// closed multi-door unit with a visible shelf grid, so we lay the 12 template
+// slots (above) onto a doors×rows grid. `colFracs`/`shelfFracs` are the door
+// centers and each plank's goods-resting line as fractions of the DISPLAYED
+// image (hand-calibrated per file). Slot IDs/zones/allow are preserved from
+// FRIDGE_SLOTS so every existing blueprint keeps working unchanged.
+const COOLER_ART = {
+  glass3: { key: "fx-cooler-glass3", file: "cooler-glass3.png", aspect: 1448 / 1086, cols: 3, rows: 4, colFracs: [0.207, 0.5, 0.793], shelfFracs: [0.355, 0.485, 0.615, 0.735], itemScale: 0.56 },
+  white3: { key: "fx-cooler-white3", file: "cooler-white3.png", aspect: 1448 / 1086, cols: 3, rows: 4, colFracs: [0.207, 0.5, 0.793], shelfFracs: [0.345, 0.475, 0.605, 0.725], itemScale: 0.56 },
+  silver4: { key: "fx-cooler-silver4", file: "cooler-silver4.png", aspect: 1448 / 1086, cols: 4, rows: 3, colFracs: [0.163, 0.388, 0.612, 0.837], shelfFracs: [0.375, 0.535, 0.695], itemScale: 0.48 },
+};
+
+// Fixed grid order the 12 template slots map into (reading order, row-major).
+const COOLER_SLOT_ORDER = [
+  "shelf_top_1", "shelf_top_2", "shelf_mid_1", "shelf_mid_2",
+  "shelf_low_1", "shelf_low_2", "drawer_left", "drawer_right",
+  "door_top_1", "door_upper_2", "door_mid_1", "door_low_1",
+];
+
+function buildCoolerLayout(artKey, { w = 720, top = 138 } = {}) {
+  const art = COOLER_ART[artKey] || COOLER_ART.glass3;
+  const h = Math.round(w / art.aspect);
+  const left = 375 - w / 2;
+  const template = new Map(FRIDGE_SLOTS.map((s) => [s.id, s]));
+  const cellW = Math.round((w / art.cols) * 0.86);
+  const capacity = art.cols * art.rows;
+  const slots = [];
+  COOLER_SLOT_ORDER.forEach((id, i) => {
+    const tpl = template.get(id);
+    if (!tpl) return;
+    // Slots beyond this art's visible capacity collapse onto the last cell so
+    // rarely-used template ids still resolve (blueprints seldom fill all 12).
+    const cell = Math.min(i, capacity - 1);
+    const col = cell % art.cols;
+    const row = Math.floor(cell / art.cols);
+    slots.push({
+      ...tpl,
+      x: Math.round(left + art.colFracs[col] * w),
+      y: Math.round(top + art.shelfFracs[row] * h),
+      w: cellW,
+      h: 116,
+      cols: Math.min(tpl.cols || 1, 2),
+      rows: 1,
+      stackLayers: 1,
+      baseline: 0.5,
+      depth: 110 + row * 20 + col,
+    });
+  });
+  const fixtures = [{ key: art.key, file: art.file, cx: 375, cy: top, w, h, originY: 0, depth: 2 }];
+  return { fixtures, slots, itemScale: art.itemScale };
+}
+
+// Deterministic per-level cooler art so the arc gets visual variety without
+// hand-assigning art to every blueprint.
+const COOLER_ROTATION = ["glass3", "white3", "silver4"];
+function coolerArtFor(id) {
+  let sum = 0;
+  for (let i = 0; i < id.length; i += 1) sum += id.charCodeAt(i);
+  return COOLER_ROTATION[sum % COOLER_ROTATION.length];
+}
 
 // ---- TOP-DOWN PACKING LEVELS -----------------------------------------------
 // Generic packing mode: fit differently shaped items into a single grid inside
@@ -273,7 +349,9 @@ function buildFridgeLevel({
   harmonyPerfect = 440, // ⭐⭐⭐
   fixedItems = [],
   trayItems = [],
+  cooler,
 }) {
+  const coolerLayout = buildCoolerLayout(cooler || coolerArtFor(id));
   return {
     id,
     revision: 10,
@@ -302,11 +380,11 @@ function buildFridgeLevel({
       snapDistance: 88,
       snapDuration: 280,
     },
-    stage: structuredClone(FRIDGE_STAGE),
-    fronts: structuredClone(FRIDGE_FRONTS),
-    slots: structuredClone(FRIDGE_SLOTS),
+    stage: { ...structuredClone(FRIDGE_STAGE), shapes: FRIDGE_FLOOR_SHAPES(), fixtures: coolerLayout.fixtures },
+    fronts: [],
+    slots: coolerLayout.slots,
     items: [
-      ...fixedItems.map((item) => buildItem(item.key, { fixed: true, slot: item.slot, id: item.id || item.key })),
+      ...fixedItems.map((item) => applyCoolerScale(buildItem(item.key, { fixed: true, slot: item.slot, id: item.id || item.key }), coolerLayout.itemScale)),
       ...trayItems.map((item, index) => {
         // Dynamic tray: spread items across 2 rows, even spacing
         const count = trayItems.length;
@@ -317,16 +395,25 @@ function buildFridgeLevel({
         const inFirstRow = index < row1Count;
         const col = inFirstRow ? index : index - row1Count;
         const trayX = inFirstRow ? row1Start + col * 100 : row2Start + col * 100;
-        const trayY = inFirstRow ? 1140 : 1200;
-        return buildItem(item.key, {
+        const trayY = inFirstRow ? 952 : 1084;
+        return applyCoolerScale(buildItem(item.key, {
           id: item.id || `${item.key}_${index + 1}`,
           trayX,
           trayY,
           ...item.overrides,
-        });
+        }), coolerLayout.itemScale);
       }),
     ],
   };
+}
+
+// Uniformly shrink a cooler item so it fits the real cooler's grid cells while
+// keeping surface/contact math intact (seating derives from normalized fractions).
+function applyCoolerScale(item, s) {
+  if (!s || s === 1) return item;
+  item.scale *= s;
+  if (item.bounds) item.bounds = { w: Math.round(item.bounds.w * s), h: Math.round(item.bounds.h * s) };
+  return item;
 }
 
 // Width-aware tray layout: each loose item reserves horizontal room based on
