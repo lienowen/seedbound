@@ -5,6 +5,7 @@ import { applyEarlyCampaignCopyPolish } from "./earlyCampaignCopyPolish.js";
 import { applyEarlyCampaignCapacityPolish } from "./earlyCampaignCapacityPolish.js";
 import { applyDropRejectPolish } from "./dropRejectPolish.js";
 import { applyFinalBossPhasePolish } from "./finalBossPhasePolish.js";
+import { applyMidCampaignReleaseGuard } from "./midCampaignReleaseGuard.js";
 
 let applied = false;
 
@@ -22,6 +23,7 @@ export function applyDragSnapPolish() {
   applyEarlyCampaignLayoutPolish();
   applyEarlyCampaignCapacityPolish();
   applyEarlyCampaignCopyPolish();
+  applyMidCampaignReleaseGuard();
   applyFinalBossPhasePolish();
   applyDropRejectPolish();
 
