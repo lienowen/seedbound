@@ -5,6 +5,7 @@ import {
   recordBonusPlacement,
 } from "./bonusChallengeRules.js";
 import { applySkipConsistencyPolish } from "./skipConsistencyPolish.js";
+import { applyBonusProgressPolish } from "./bonusProgressPolish.js";
 
 let applied = false;
 
@@ -79,4 +80,6 @@ export function applyBonusChallengePolish() {
     if (state.spec && !state.completed && this.dragItem === obj) state.misses += 1;
     return originalReturnHome.call(this, obj, message);
   };
+
+  applyBonusProgressPolish();
 }
