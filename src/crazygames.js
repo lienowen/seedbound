@@ -10,13 +10,6 @@ function sdk() {
   return window.CrazyGames?.SDK || null;
 }
 
-/**
- * The SDK script is served on every domain, so `window.CrazyGames.SDK` and its
- * `init` method exist even off-platform (local dev, the v0 preview, itch, etc).
- * Calling `init()` there throws "CrazySDK is disabled on this domain". CrazyGames
- * only enables the SDK when the game is embedded from a crazygames domain, so we
- * gate initialization on the hostname (checking the top frame when embedded).
- */
 function onCrazyGamesDomain() {
   if (typeof window === "undefined") return false;
   const hosts = [];
@@ -25,8 +18,6 @@ function onCrazyGamesDomain() {
   } catch {
     /* no-op */
   }
-  // When embedded, the parent frame is the crazygames.com page; read it when the
-  // browser allows same-origin access, and fall back to the referrer otherwise.
   try {
     if (window.top && window.top !== window.self) hosts.push(window.top.location.hostname);
   } catch {
@@ -41,8 +32,9 @@ function onCrazyGamesDomain() {
 
 let initPromise = null;
 let ready = false;
+const MIDGAME_COOLDOWN_MS = 90000;
+let nextMidgameAdAt = Date.now() + MIDGAME_COOLDOWN_MS;
 
-/** Initialize the SDK once. Safe to call when the SDK is absent or disabled. */
 export function initCrazyGames() {
   if (initPromise) return initPromise;
   const s = sdk();
@@ -54,6 +46,7 @@ export function initCrazyGames() {
     .init()
     .then(() => {
       ready = true;
+      nextMidgameAdAt = Date.now() + MIDGAME_COOLDOWN_MS;
       return true;
     })
     .catch(() => false);
@@ -77,27 +70,30 @@ export const cgLoadingStart = () => safeGame("loadingStart");
 export const cgLoadingStop = () => safeGame("loadingStop");
 export const cgGameplayStart = () => safeGame("gameplayStart");
 export const cgGameplayStop = () => safeGame("gameplayStop");
-/** Signal a moment of delight (level cleared, high score) for engagement tuning. */
 export const cgHappytime = () => safeGame("happytime");
 
-/**
- * Request a midgame ad. Resolves when the ad flow ends (finished, errored, or
- * skipped because the SDK is absent) so the caller can always continue.
- * The SDK automatically mutes/pauses the page during the ad.
- */
 export function cgMidgameAd() {
   return new Promise((resolve) => {
+    const now = Date.now();
+    if (now < nextMidgameAdAt) {
+      resolve("cooldown");
+      return;
+    }
+
     const s = sdk();
     if (!ready || !s?.ad || typeof s.ad.requestAd !== "function") {
       resolve("unavailable");
       return;
     }
+
+    nextMidgameAdAt = now + MIDGAME_COOLDOWN_MS;
     let settled = false;
     const done = (result) => {
       if (settled) return;
       settled = true;
       resolve(result);
     };
+
     try {
       s.ad.requestAd("midgame", {
         adStarted: () => {},
@@ -107,15 +103,10 @@ export function cgMidgameAd() {
     } catch {
       done("error");
     }
-    // Safety timeout so a stuck ad callback never blocks progression.
     setTimeout(() => done("timeout"), 20000);
   });
 }
 
-/**
- * Request a rewarded ad. `onReward` runs only when the ad actually finished.
- * Per CrazyGames policy, do NOT reward on adError.
- */
 export function cgRewardedAd(onReward) {
   return new Promise((resolve) => {
     const s = sdk();

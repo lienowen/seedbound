@@ -1,9 +1,26 @@
 import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
+import { applyCoreConsistencyPatches } from "./runtime/coreConsistencyBootstrap.js";
+import { applyEngineConsistency } from "./runtime/engineConsistency.js";
+import { applyPreviewConstraintPolish } from "./runtime/previewConstraintPolish.js";
 import "./fridge-phaser.css";
 
-const fridgePhaserGameImport = import("./FridgePhaserGame.jsx");
+// Apply data and engine consistency before campaign progress is read.
+applyCoreConsistencyPatches();
+applyEngineConsistency();
+applyPreviewConstraintPolish();
+
+// Keep Phaser and scene-level polish out of the initial UI bundle. Both chunks
+// load together, then scene patches are applied before React mounts the game.
+const fridgePhaserGameImport = Promise.all([
+  import("./runtime/dragSnapPolish.js"),
+  import("./FridgePhaserGame.jsx"),
+]).then(([polish, gameModule]) => {
+  polish.applyDragSnapPolish();
+  return gameModule;
+});
+
 const FridgePhaserGame = lazy(() =>
   fridgePhaserGameImport.then((module) => ({ default: module.FridgePhaserGame })),
 );

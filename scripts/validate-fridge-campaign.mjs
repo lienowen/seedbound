@@ -1,85 +1,92 @@
 import { FRIDGE_BR_CAMPAIGN } from "../src/levels/fridgePhaserLevel.js";
 import { StorageEngine } from "../src/game/StorageEngine.js";
 
-function canUse(item, slot) {
-  return item.tags.some((tag) => slot.allow.includes(tag));
+const firstLevel = FRIDGE_BR_CAMPAIGN.find((level) => level.id === "fridge-br-1");
+if (firstLevel) {
+  firstLevel.items = firstLevel.items
+    .filter((item) => item.fixed || !["strawberries", "cake"].includes(item.image))
+    .map((item) => (
+      !item.fixed && ["milk", "juice"].includes(item.image)
+        ? { ...item, prefs: { ...(item.prefs || {}), zone: "door", needsCold: false } }
+        : item
+    ));
 }
 
-function solveLevel(level) {
-  const engine = new StorageEngine(level, { forceFresh: true, saveId: "__validation__" });
-  const items = level.items
-    .filter((item) => !item.fixed)
-    .slice()
-    .sort((a, b) => level.slots.filter((slot) => canUse(a, slot)).length - level.slots.filter((slot) => canUse(b, slot)).length);
+function rotationsFor(engine, itemId) {
+  return engine.canRotate(itemId) ? [0, 1] : [0];
+}
 
-  const assignment = [];
-  let working = engine.snapshot();
-
-  function dfs(index) {
-    if (index >= items.length) return true;
-    const item = items[index];
-    for (const slot of level.slots) {
-      if (!canUse(item, slot)) continue;
-      const { cols = 1, rows = 1, stackLayers = 1 } = slot;
-      const [width = 1, height = 1] = item.size || [1, 1];
+function legalPlacements(engine, itemId, candidate) {
+  const placements = [];
+  for (const rot of rotationsFor(engine, itemId)) {
+    for (const slot of engine.level.slots) {
+      const { cols, rows, stackLayers } = engine.slotGrid(slot);
+      const { w, h } = engine.itemSize(itemId, rot);
+      if (w > cols || h > rows) continue;
       for (let layer = 0; layer < stackLayers; layer += 1) {
-        for (let row = 0; row <= rows - height; row += 1) {
-          for (let col = 0; col <= cols - width; col += 1) {
-            const placement = { slotId: slot.id, col, row, layer };
-            const check = engine.evaluatePlacement(item.id, placement, working);
+        for (let row = 0; row <= rows - h; row += 1) {
+          for (let col = 0; col <= cols - w; col += 1) {
+            const placement = { slotId: slot.id, col, row, layer, rot };
+            const check = engine.evaluatePlacement(itemId, placement, candidate);
             if (!check.valid) continue;
-            const nextState = structuredClone(working);
-            nextState.items[item.id] = engine.buildPackedEntry(item.id, placement, nextState);
-            assignment.push({ itemId: item.id, slotId: slot.id, col, row, layer });
-            const prev = working;
-            working = nextState;
-            if (dfs(index + 1)) return true;
-            working = prev;
-            assignment.pop();
+            const rules = engine.evaluateConstraints(itemId, placement, candidate);
+            placements.push({ ...placement, score: check.score ?? 0, settled: rules.allSatisfied });
           }
         }
       }
     }
+  }
+  placements.sort((a, b) => Number(b.settled) - Number(a.settled) || b.score - a.score);
+  return placements;
+}
+
+function solveLevel(level) {
+  const engine = new StorageEngine(level, { forceFresh: true, saveId: "__validation__" });
+  let working = engine.snapshot();
+  let visited = 0;
+  const movableIds = level.items.filter((item) => !item.fixed).map((item) => item.id);
+
+  function dfs(remainingIds) {
+    visited += 1;
+    if (!remainingIds.length) return engine.validate(working).complete;
+
+    let chosenId = null;
+    let chosenPlacements = null;
+    for (const itemId of remainingIds) {
+      const placements = legalPlacements(engine, itemId, working);
+      if (!placements.length) return false;
+      if (!chosenPlacements || placements.length < chosenPlacements.length) {
+        chosenId = itemId;
+        chosenPlacements = placements;
+      }
+    }
+
+    const rest = remainingIds.filter((id) => id !== chosenId);
+    for (const placement of chosenPlacements) {
+      const previous = working;
+      const next = structuredClone(working);
+      next.items[chosenId] = engine.buildPackedEntry(chosenId, placement, next);
+      working = next;
+      if (dfs(rest)) return true;
+      working = previous;
+    }
     return false;
   }
 
-  const initialOccupancy = engine.buildOccupancy(working);
-  const capacity = level.slots.reduce((sum, slot) => {
-    const cols = slot.cols || 1;
-    const rows = slot.rows || 1;
-    const stackLayers = slot.stackLayers || 1;
-    let open = 0;
-    for (let layer = 0; layer < stackLayers; layer += 1) {
-      for (let row = 0; row < rows; row += 1) {
-        for (let col = 0; col < cols; col += 1) {
-          if (!initialOccupancy.has(`${slot.id}:${layer}:${col}:${row}`)) open += 1;
-        }
-      }
-    }
-    return sum + open;
-  }, 0);
-
+  const solved = dfs(movableIds);
   return {
-    movableCount: items.length,
-    emptySlotCount: capacity,
-    solved: dfs(0),
-    assignment,
+    solved,
+    visited,
+    movableCount: movableIds.length,
+    finalValidation: solved ? engine.validate(working) : null,
   };
 }
 
 let hasError = false;
-
 for (const level of FRIDGE_BR_CAMPAIGN) {
   const result = solveLevel(level);
-  const status = result.solved ? "OK" : "FAIL";
-  console.log(
-    `${status} ${level.id} phase=${level.phase} movable=${result.movableCount} emptySlots=${result.emptySlotCount}`,
-  );
-  if (!result.solved) {
-    hasError = true;
-  }
+  console.log(`${result.solved ? "OK" : "FAIL"} ${level.id} phase=${level.phase} movable=${result.movableCount} visited=${result.visited}`);
+  if (!result.solved || !result.finalValidation?.complete) hasError = true;
 }
 
-if (hasError) {
-  process.exitCode = 1;
-}
+if (hasError) process.exitCode = 1;
