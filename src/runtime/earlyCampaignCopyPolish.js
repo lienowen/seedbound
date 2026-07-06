@@ -1,4 +1,5 @@
 import { CAMPAIGN_I18N } from "../i18n/campaign.js";
+import { applyBonusChallengePolish } from "./bonusChallengePolish.js";
 
 let applied = false;
 
@@ -79,4 +80,5 @@ export function applyEarlyCampaignCopyPolish() {
   if (applied) return;
   applied = true;
   CAMPAIGN_I18N.en = { ...CAMPAIGN_I18N.en, ...EN };
+  applyBonusChallengePolish();
 }
