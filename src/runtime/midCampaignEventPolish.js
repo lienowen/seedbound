@@ -1,4 +1,5 @@
 import { StorageScene } from "../game/StorageScene.js";
+import { StorageEngine } from "../game/StorageEngine.js";
 
 let applied = false;
 
@@ -23,43 +24,82 @@ function packedMovableCount(scene) {
   return movableIds(scene).filter((id) => scene.engine.state.items[id]?.status === "packed").length;
 }
 
-function revealWave(scene, wave) {
+function setEventHidden(scene, id, hidden) {
+  const def = scene.engine.itemDef(id);
+  if (def) def.eventHidden = hidden;
+}
+
+function eventStorageKey(scene) {
+  return `cozyshelf.mid-event.${scene.level.id}.v1`;
+}
+
+function readEventSave(scene) {
+  try {
+    return JSON.parse(localStorage.getItem(eventStorageKey(scene)) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeEventSave(scene, value) {
+  try {
+    localStorage.setItem(eventStorageKey(scene), JSON.stringify(value));
+  } catch {
+    // Event persistence must never interrupt play.
+  }
+}
+
+function revealWave(scene, wave, animate = true) {
   if (wave.revealed) return;
   wave.revealed = true;
   for (const id of wave.ids) {
+    setEventHidden(scene, id, false);
     const sprite = scene.sprites.get(id);
     if (!sprite) continue;
-    sprite.setActive(true).setVisible(true).setAlpha(0).setScale(sprite.scaleX * 0.82);
+    const baseScale = scene.displayScaleFor(sprite.getData("item"), sprite.getData("home"));
+    sprite.setActive(true).setVisible(true).setAlpha(animate ? 0 : 1).setScale(animate ? baseScale * 0.82 : baseScale);
     sprite.setInteractive({ draggable: true, pixelPerfect: false });
     scene.input.setDraggable(sprite);
-    scene.tweens.add({
-      targets: sprite,
-      alpha: 1,
-      scaleX: sprite.scaleX / 0.82,
-      scaleY: sprite.scaleY / 0.82,
-      duration: 260,
-      ease: "Back.out(1.8)",
-    });
+    if (animate) {
+      scene.tweens.add({
+        targets: sprite,
+        alpha: 1,
+        scaleX: baseScale,
+        scaleY: baseScale,
+        duration: 260,
+        ease: "Back.out(1.8)",
+      });
+    }
   }
-  scene.playCallout("NEW STOCK!", "gold");
-  scene.setToastMessage(wave.label);
+  if (animate) {
+    scene.playCallout("NEW STOCK!", "gold");
+    scene.setToastMessage(wave.label);
+  }
 }
 
-function hideLaterWaves(scene, spec) {
+function prepareWaves(scene, spec) {
   const ids = movableIds(scene);
+  const packed = packedMovableCount(scene);
   let cursor = ids.length;
   const waves = [];
+
   for (const config of [...(spec.waves || [])].reverse()) {
     const start = Math.max(0, cursor - config.count);
     const group = ids.slice(start, cursor);
     cursor = start;
     waves.unshift({ ...config, ids: group, revealed: false });
   }
+
   for (const wave of waves) {
+    const restoredProgress = packed >= wave.after || wave.ids.some((id) => scene.engine.state.items[id]?.status === "packed");
+    if (restoredProgress) {
+      revealWave(scene, wave, false);
+      continue;
+    }
     for (const id of wave.ids) {
+      setEventHidden(scene, id, true);
       const sprite = scene.sprites.get(id);
-      if (!sprite) continue;
-      sprite.disableInteractive().setVisible(false).setActive(false);
+      if (sprite) sprite.disableInteractive().setVisible(false).setActive(false);
     }
   }
   return waves;
@@ -77,6 +117,7 @@ function triggerPickup(scene, state) {
   if (!id) return;
 
   state.pickupDone = true;
+  writeEventSave(scene, { pickupDone: true });
   scene.time.delayedCall(420, () => {
     if (!scene.scene.isActive() || scene.engine.validate().complete) return;
     const sprite = scene.sprites.get(id);
@@ -91,14 +132,30 @@ export function applyMidCampaignEventPolish() {
   if (applied) return;
   applied = true;
 
+  const originalMovableItems = StorageEngine.prototype.movableItems;
+  StorageEngine.prototype.movableItems = function visibleMovableItems() {
+    return originalMovableItems.call(this).filter((item) => !item.eventHidden);
+  };
+
   const originalCreate = StorageScene.prototype.create;
   const originalDragEnd = StorageScene.prototype.onDragEnd;
 
   StorageScene.prototype.create = function createWithMidEvents(data) {
+    const payload = { ...this.entryData, ...data };
     const result = originalCreate.call(this, data);
     const spec = EVENTS[this.level?.id];
     if (!spec || this.editMode) return result;
-    this.midEventState = { spec, waves: hideLaterWaves(this, spec), pickupDone: false, lastPlacedId: null };
+
+    if (payload.forceFresh) {
+      try { localStorage.removeItem(eventStorageKey(this)); } catch { /* no-op */ }
+    }
+    const saved = readEventSave(this);
+    this.midEventState = {
+      spec,
+      waves: prepareWaves(this, spec),
+      pickupDone: !!saved.pickupDone,
+      lastPlacedId: null,
+    };
     this.time.delayedCall(900, () => this.setToastMessage("Dynamic shift: expect surprises."));
     return result;
   };
@@ -116,7 +173,7 @@ export function applyMidCampaignEventPolish() {
 
     const packed = packedMovableCount(this);
     for (const wave of state.waves) {
-      if (!wave.revealed && packed >= wave.after) revealWave(this, wave);
+      if (!wave.revealed && packed >= wave.after) revealWave(this, wave, true);
     }
     triggerPickup(this, state);
     return result;
