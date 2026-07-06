@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "prebuild": "node scripts/solve-early-campaign.mjs",
     "build": "node scripts/audit-early-campaign.mjs && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "validate:fridge": "node scripts/validate-fridge-campaign.mjs",
