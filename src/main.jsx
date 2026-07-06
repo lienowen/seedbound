@@ -1,7 +1,11 @@
 import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
+import { applyCoreConsistencyPatches } from "./runtime/coreConsistencyBootstrap.js";
 import "./fridge-phaser.css";
+
+// Apply data/save migrations before the game module reads campaign progress.
+applyCoreConsistencyPatches();
 
 const fridgePhaserGameImport = import("./FridgePhaserGame.jsx");
 const FridgePhaserGame = lazy(() =>
