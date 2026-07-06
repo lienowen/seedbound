@@ -1,6 +1,7 @@
 {
   "name": "cozy-shelf",
   "version": "0.0.0",
+  "description": "GitHub write access test on isolated branch",
   "private": true,
   "type": "module",
   "scripts": {
