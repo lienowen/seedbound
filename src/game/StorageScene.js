@@ -84,6 +84,13 @@ export class StorageScene extends Phaser.Scene {
     });
     this.loadStageAsset(level.assets?.back);
     this.loadStageAsset(level.assets?.front);
+    if (Array.isArray(level.stage?.fixtures)) {
+      for (const fx of level.stage.fixtures) {
+        if (!fx?.key || !fx?.file) continue;
+        if (this.textures.exists(fx.key)) continue;
+        this.load.image(fx.key, `${ASSET}${fx.file}`);
+      }
+    }
     for (const item of level.items) {
       if (this.textures.exists(item.image)) continue;
       const file = item.file || `${item.image}.png`;
@@ -393,6 +400,20 @@ export class StorageScene extends Phaser.Scene {
     }
     for (const shape of this.level.stage.shapes) this.drawShape(g, shape);
     g.setDepth(0);
+
+    // Fixture base images (real hand-drawn coolers / shelving). Rendered above
+    // the backdrop but below items so goods stack ON the painted shelves. Each
+    // entry: { key, cx, cy, w, h, depth }. Missing textures fall back silently
+    // to the procedural shapes already drawn above.
+    if (Array.isArray(this.level.stage.fixtures)) {
+      for (const fx of this.level.stage.fixtures) {
+        if (!this.textures.exists(fx.key)) continue;
+        this.add.image(fx.cx, fx.cy, fx.key)
+          .setDisplaySize(fx.w, fx.h)
+          .setOrigin(0.5, fx.originY ?? 0.5)
+          .setDepth(fx.depth ?? 2);
+      }
+    }
 
     this.itemLayer = this.add.layer().setDepth(100);
     this.frontLayer = this.add.layer().setDepth(300);

@@ -680,6 +680,22 @@ function endcapFixture({ id, cx, w, shelfYs, cols = 3, allow = PANTRY_ALLOW, cra
   return { shapes, slots };
 }
 
+// One fixture rendered from a REAL hand-drawn PNG (cooler / shelving unit)
+// instead of procedural shapes. The image is fit to width `w` at center `cx`,
+// anchored by its TOP at `top`. `shelfFracs` are the vertical fractions (0..1 of
+// the displayed image height) of each plank's goods-resting surface — these are
+// hand-calibrated per art file. Returns { fixtures:[imgSpec], slots, height }.
+function imageFixture({ id, key, file, cx, top, w, aspect, shelfFracs, cols = 3, allow = PANTRY_ALLOW, slotWidthFrac = 0.82 }) {
+  const h = Math.round(w / aspect);
+  const fixtures = [{ key, file, cx, cy: top, w, h, originY: 0, depth: 2 }];
+  const slots = shelfFracs.map((frac, tier) => ({
+    id: `${id}_${tier}`, zone: "shelf", tier, allow,
+    x: cx, y: Math.round(top + frac * h), w: Math.round(w * slotWidthFrac), h: 118,
+    cols, rows: 1, stackLayers: 1, baseline: 0.5, depth: 110 + tier * 20,
+  }));
+  return { fixtures, slots, height: h };
+}
+
 const FIXTURE_BUILDERS = { gondola: gondolaFixture, endcap: endcapFixture };
 
 // Build a restock level whose shelves span MULTIPLE fixtures placed across the
@@ -687,25 +703,37 @@ const FIXTURE_BUILDERS = { gondola: gondolaFixture, endcap: endcapFixture };
 // where each shelf is { category, products:[key,…] } exactly like
 // buildRestockLevel. This is the multi-fixture analogue of buildRestockLevel:
 // same gameplay, more space and fixture variety.
-function buildAisleRestockLevel({ id, phase, title, subtitle, reward = 130, harmonyTarget = 260, harmonyGold = 340, harmonyPerfect = 420, copy, sections = [] }) {
+function buildAisleRestockLevel({ id, phase, title, subtitle, reward = 130, harmonyTarget = 260, harmonyGold = 340, harmonyPerfect = 420, copy, sections = [], itemScale = 1 }) {
   const stageShapes = [
     // Store floor beneath the fit-to-width aisle backdrop, matching pantry levels.
     { kind: "rect", x: 0, y: 744, w: 750, h: 1334 - 744, fill: 0xe7cea0 },
     { kind: "rect", x: 0, y: 744, w: 750, h: 10, fill: 0xf3e2b8, alpha: 0.5 },
   ];
+  const stageFixtures = [];
   const slots = [];
   const planogram = [];
   const flat = [];
   sections.forEach((sec, s) => {
     const secId = `sec${s}`;
-    const build = FIXTURE_BUILDERS[sec.kind] || gondolaFixture;
-    const fixture = build({ id: secId, cx: sec.cx, w: sec.w, shelfYs: sec.shelfYs });
-    stageShapes.push(...fixture.shapes);
+    let fixture;
+    if (sec.kind === "image") {
+      fixture = imageFixture({
+        id: secId, key: sec.key, file: sec.file, cx: sec.cx, top: sec.top,
+        w: sec.w, aspect: sec.aspect, shelfFracs: sec.shelfFracs,
+        cols: sec.cols || 3, slotWidthFrac: sec.slotWidthFrac,
+      });
+      stageFixtures.push(...fixture.fixtures);
+    } else {
+      const build = FIXTURE_BUILDERS[sec.kind] || gondolaFixture;
+      fixture = build({ id: secId, cx: sec.cx, w: sec.w, shelfYs: sec.shelfYs });
+      stageShapes.push(...fixture.shapes);
+    }
     fixture.slots.forEach((slot, tier) => {
       const shelf = sec.shelves[tier];
       if (!shelf) { slots.push({ ...slot, cols: 1, empty: true }); return; }
       const cols = shelf.products.length;
-      slots.push({ ...slot, category: shelf.category, cols, w: Math.min(slot.w, cols >= 3 ? slot.w : Math.round(sec.w * 0.66)) });
+      const narrowW = sec.kind === "image" ? Math.round(sec.w * 0.72) : Math.round(sec.w * 0.66);
+      slots.push({ ...slot, category: shelf.category, cols, w: Math.min(slot.w, cols >= 3 ? slot.w : narrowW) });
       planogram.push({ slotId: slot.id, products: shelf.products.map((key) => ITEM_LIBRARY[key]?.image || key) });
       shelf.products.forEach((key, i) => flat.push({ key, category: shelf.category, slotId: slot.id, i }));
     });
@@ -720,12 +748,20 @@ function buildAisleRestockLevel({ id, phase, title, subtitle, reward = 130, harm
     const rowsTotal = twoRows ? 2 : 1;
     const thisRowCount = row === rowsTotal - 1 ? count - perRow * row : perRow;
     const rowStart = 375 - ((thisRowCount - 1) * 92) / 2;
-    return buildItem(f.key, {
+    const item = buildItem(f.key, {
       id: `${f.key}_${f.slotId}_${f.i}`,
       trayX: rowStart + colInRow * 92,
       trayY: twoRows ? (row === 0 ? 1118 : 1206) : 1162,
       prefs: pantryPrefs({ category: f.category }),
     });
+    // Shrink goods on image-fixture levels so they fit the (tighter) real shelf
+    // compartments. Scaling `scale` uniformly keeps the contact/surface math
+    // correct because seating is derived from normalized surface fractions.
+    if (itemScale && itemScale !== 1) {
+      item.scale *= itemScale;
+      if (item.bounds) item.bounds = { w: Math.round(item.bounds.w * itemScale), h: Math.round(item.bounds.h * itemScale) };
+    }
+    return item;
   });
   return {
     id,
@@ -737,7 +773,7 @@ function buildAisleRestockLevel({ id, phase, title, subtitle, reward = 130, harm
     theme: { key: "pantry", title, subtitle, background: "#f6e6cf" },
     assets: structuredClone(PANTRY_ASSETS),
     tuning: { magnetPreviewDistance: 132, snapDistance: 88, snapDuration: 280 },
-    stage: { width: 750, height: 1334, shapes: stageShapes },
+    stage: { width: 750, height: 1334, shapes: stageShapes, fixtures: stageFixtures },
     fronts: [],
     slots,
     planogram,
@@ -867,44 +903,31 @@ const PANTRY_BLUEPRINTS = [
   },
 ];
 
-// Progressive plank heights inside one fixture.
-function shelfYsFor(n) {
-  if (n >= 3) return [440, 630, 815];
-  if (n === 2) return [520, 760];
-  return [640];
-}
+// Real hand-drawn shelving art (5 planks each). `fracs` = the goods-resting
+// surface of each plank as a fraction of the DISPLAYED image height, hand
+// calibrated against the PNG. Rotating the art across the arc adds variety.
+const AISLE_SHELF_ART = [
+  { key: "fx-shelf-beige", file: "shelf-beige.png", aspect: 980 / 735, fracs: [0.235, 0.375, 0.515, 0.655, 0.79] },
+  { key: "fx-shelf-wood", file: "shelf-wood.png", aspect: 980 / 735, fracs: [0.235, 0.375, 0.515, 0.655, 0.79] },
+  { key: "fx-shelf-metal", file: "shelf-metal.png", aspect: 980 / 735, fracs: [0.235, 0.375, 0.515, 0.655, 0.79] },
+];
 
-// Turn a flat blueprint (list of shelves) into a MULTI-FIXTURE layout that grows
-// with the level index — the core "space expands" curve for the aisle levels:
-//   L1-2  → one centered gondola
-//   L3-5  → two gondolas side by side
-//   L6-8  → two gondolas + a promotional endcap island (three fixtures)
+// Turn a flat blueprint (list of category shelves) into a SINGLE real shelving
+// fixture. The unit widens with the level index (space grows), and the used
+// planks are centered within the 5-plank art so the stocked shelves read as a
+// tidy block with a little empty headroom above/below.
 function aisleSections(shelves, i) {
-  if (i <= 1) {
-    return [{ kind: "gondola", cx: 375, w: 452, shelfYs: shelfYsFor(shelves.length), shelves }];
-  }
-  if (i <= 4) {
-    const half = Math.ceil(shelves.length / 2);
-    const a = shelves.slice(0, half);
-    const b = shelves.slice(half);
-    return [
-      { kind: "gondola", cx: 200, w: 344, shelfYs: shelfYsFor(a.length), shelves: a },
-      { kind: "gondola", cx: 552, w: 344, shelfYs: shelfYsFor(b.length), shelves: b },
-    ];
-  }
-  // Two upper gondolas share the first shelves; the last shelf becomes a low
-  // promo endcap island centered at the front — a different fixture entirely.
-  const top = shelves.slice(0, shelves.length - 1);
-  const last = shelves.slice(shelves.length - 1);
-  const half = Math.max(1, Math.ceil(top.length / 2));
-  const a = top.slice(0, half);
-  const b = top.slice(half);
-  const sections = [
-    { kind: "gondola", cx: 200, w: 344, shelfYs: shelfYsFor(a.length), shelves: a },
-  ];
-  if (b.length) sections.push({ kind: "gondola", cx: 552, w: 344, shelfYs: shelfYsFor(b.length), shelves: b });
-  sections.push({ kind: "endcap", cx: 375, w: 400, shelfYs: [872], shelves: last });
-  return sections;
+  const n = shelves.length;
+  const art = AISLE_SHELF_ART[i % AISLE_SHELF_ART.length];
+  const w = i <= 1 ? 620 : i <= 4 ? 690 : 738;
+  const top = 156;
+  // Center the n used planks among the 5 available.
+  const startPlank = Math.max(0, Math.floor((art.fracs.length - n) / 2));
+  const shelfFracs = art.fracs.slice(startPlank, startPlank + n);
+  return [{
+    kind: "image", key: art.key, file: art.file, cx: 375, top, w,
+    aspect: art.aspect, shelfFracs, shelves,
+  }];
 }
 
 const PANTRY_LEVELS = PANTRY_BLUEPRINTS.map((bp, i) =>
@@ -918,6 +941,7 @@ const PANTRY_LEVELS = PANTRY_BLUEPRINTS.map((bp, i) =>
     harmonyPerfect: Math.round(bp.harmony * 1.65),
     copy: pantryCopy({ difficulty: bp.tier, goal: bp.goal }),
     sections: aisleSections(bp.shelves, i),
+    itemScale: 0.62,
   })
 );
 
