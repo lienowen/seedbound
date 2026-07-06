@@ -1,24 +1,17 @@
 import { FRIDGE_BR_CAMPAIGN } from "../levels/fridgePhaserLevel.js";
 import { LOCALES, progressStorageKey } from "../i18n/locale.js";
 
-const MIGRATION_TAG = 1;
+const MIGRATION_TAG = 2;
 const LEGACY_PACK_INSERT_AFTER = [2, 4, 6, 8, 10, 12, 14, 16, 18];
 
 function patchFirstLevel() {
   const first = FRIDGE_BR_CAMPAIGN.find((level) => level.id === "fridge-br-1");
   if (!first) return;
 
-  // The authored goal says "place four drinks on the door", so the runtime data
-  // must expose exactly those four movable items. Decorative food stays out of the
-  // objective instead of silently becoming extra mandatory work.
   first.items = first.items.filter((item) => (
     item.fixed || !["strawberries", "cake"].includes(item.image)
   ));
 
-  // Milk and juice used to require both `zone: door` and `needsCold: true` while
-  // the engine defines only chill/drawer as cold zones. That contradiction made
-  // the tutorial goal impossible to satisfy truthfully. Level 1 is a door-facing
-  // tutorial, so its four drinks use the door rule only.
   first.items = first.items.map((item) => {
     if (item.fixed || !["milk", "juice"].includes(item.image)) return item;
     return {
@@ -38,7 +31,6 @@ function patchFirstLevel() {
     itemImages: ["green-soda", "red-soda", "juice", "milk"],
   };
 
-  // Invalidate any saved board state created with the old six-item tutorial.
   first.revision = Math.max(2, Number(first.revision || 1));
 }
 
@@ -60,13 +52,31 @@ function currentIndexForLegacyToken(token) {
     return index >= 0 ? index : 0;
   }
 
-  // Current campaign has pantry beats after 2..16. The old final pack beat after
-  // fridge 18 no longer exists, so map it to the nearest stable story level.
   const pantryNumber = token.after / 2;
   const pantryIndex = FRIDGE_BR_CAMPAIGN.findIndex((level) => level.id === `pantry-${pantryNumber}`);
   if (pantryIndex >= 0) return pantryIndex;
   const fallback = FRIDGE_BR_CAMPAIGN.findIndex((level) => level.id === `fridge-br-${token.after}`);
   return fallback >= 0 ? fallback : 0;
+}
+
+function clampCurrent(parsed) {
+  parsed.current = Math.max(0, Math.min(FRIDGE_BR_CAMPAIGN.length - 1, Number(parsed.current || 0)));
+  parsed.unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, Number(parsed.unlocked || 1)));
+}
+
+function migrateLegacyLayout3(parsed) {
+  const legacy = buildLegacyLayout();
+  const oldCurrent = Math.max(0, Math.min(legacy.length - 1, Number(parsed.current || 0)));
+  const current = currentIndexForLegacyToken(legacy[oldCurrent]);
+
+  const oldUnlocked = Math.max(1, Math.min(legacy.length, Number(parsed.unlocked || 1)));
+  let unlocked = 1;
+  for (const token of legacy.slice(0, oldUnlocked)) {
+    unlocked = Math.max(unlocked, currentIndexForLegacyToken(token) + 1);
+  }
+
+  parsed.current = Math.max(0, Math.min(FRIDGE_BR_CAMPAIGN.length - 1, current));
+  parsed.unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, unlocked));
 }
 
 function migrateProgressRecord(key) {
@@ -79,29 +89,30 @@ function migrateProgressRecord(key) {
     if (!parsed || typeof parsed !== "object") return;
     if (parsed.coreConsistencyMigration >= MIGRATION_TAG) return;
 
+    const currentIds = new Set(FRIDGE_BR_CAMPAIGN.map((level) => level.id));
     const starIds = Object.keys(parsed.stars && typeof parsed.stars === "object" ? parsed.stars : {});
+    const stableCurrentId = typeof parsed.currentLevelId === "string" && currentIds.has(parsed.currentLevelId)
+      ? parsed.currentLevelId
+      : null;
     const hasPantryProgress = starIds.some((id) => id.startsWith("pantry-"));
+    const hasUnknownStarLevel = starIds.some((id) => !currentIds.has(id));
+    const hasUnknownCurrentId = typeof parsed.currentLevelId === "string" && !currentIds.has(parsed.currentLevelId);
+    const explicitLegacyEvidence = hasUnknownStarLevel || hasUnknownCurrentId;
 
-    // Layout 3 was used by both the old nine-pack-insert build and the current
-    // pantry build. Pantry star IDs prove the save already uses the current order,
-    // so only legacy-looking records are remapped. This avoids regressing a current
-    // late-game save around the removed insert after fridge 18.
-    if ((parsed.layout || 1) === 3 && !hasPantryProgress) {
-      const legacy = buildLegacyLayout();
-      const oldCurrent = Math.max(0, Math.min(legacy.length - 1, Number(parsed.current || 0)));
-      const current = currentIndexForLegacyToken(legacy[oldCurrent]);
-
-      const oldUnlocked = Math.max(1, Math.min(legacy.length, Number(parsed.unlocked || 1)));
-      let unlocked = 1;
-      for (const token of legacy.slice(0, oldUnlocked)) {
-        unlocked = Math.max(unlocked, currentIndexForLegacyToken(token) + 1);
-      }
-
-      parsed.current = Math.max(0, Math.min(FRIDGE_BR_CAMPAIGN.length - 1, current));
-      parsed.unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, unlocked));
+    if (stableCurrentId) {
+      const stableIndex = FRIDGE_BR_CAMPAIGN.findIndex((level) => level.id === stableCurrentId);
+      parsed.current = Math.max(0, stableIndex);
+      parsed.unlocked = Math.max(
+        parsed.current + 1,
+        Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, Number(parsed.unlocked || 1))),
+      );
+    } else if ((parsed.layout || 1) === 3 && !hasPantryProgress && explicitLegacyEvidence) {
+      migrateLegacyLayout3(parsed);
     } else {
-      parsed.current = Math.max(0, Math.min(FRIDGE_BR_CAMPAIGN.length - 1, Number(parsed.current || 0)));
-      parsed.unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, Number(parsed.unlocked || 1)));
+      // Layout 3 is ambiguous: both the old pack-insert build and the current pantry
+      // build used it. Without positive legacy evidence, preserving the current index
+      // is safer than guessing and moving a valid modern save to another level.
+      clampCurrent(parsed);
     }
 
     parsed.currentLevelId = FRIDGE_BR_CAMPAIGN[parsed.current]?.id || "fridge-br-1";
