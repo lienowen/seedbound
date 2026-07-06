@@ -1,4 +1,7 @@
 import { useEffect, useRef } from "react";
+import { assetUrl } from "../assetBase.js";
+
+const HOME_HERO_SRC = assetUrl("tidy/home-hero-market.png");
 
 const svgProps = {
   viewBox: "0 0 24 24",
@@ -255,8 +258,8 @@ export function HomeScreen({
       </header>
 
       <div className="nav-home-hero">
-        <img src="/assets/tidy/home-hero.png" alt="" className="nav-home-art" />
-        <h1 className="nav-home-title">Seedbound</h1>
+        <img src={HOME_HERO_SRC} alt="" className="nav-home-art" />
+        <h1 className="nav-home-title">Cozy Shelf</h1>
         <p className="nav-home-tagline">{nav.tagline}</p>
       </div>
 
@@ -313,7 +316,30 @@ export function HomeScreen({
 }
 
 /* -------------------------------------------------------------- Level map */
-export function LevelMapScreen({ nav, coins, campaign, unlockedCount, starsById, onPlayLevel, onBack }) {
+function ZoneGlyph({ kind }) {
+  // Simple line icons (no emoji) — a cold cabinet vs a shelf gondola.
+  if (kind === "fridge") {
+    return (
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="5" y="2.5" width="14" height="19" rx="2.2" />
+        <line x1="5" y1="10" x2="19" y2="10" />
+        <line x1="8.5" y1="5" x2="8.5" y2="7.5" />
+        <line x1="8.5" y1="13" x2="8.5" y2="16" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="1.6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="7" y1="7" x2="7" y2="9.5" />
+      <line x1="12" y1="7" x2="12" y2="9.5" />
+      <line x1="17" y1="7" x2="17" y2="9.5" />
+    </svg>
+  );
+}
+
+export function LevelMapScreen({ nav, coins, campaign, zones = [], unlockedCount, starsById, onPlayLevel, onBack }) {
   const currentRef = useRef(null);
   useEffect(() => {
     currentRef.current?.scrollIntoView({ block: "center" });
@@ -328,6 +354,55 @@ export function LevelMapScreen({ nav, coins, campaign, unlockedCount, starsById,
         <h2 className="nav-bar-title">{nav.mapTitle}</h2>
         <CoinPill coins={coins} />
       </header>
+
+      {zones.length > 0 && (
+        <div className="store-map" aria-label={nav.storeMap}>
+          <div className="store-map-head">
+            <h3 className="store-map-title">{nav.storeMap}</h3>
+            <p className="store-map-sub">{nav.storeMapSub}</p>
+          </div>
+          <ul className="store-map-zones">
+            {zones.map((z) => {
+              const complete = !z.locked && z.done >= z.total;
+              const pct = z.total ? Math.round((z.done / z.total) * 100) : 0;
+              return (
+                <li key={z.id} className={`store-zone store-zone--${z.kind}${z.locked ? " is-locked" : ""}${complete ? " is-complete" : ""}`}>
+                  <button
+                    type="button"
+                    className="store-zone-btn"
+                    disabled={z.locked}
+                    onClick={() => !z.locked && onPlayLevel(z.playIndex)}
+                    aria-label={`${z.name}${z.locked ? ` — ${nav.zoneLockedAt(z.unlockLevel)}` : ` — ${nav.zoneProgress(z.done, z.total)}`}`}
+                  >
+                    <span className="store-zone-glyph">
+                      {z.locked ? (
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="5" y="11" width="14" height="9" rx="2" />
+                          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                        </svg>
+                      ) : (
+                        <ZoneGlyph kind={z.kind} />
+                      )}
+                    </span>
+                    <span className="store-zone-body">
+                      <span className="store-zone-name">{z.name}</span>
+                      <span className="store-zone-meta">
+                        {z.locked ? nav.zoneLockedAt(z.unlockLevel) : complete ? nav.zoneDone : nav.zoneProgress(z.done, z.total)}
+                      </span>
+                      {!z.locked && (
+                        <span className="store-zone-bar" aria-hidden="true">
+                          <span className="store-zone-fill" style={{ width: `${pct}%` }} />
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       <p className="nav-map-sub">{nav.mapSub}</p>
 
       <ol className="nav-map-list">
@@ -336,6 +411,9 @@ export function LevelMapScreen({ nav, coins, campaign, unlockedCount, starsById,
           const isCurrent = index === unlockedCount - 1;
           const stars = starsById[entry.id] || 0;
           const packing = !!entry.packing;
+          const pantry = entry.theme?.key === "pantry";
+          const typeMod = packing ? "pack" : pantry ? "pantry" : "fridge";
+          const typeLabel = packing ? nav.packType : pantry ? nav.pantryType : nav.fridgeType;
           return (
             <li
               key={entry.id}
@@ -352,8 +430,8 @@ export function LevelMapScreen({ nav, coins, campaign, unlockedCount, starsById,
                 <span className="nav-node-num">{locked ? "🔒" : index + 1}</span>
                 <span className="nav-node-info">
                   <strong className="nav-node-name">{entry.theme.title}</strong>
-                  <span className={`nav-node-type nav-node-type--${packing ? "pack" : "fridge"}`}>
-                    {packing ? nav.packType : nav.fridgeType}
+                  <span className={`nav-node-type nav-node-type--${typeMod}`}>
+                    {typeLabel}
                   </span>
                 </span>
                 {!locked && <Stars count={stars} />}
@@ -367,7 +445,7 @@ export function LevelMapScreen({ nav, coins, campaign, unlockedCount, starsById,
 }
 
 /* ---------------------------------------------------------------- Settings */
-export function SettingsScreen({ nav, muted, onToggleSound, locale, onSetLocale, onReset, onBack, langLabels }) {
+export function SettingsScreen({ nav, muted, onToggleSound, onReset, onBack }) {
   return (
     <section className="nav-screen nav-settings" aria-label={nav.settingsTitle}>
       <header className="nav-bar">
@@ -391,22 +469,6 @@ export function SettingsScreen({ nav, muted, onToggleSound, locale, onSetLocale,
             <span className="nav-toggle-knob" />
             <span className="nav-toggle-text">{muted ? nav.soundOff : nav.soundOn}</span>
           </button>
-        </div>
-
-        <div className="nav-setting-row nav-setting-row--stack">
-          <span className="nav-setting-label">{nav.language}</span>
-          <div className="nav-lang-group" role="group" aria-label={nav.language}>
-            {["pt", "en", "cn"].map((code) => (
-              <button
-                key={code}
-                type="button"
-                className={`nav-lang-btn${locale === code ? " is-active" : ""}`}
-                onClick={() => onSetLocale(code)}
-              >
-                {langLabels[code]}
-              </button>
-            ))}
-          </div>
         </div>
 
         <button type="button" className="nav-btn nav-btn--danger" onClick={onReset}>

@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Phaser from "phaser";
 import { StorageScene } from "./game/StorageScene.js";
 import { createUiSounds } from "./game/playFeedback.js";
-import { FRIDGE_BR_CAMPAIGN, MAKEUP_LEVEL, PICNIC_LEVEL, SUITCASE_LEVEL } from "./levels/fridgePhaserLevel.js";
+import { FRIDGE_BR_CAMPAIGN, PICNIC_LEVEL, SUITCASE_LEVEL, BENTO_LEVEL_EASY } from "./levels/fridgePhaserLevel.js";
 import { createI18n, localizeCampaign, localizeLevel } from "./i18n/index.js";
 import { effectiveLocale, htmlLang, isLocaleSwitcherEnabled, parseLocale, progressStorageKey, switchLocaleHref, writeLocalePreference } from "./i18n/locale.js";
 import { MetaLayer } from "./components/MetaLayer.jsx";
 import { HomeScreen, LevelMapScreen, SettingsScreen, HelpScreen } from "./components/NavScreens.jsx";
+import { ChapterCutscene } from "./components/ChapterCutscene.jsx";
+import { CAMPAIGN_CHAPTERS, CAMPAIGN_FINALE } from "./i18n/campaign.js";
 import { readMeta, writeMeta, discoverItem, bumpStreak, skinById, setMuted as setMetaMuted, dailyStatus } from "./meta/metaProgress.js";
+import { initCrazyGames, cgLoadingStart, cgLoadingStop, cgGameplayStart, cgGameplayStop, cgHappytime, cgMidgameAd } from "./crazygames.js";
 import "./meta.css";
 import "./nav.css";
 
@@ -74,6 +77,25 @@ function writeProgress(locale, progress) {
   }
 }
 
+// Which story chapters the player has already watched, so each cutscene only
+// interrupts once (on first arrival at that chapter's starting level).
+const CHAPTERS_SEEN_KEY = "cozyshelf.chapters.seen";
+function readSeenChapters() {
+  try {
+    const raw = localStorage.getItem(CHAPTERS_SEEN_KEY);
+    return new Set(Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+function writeSeenChapters(set) {
+  try {
+    localStorage.setItem(CHAPTERS_SEEN_KEY, JSON.stringify([...set]));
+  } catch {
+    // Non-critical.
+  }
+}
+
 export function FridgePhaserGame() {
   const mount = useRef(null);
   const sceneRef = useRef(null);
@@ -87,7 +109,7 @@ export function FridgePhaserGame() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const editMode = params.get("edit") === "true";
   const themeParam = params.get("theme");
-  const theme = themeParam === "makeup" ? "makeup" : themeParam === "pack" ? "pack" : themeParam === "suitcase" ? "suitcase" : "fridge";
+  const theme = themeParam === "pack" ? "pack" : themeParam === "suitcase" ? "suitcase" : themeParam === "bento" ? "bento" : "fridge";
   // Standalone single-level modes (no campaign progression / economy UI).
   const standalone = theme !== "fridge";
   const [progress, setProgress] = useState(() => (standalone ? { unlocked: 1, coins: 0, current: 0, stars: {} } : readProgress(locale)));
@@ -104,7 +126,14 @@ export function FridgePhaserGame() {
   const [lastStars, setLastStars] = useState(0);
   const [meta, setMeta] = useState(() => readMeta());
   const [discovery, setDiscovery] = useState(null);
-  const [autoOpenDaily, setAutoOpenDaily] = useState(true);
+  // Story chapter cutscene currently on screen (or null), plus the set of
+  // chapters already watched so each only plays once.
+  const [cutscene, setCutscene] = useState(null);
+  const seenChaptersRef = useRef(readSeenChapters());
+  // Do NOT auto-pop the daily gift on cold start — CrazyGames QA requires
+  // players to land directly in a playable state with nothing blocking the
+  // screen. The gift stays reachable via the menu button (badged when ready).
+  const [autoOpenDaily, setAutoOpenDaily] = useState(false);
   // Screen routing: standalone/edit modes jump straight into the game.
   const [screen, setScreen] = useState(() => (standalone || params.get("edit") === "true" ? "game" : "home"));
   // Lifted meta panel state so Home shortcuts and the in-game toolbar share it.
@@ -114,6 +143,8 @@ export function FridgePhaserGame() {
   const discoveryTimerRef = useRef(null);
   const placedRef = useRef(0);
   const currentIndexRef = useRef(0);
+  // Timestamp of the last midgame ad, to keep ads from showing too frequently.
+  const lastAdRef = useRef(0);
   const progressRef = useRef(progress);
   const hasMountedOnceRef = useRef(false);
 
@@ -121,9 +152,9 @@ export function FridgePhaserGame() {
   currentIndexRef.current = currentIndex;
   progressRef.current = progress;
   const level = useMemo(() => {
-    if (theme === "makeup") return localizeLevel(MAKEUP_LEVEL, locale);
     if (theme === "pack") return localizeLevel(PICNIC_LEVEL, locale);
     if (theme === "suitcase") return localizeLevel(SUITCASE_LEVEL, locale);
+    if (theme === "bento") return localizeLevel(BENTO_LEVEL_EASY, locale);
     return campaign[currentIndex];
   }, [theme, locale, campaign, currentIndex]);
   const isLastLevel = currentIndex >= campaign.length - 1;
@@ -135,6 +166,40 @@ export function FridgePhaserGame() {
   const starsEarned = campaign.reduce((n, entry) => n + (starsById[entry.id] || 0), 0);
   const starsTotal = campaign.length * 3;
   const hasProgress = progress.unlocked > 1 || levelsDone > 0;
+  // Store-map zones: each story chapter is a physical area of the shop, spanning
+  // the campaign levels from its startLevelId up to the next chapter's start.
+  // Meta-progression = areas light up as the frontier advances.
+  const zones = useMemo(() => {
+    const starts = CAMPAIGN_CHAPTERS.map((c) => ({
+      chapter: c,
+      index: Math.max(0, campaign.findIndex((e) => e.id === c.startLevelId)),
+    }));
+    return starts.map((s, i) => {
+      const start = s.index;
+      const end = i + 1 < starts.length ? starts[i + 1].index : campaign.length;
+      const slice = campaign.slice(start, end);
+      const done = slice.reduce((n, e) => n + (starsById[e.id] > 0 ? 1 : 0), 0);
+      const fridgeN = slice.filter((e) => !e.packing && e.theme?.key !== "pantry").length;
+      const kind = fridgeN >= slice.length / 2 ? "fridge" : "pantry";
+      const copy = s.chapter.cn && locale === "cn" ? s.chapter.cn : s.chapter.en;
+      return {
+        id: s.chapter.id,
+        number: s.chapter.number,
+        name: copy.title,
+        startIndex: start,
+        total: slice.length,
+        done,
+        kind,
+        locked: start >= unlockedCount,
+        unlockLevel: start + 1,
+        // Jump target: first uncleared level in the zone, else the zone start.
+        playIndex: (() => {
+          const firstOpen = slice.findIndex((e, k) => !(starsById[e.id] > 0) && start + k < unlockedCount);
+          return firstOpen >= 0 ? start + firstOpen : start;
+        })(),
+      };
+    });
+  }, [campaign, starsById, unlockedCount, locale]);
   const dailyReady = !standalone && dailyStatus(meta).claimable;
   // Packing levels use rotate+fit mechanics, so the fridge "wish" hint does not
   // apply — the Best-Spot tool covers hinting instead.
@@ -143,6 +208,35 @@ export function FridgePhaserGame() {
   useEffect(() => {
     document.documentElement.lang = htmlLang(locale);
   }, [locale]);
+
+  // Show a story cutscene the first time the player reaches a chapter's starting
+  // level (only in the real campaign, on the game screen, once per chapter).
+  useEffect(() => {
+    if (standalone || editMode) return;
+    if (screen !== "game") return;
+    const chapter = CAMPAIGN_CHAPTERS.find((c) => c.startLevelId === level?.id);
+    if (!chapter || seenChaptersRef.current.has(chapter.id)) return;
+    setCutscene(chapter);
+  }, [screen, level?.id, standalone, editMode]);
+
+  // Play the ending once the final level is cleared — the story payoff. Shown
+  // once automatically; can be replayed from the completion screen afterwards.
+  useEffect(() => {
+    if (standalone || editMode) return;
+    if (!complete || !isLastLevel) return;
+    if (seenChaptersRef.current.has(CAMPAIGN_FINALE.id)) return;
+    setCutscene(CAMPAIGN_FINALE);
+  }, [complete, isLastLevel, standalone, editMode]);
+
+  function dismissCutscene() {
+    setCutscene((current) => {
+      if (current) {
+        seenChaptersRef.current.add(current.id);
+        writeSeenChapters(seenChaptersRef.current);
+      }
+      return null;
+    });
+  }
 
   function buildUiState(nextLevel = level, nextProgress = progress) {
     const movable = nextLevel.items.filter((item) => !item.fixed);
@@ -161,11 +255,15 @@ export function FridgePhaserGame() {
       total: movableTotal,
       title: nextLevel.theme.title,
       subtitle: nextLevel.theme.subtitle,
-      goal: nextLevel.packing
-        ? (nextLevel.copy?.goal || i18n.ui.packGoalDefault || i18n.ui.goalDefault)
-        : pickyTotal > 0
-          ? i18n.ui.constraintGoalText(pickyTotal)
-          : i18n.ui.goalDefault,
+      // Prefer the hand-written, story-specific goal for every level. Fall back
+      // to generic auto-generated text only when a level has no authored goal.
+      goal:
+        nextLevel.copy?.goal ||
+        (nextLevel.packing
+          ? i18n.ui.packGoalDefault || i18n.ui.goalDefault
+          : pickyTotal > 0
+            ? i18n.ui.constraintGoalText(pickyTotal)
+            : i18n.ui.goalDefault),
       toast: nextLevel.copy?.intro || i18n.ui.dragHint,
       currentIndex,
       unlockedCount,
@@ -236,9 +334,16 @@ export function FridgePhaserGame() {
     setReloadToken((prev) => prev + 1);
   }
 
-  function goNextLevel() {
+  async function goNextLevel() {
     if (standalone) return;
     const nextIndex = Math.min(currentIndex + 1, campaign.length - 1);
+    // Show a midgame ad at this natural break, throttled to at most once per
+    // ~90s so we never spam the player (a CrazyGames QA requirement).
+    const now = Date.now();
+    if (now - lastAdRef.current > 90000) {
+      lastAdRef.current = now;
+      await cgMidgameAd();
+    }
     soundRef.current?.phase();
     pendingFreshRef.current = true;
     updateProgress({ current: nextIndex });
@@ -263,7 +368,11 @@ export function FridgePhaserGame() {
   function resetCampaign() {
     if (standalone) return;
     soundRef.current?.miss();
-    for (const entry of FRIDGE_BR_CAMPAIGN) localStorage.removeItem(`seedbound.storage.${entry.id}`);
+    for (const entry of FRIDGE_BR_CAMPAIGN) localStorage.removeItem(`cozyshelf.storage.${entry.id}`);
+    // Replay the story from the top on a fresh campaign.
+    seenChaptersRef.current = new Set();
+    writeSeenChapters(seenChaptersRef.current);
+    setCutscene(null);
     updateProgress({ unlocked: 1, coins: 125, current: 0, stars: {} });
     setComplete(false);
     setLastReward(0);
@@ -415,6 +524,27 @@ export function FridgePhaserGame() {
     soundRef.current?.setMuted?.(!!meta.settings?.muted);
   }, [meta.settings?.muted]);
 
+  // ---- CrazyGames SDK lifecycle -------------------------------------------
+  // Initialize once on mount. All calls no-op when the SDK isn't present.
+  useEffect(() => {
+    initCrazyGames();
+  }, []);
+
+  // Loading state: bracket asset boot with loadingStart/loadingStop so the
+  // portal can show its own loading UI and hold ads until the game is ready.
+  useEffect(() => {
+    if (booting) cgLoadingStart();
+    else cgLoadingStop();
+  }, [booting]);
+
+  // Gameplay is active exactly while the game screen is showing an unfinished
+  // level (not on Home/Map/Settings, not on the win overlay, not while booting).
+  const gameplayActive = screen === "game" && !complete && !booting;
+  useEffect(() => {
+    if (gameplayActive) cgGameplayStart();
+    else cgGameplayStop();
+  }, [gameplayActive]);
+
   useEffect(() => {
     // Only mount Phaser while the game screen is active; Home/Map/Settings are
     // pure React so we free the canvas + audio while the player is browsing.
@@ -464,6 +594,12 @@ export function FridgePhaserGame() {
           soundRef.current?.miss();
           setMessage(event.message);
         });
+        // Full-shelf restock payoff: award bonus coins + a celebratory sound.
+        scene.events.on("shelf-clear", (detail) => {
+          if (detail?.bonus) addCoins(detail.bonus);
+          if ((detail?.streak || 0) >= 2) soundRef.current?.fanfare?.();
+          else soundRef.current?.impact?.();
+        });
         // Packing-mode tactile feedback
         scene.events.on("pickup", () => soundRef.current?.pickup?.());
         scene.events.on("rotate", () => soundRef.current?.rotate?.());
@@ -508,6 +644,7 @@ export function FridgePhaserGame() {
         soundRef.current?.success();
       }
       setComplete(true);
+      cgHappytime();
       setLastReward(detail.gold || 0);
       setLastStars(detail.stars || 1);
       const starText = i18n.ui.starLabel(detail.stars || 1);
@@ -657,6 +794,7 @@ export function FridgePhaserGame() {
           nav={nav}
           coins={progress.coins}
           campaign={campaign}
+          zones={zones}
           unlockedCount={unlockedCount}
           starsById={starsById}
           onPlayLevel={playLevelFromMap}
@@ -668,13 +806,10 @@ export function FridgePhaserGame() {
           nav={nav}
           muted={!!meta.settings?.muted}
           onToggleSound={toggleSound}
-          locale={locale}
-          onSetLocale={(code) => changeLocale(code, { preventDefault() {} })}
           onReset={() => {
             if (window.confirm(nav.resetConfirm)) resetCampaign();
           }}
           onBack={goHome}
-          langLabels={{ pt: i18n.ui.langPt, en: i18n.ui.langEn, cn: i18n.ui.langCn }}
         />
       )}
       {!standalone && !editMode && screen === "help" && (
@@ -785,7 +920,7 @@ export function FridgePhaserGame() {
       {showGame && <div className={`fridge-boot-overlay fridge-boot-overlay--${bootVariant}${booting ? " visible" : ""}`} aria-hidden={!booting}>
         <div className="fridge-boot-overlay__veil" />
         <div className="fridge-boot-overlay__card">
-          <div className="fridge-boot-badge">Seedbound</div>
+          <div className="fridge-boot-badge">Cozy Shelf</div>
           <div className="fridge-boot-portal" aria-hidden="true">
             <div className="fridge-boot-portal__glow" />
             <div className="fridge-boot-portal__frame">
@@ -811,6 +946,9 @@ export function FridgePhaserGame() {
           <p>{level.copy?.intro || i18n.ui.dragHint}</p>
         </div>
       </div>}
+      {showGame && cutscene && (
+        <ChapterCutscene chapter={cutscene} locale={locale} onDismiss={dismissCutscene} />
+      )}
       {showGame && complete && (
         <section className="fridge-result fridge-result--celebrate">
           <div className="fridge-result-sparkles" aria-hidden="true">
@@ -829,6 +967,11 @@ export function FridgePhaserGame() {
           <p>{level.copy?.successBody || i18n.ui.successBody}</p>
           <div className="fridge-result-actions">
             {!isLastLevel && <button onClick={goNextLevel}>{level.copy?.nextLabel || i18n.ui.nextLabel}</button>}
+            {isLastLevel && (
+              <button onClick={() => setCutscene(CAMPAIGN_FINALE)}>
+                {locale === "cn" ? "重温结局" : "See the ending"}
+              </button>
+            )}
             <button className="secondary" onClick={replayLevel}>{level.copy?.retryLabel || i18n.ui.retryLabel}</button>
             {!standalone && <button className="secondary" onClick={() => { setComplete(false); setScreen("map"); }}>{nav.levelMap}</button>}
           </div>

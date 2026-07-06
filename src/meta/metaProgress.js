@@ -1,4 +1,4 @@
-// Meta-progression layer for Seedbound.
+// Meta-progression layer for Cozy Shelf.
 // A single localStorage-backed store powering four retention hooks:
 //   1. Food catalog   -> discovered items (collection book)
 //   2. Combo streak    -> consecutive level completions
@@ -6,8 +6,10 @@
 //   4. Coin shop       -> owned + equipped fridge skins
 // Everything lives under one key so it is easy to inspect and reset while testing.
 
-const STORE_KEY = "seedbound.meta.v1";
-const ASSET_BASE = `${import.meta.env.BASE_URL}assets/tidy/`;
+import { TIDY_BASE, SKINS_BASE } from "../assetBase.js";
+
+const STORE_KEY = "cozyshelf.meta.v1";
+const ASSET_BASE = TIDY_BASE;
 
 // ---- Catalog metadata (localized names + flavor text) -----------------------
 // Ordered roughly by when players first meet each item in the campaign.
@@ -73,7 +75,7 @@ export const CATALOG_TEXT = {
 
 // ---- Fridge skins (shop) ----------------------------------------------------
 // Each skin recolors the scene background. `price` 0 == owned by default.
-const SKIN_BASE = `${import.meta.env.BASE_URL}assets/skins/`;
+const SKIN_BASE = SKINS_BASE;
 
 export const FRIDGE_SKINS = [
   { id: "cream", price: 0, background: "#ffecc8", swatch: "#ffecc8", pattern: `${SKIN_BASE}cream.png` },

@@ -182,4 +182,21 @@ export const ITEM_RENDER_PROFILES = {
   watermelon: { originX: 0.4522, originY: 0.9807, contactLeft: 0.0994, contactRight: 0.8177, contactCenterX: 0.4522, contactY: 0.9807, visibleTopY: 0.0773, visibleHeight: 0.9033, supportTopY: 0.0773, stackable: false, textureWidth: 362, textureHeight: 362 },
   corn: { originX: 0.4431, originY: 0.9807, contactLeft: 0.0829, contactRight: 0.8232, contactCenterX: 0.4431, contactY: 0.9807, visibleTopY: 0.4199, visibleHeight: 0.5608, supportTopY: 0.4199, stackable: false, textureWidth: 362, textureHeight: 362 },
   fish: { originX: 0.4931, originY: 0.9807, contactLeft: 0.0414, contactRight: 0.7845, contactCenterX: 0.4931, contactY: 0.9807, visibleTopY: 0.6519, visibleHeight: 0.3287, supportTopY: 0.6519, stackable: false, textureWidth: 362, textureHeight: 362 },
+
+  // ---- PANTRY DRY-GOODS (repointed to hand-drawn art in scripts/process-assets.mjs) ----
+  // Keys keep their gameplay names; textures now load the real cut-outs (512px).
+  jam: { originX: 0.4834, originY: 0.9395, contactLeft: 0.248, contactRight: 0.7539, contactCenterX: 0.501, contactY: 0.9395, visibleTopY: 0.1094, visibleHeight: 0.8301, supportTopY: 0.1094, stackable: false, textureWidth: 512, textureHeight: 512 },
+  honey: { originX: 0.498, originY: 0.9336, contactLeft: 0.2676, contactRight: 0.7383, contactCenterX: 0.5029, contactY: 0.9336, visibleTopY: 0.1191, visibleHeight: 0.8145, supportTopY: 0.1191, stackable: false, textureWidth: 512, textureHeight: 512 },
+  coffee: { originX: 0.5039, originY: 0.918, contactLeft: 0.1934, contactRight: 0.8223, contactCenterX: 0.5078, contactY: 0.918, visibleTopY: 0.1055, visibleHeight: 0.8125, supportTopY: 0.1055, stackable: true, textureWidth: 512, textureHeight: 512 },
+  beans: { originX: 0.5088, originY: 0.8613, contactLeft: 0.291, contactRight: 0.7324, contactCenterX: 0.5117, contactY: 0.8613, visibleTopY: 0.1602, visibleHeight: 0.7012, supportTopY: 0.1602, stackable: true, textureWidth: 512, textureHeight: 512 },
+  peanut: { originX: 0.499, originY: 0.9004, contactLeft: 0.293, contactRight: 0.7246, contactCenterX: 0.5088, contactY: 0.9004, visibleTopY: 0.1133, visibleHeight: 0.7871, supportTopY: 0.1133, stackable: false, textureWidth: 512, textureHeight: 512 },
+  chips: { originX: 0.5088, originY: 0.9453, contactLeft: 0.1953, contactRight: 0.8242, contactCenterX: 0.5098, contactY: 0.9453, visibleTopY: 0.0625, visibleHeight: 0.8828, supportTopY: 0.0625, stackable: false, textureWidth: 512, textureHeight: 512 },
+  // ---- New hand-drawn extras (own keys) ----
+  "jar-choco": { originX: 0.499, originY: 0.9512, contactLeft: 0.248, contactRight: 0.7734, contactCenterX: 0.5107, contactY: 0.9512, visibleTopY: 0.1055, visibleHeight: 0.8457, supportTopY: 0.1055, stackable: false, textureWidth: 512, textureHeight: 512 },
+  "can-peas": { originX: 0.5039, originY: 0.8809, contactLeft: 0.2734, contactRight: 0.7441, contactCenterX: 0.5088, contactY: 0.8809, visibleTopY: 0.1191, visibleHeight: 0.7617, supportTopY: 0.1191, stackable: true, textureWidth: 512, textureHeight: 512 },
+  "can-tuna": { originX: 0.4463, originY: 0.7949, contactLeft: 0.1758, contactRight: 0.8242, contactCenterX: 0.5, contactY: 0.7949, visibleTopY: 0.0273, visibleHeight: 0.7676, supportTopY: 0.0273, stackable: true, textureWidth: 512, textureHeight: 512 },
+  "box-pasta": { originX: 0.5234, originY: 0.9668, contactLeft: 0.1855, contactRight: 0.8613, contactCenterX: 0.5234, contactY: 0.9668, visibleTopY: 0.0313, visibleHeight: 0.9355, supportTopY: 0.0313, stackable: false, textureWidth: 512, textureHeight: 512 },
+  crackers: { originX: 0.5367, originY: 0.9807, contactLeft: 0.3923, contactRight: 0.6851, contactCenterX: 0.5367, contactY: 0.9807, visibleTopY: 0.5635, visibleHeight: 0.4171, supportTopY: 0.5635, stackable: true, textureWidth: 362, textureHeight: 362 },
+  cookies: { originX: 0.4976, originY: 0.9807, contactLeft: 0.3591, contactRight: 0.6464, contactCenterX: 0.4976, contactY: 0.9807, visibleTopY: 0.5193, visibleHeight: 0.4613, supportTopY: 0.5193, stackable: true, textureWidth: 362, textureHeight: 362 },
+  pasta: { originX: 0.4998, originY: 0.9807, contactLeft: 0.0525, contactRight: 0.9503, contactCenterX: 0.4998, contactY: 0.9807, visibleTopY: 0.6961, visibleHeight: 0.2845, supportTopY: 0.6961, stackable: true, textureWidth: 362, textureHeight: 362 },
 };

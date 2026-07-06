@@ -16,7 +16,7 @@ createRoot(document.getElementById("root")).render(
       fallback={(
         <main className="fridge-shell fridge-boot-shell">
           <section className="fridge-boot-card fridge-boot-card--transition" aria-live="polite">
-            <div className="fridge-boot-badge">Seedbound</div>
+            <div className="fridge-boot-badge">Cozy Shelf</div>
             <div className="fridge-boot-portal" aria-hidden="true">
               <div className="fridge-boot-portal__glow" />
               <div className="fridge-boot-portal__frame">
@@ -38,8 +38,8 @@ createRoot(document.getElementById("root")).render(
                 </div>
               </div>
             </div>
-            <h1>Seedbound</h1>
-            <p>Opening the cozy fridge...</p>
+            <h1>Cozy Shelf</h1>
+            <p>Opening up the shop...</p>
           </section>
         </main>
       )}

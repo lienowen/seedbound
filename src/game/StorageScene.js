@@ -2,8 +2,9 @@ import Phaser from "phaser";
 import { STORAGE_LEVEL } from "../levels/fridgePhaserLevel.js";
 import { StorageEngine } from "./StorageEngine.js";
 import { createI18n } from "../i18n/index.js";
+import { TIDY_BASE } from "../assetBase.js";
 
-const ASSET = `${import.meta.env.BASE_URL}assets/tidy/`;
+const ASSET = TIDY_BASE;
 const PREVIEW_COLORS = {
   good: { fill: 0x67edb8, line: 0xeafff7, fillAlpha: 0.12, lineAlpha: 0.88, lineWidth: 3 },
   bad: { fill: 0xff7d62, line: 0xffefe7, fillAlpha: 0.14, lineAlpha: 0.82, lineWidth: 3 },
@@ -11,7 +12,7 @@ const PREVIEW_COLORS = {
 // The order in which an item's hard requirements are surfaced (bubble + badge).
 // Only these gate the win — "likesNeighbors" is a soft bonus and never shown as
 // a requirement, so we no longer nag the player to "put me next to X".
-const NEED_PRIORITY = ["cold", "warm", "topShelf", "zone", "visible", "hates"];
+const NEED_PRIORITY = ["cold", "warm", "topShelf", "category", "heavy", "light", "zone", "visible", "mustNeighbor", "hates"];
 // Inner-wall regions where the shop skin "liner" wallpaper is tiled. Tuned to
 // the realistic fridge board: the main cabinet (shelves/drawers) and the door.
 const SKIN_LINER_REGIONS = [
@@ -69,6 +70,8 @@ export class StorageScene extends Phaser.Scene {
     this.mistakeCount = 0;
     this.comboSparkTimer?.remove?.();
     this.comboSparkTimer = null;
+    this._clearedShelves = new Set();
+    this._shelfStreak = 0;
     this.phaseButtons = [];
     this.phaseButtonTexts = [];
   }
@@ -81,6 +84,13 @@ export class StorageScene extends Phaser.Scene {
     });
     this.loadStageAsset(level.assets?.back);
     this.loadStageAsset(level.assets?.front);
+    if (Array.isArray(level.stage?.fixtures)) {
+      for (const fx of level.stage.fixtures) {
+        if (!fx?.key || !fx?.file) continue;
+        if (this.textures.exists(fx.key)) continue;
+        this.load.image(fx.key, `${ASSET}${fx.file}`);
+      }
+    }
     for (const item of level.items) {
       if (this.textures.exists(item.image)) continue;
       const file = item.file || `${item.image}.png`;
@@ -144,6 +154,7 @@ export class StorageScene extends Phaser.Scene {
     this.buildStage();
     this.buildSlots();
     this.buildItems();
+    this.buildFacingGhosts();
     this.buildEditor();
     this.unsubscribeEngine = this.engine.subscribe((state, validation) => this.renderState(state, validation));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.unsubscribeEngine?.());
@@ -157,7 +168,7 @@ export class StorageScene extends Phaser.Scene {
   // ---- FIRST-TIME COACHING ----
   hasOnboarded() {
     try {
-      return localStorage.getItem("seedbound_onboarded_v1") === "1";
+      return localStorage.getItem("cozyshelf_onboarded_v1") === "1";
     } catch {
       return false;
     }
@@ -165,7 +176,7 @@ export class StorageScene extends Phaser.Scene {
 
   markOnboarded() {
     try {
-      localStorage.setItem("seedbound_onboarded_v1", "1");
+      localStorage.setItem("cozyshelf_onboarded_v1", "1");
     } catch {
       /* storage blocked; coaching just won't persist */
     }
@@ -302,6 +313,12 @@ export class StorageScene extends Phaser.Scene {
       if (this.skinLiners) for (const img of this.skinLiners) img.destroy();
       this.skinLiners = [];
     };
+    // The market shelf (pantry) is fully self-styled and its liner regions are
+    // fridge-specific, so skip the wallpaper liners there entirely.
+    if (this.level?.theme?.key === "pantry") {
+      clearLiners();
+      return;
+    }
     const place = (key) => {
       clearLiners();
       this.skinLiners = SKIN_LINER_REGIONS.map((r) => {
@@ -349,7 +366,26 @@ export class StorageScene extends Phaser.Scene {
     const g = this.add.graphics();
     if (this.level.assets?.back) {
       const back = this.level.assets.back;
-      if (back.contain) {
+      if (back.coverTop) {
+        // Fit a (square) backdrop illustration to the stage width and anchor it
+        // to the top; a floor-color fill covers whatever remains below it so the
+        // scene reads as a continuous store interior (see the pantry level's
+        // floor rect). Used by the supermarket-aisle backdrop.
+        const sw = this.level.stage.width, sh = this.level.stage.height;
+        const src = this.textures.get(back.key).getSourceImage();
+        const dispW = sw;
+        const dispH = src && src.width ? (src.height * sw) / src.width : sh;
+        if (back.floorFill != null) {
+          g.fillStyle(back.floorFill, 1);
+          g.fillRect(0, Math.max(0, dispH - 2), sw, sh - Math.max(0, dispH - 2));
+        }
+        // Depth -10 keeps the backdrop behind the shapes graphics (depth 0),
+        // which is where the gondola shelf is drawn.
+        this.add.image(sw / 2, 0, back.key)
+          .setOrigin(0.5, 0)
+          .setDisplaySize(dispW, dispH)
+          .setDepth(-10);
+      } else if (back.contain) {
         // Preserve the square aspect of a top-down illustration (e.g. the
         // picnic basket) instead of stretching it to the portrait stage.
         const size = back.size || this.level.stage.width;
@@ -364,6 +400,20 @@ export class StorageScene extends Phaser.Scene {
     }
     for (const shape of this.level.stage.shapes) this.drawShape(g, shape);
     g.setDepth(0);
+
+    // Fixture base images (real hand-drawn coolers / shelving). Rendered above
+    // the backdrop but below items so goods stack ON the painted shelves. Each
+    // entry: { key, cx, cy, w, h, depth }. Missing textures fall back silently
+    // to the procedural shapes already drawn above.
+    if (Array.isArray(this.level.stage.fixtures)) {
+      for (const fx of this.level.stage.fixtures) {
+        if (!this.textures.exists(fx.key)) continue;
+        this.add.image(fx.cx, fx.cy, fx.key)
+          .setDisplaySize(fx.w, fx.h)
+          .setOrigin(0.5, fx.originY ?? 0.5)
+          .setDepth(fx.depth ?? 2);
+      }
+    }
 
     this.itemLayer = this.add.layer().setDepth(100);
     this.frontLayer = this.add.layer().setDepth(300);
@@ -929,7 +979,165 @@ export class StorageScene extends Phaser.Scene {
       this.syncSlotVisual(entry);
       return entry;
     });
+    this.buildShelfCategoryTags();
     if (this.editMode && this.slots.length) this.selectSlot(this.slots[0].id);
+  }
+
+  // Persistent shelf labels for the pantry category rule. Without a visible tag
+  // the "put jars on the jar shelf" rule would be guesswork, so each labelled
+  // shelf gets a small cozy pill on its left edge naming what it holds.
+  buildShelfCategoryTags() {
+    if (this.categoryTags) this.categoryTags.forEach((t) => t.destroy());
+    this.categoryTags = [];
+    if (this.editMode) return;
+    const names = this.i18n?.ui?.shelfCategory || {};
+    for (const slot of this.slots) {
+      if (!slot.category) continue;
+      const name = names[slot.category] || slot.category;
+      // Sit the label on the shelf's cream price-tag rail (drawn just below the
+      // plank top at slot.y + 16), like a real supermarket shelf-edge label.
+      const tag = this.add.text(slot.x - slot.w / 2 + 4, slot.y + 15, name.toUpperCase(), {
+        fontFamily: "Baloo 2, sans-serif",
+        fontSize: 15,
+        fontStyle: "bold",
+        color: "#8a5220",
+        backgroundColor: "rgba(255, 247, 232, 0.95)",
+        padding: { x: 8, y: 2 },
+      }).setOrigin(0, 0).setDepth(62);
+      this.categoryTags.push(tag);
+    }
+  }
+
+  // Restock facing outlines: a neutral empty "slot" frame at each facing the
+  // shelf can hold — NOT the product itself. It shows how many facings a shelf
+  // fits and where they sit, but deliberately reveals nothing about WHICH good
+  // belongs there. The shelf's category label (JARS / CANS / DRINKS…) is the
+  // only sorting clue, so stocking stays a light bit of reasoning instead of
+  // "match the picture to its own shadow." Outlines fade as facings fill.
+  buildFacingGhosts() {
+    if (this.facingGhosts) this.facingGhosts.forEach((g) => g.ghost.destroy());
+    this.facingGhosts = [];
+    const plan = this.level?.planogram;
+    if (!plan?.length || this.editMode) return;
+    for (const shelf of plan) {
+      const slot = this.findSlot(shelf.slotId);
+      if (!slot) continue;
+      shelf.products.forEach((imageKey, col) => {
+        // Borrow a real level item only to compute the facing's anchor point and
+        // footprint — never its texture — so the outline sits where a good lands.
+        const def = this.level.items.find((it) => it.image === imageKey);
+        if (!def) return;
+        const anchor = this.engine.placementAnchor({ slotId: slot.id, col, row: 0, layer: 0, rot: 0, itemId: def.id });
+        const fakeEntry = { status: "packed", slotId: slot.id, col, row: 0, layer: 0, rot: 0, x: anchor.x, y: anchor.y, itemId: def.id };
+        const pt = this.displayPointFor(def, fakeEntry);
+        const scale = this.displayScaleFor(def, fakeEntry);
+        const tex = this.textures.get(imageKey)?.getSourceImage?.();
+        const fw = (tex?.width ?? 120) * scale * 0.62;
+        const fh = (tex?.height ?? 120) * scale * 0.72;
+        const ghost = this.add.container(pt.x, pt.y - fh * 0.28);
+        const frame = this.add.graphics();
+        frame.fillStyle(0x000000, 0.05);
+        frame.fillRoundedRect(-fw / 2, -fh / 2, fw, fh, 10);
+        frame.lineStyle(2, 0x8a6a4a, 0.35);
+        frame.strokeRoundedRect(-fw / 2, -fh / 2, fw, fh, 10);
+        const dot = this.add.graphics();
+        dot.fillStyle(0x8a6a4a, 0.3);
+        dot.fillCircle(0, 0, 4);
+        ghost.add([frame, dot]);
+        ghost.setDepth(60);
+        this.itemLayer.add(ghost);
+        this.facingGhosts.push({ slotId: slot.id, col, ghost });
+      });
+    }
+    this.updateFacingGhosts();
+  }
+
+  // Fade out the outline for any facing that now holds a real good; show the rest.
+  updateFacingGhosts() {
+    if (!this.facingGhosts?.length) return;
+    const snap = this.engine.snapshot();
+    const occupied = new Set();
+    for (const entry of Object.values(snap.items)) {
+      if (entry.status === "packed" && entry.slotId != null) occupied.add(`${entry.slotId}:${entry.col ?? 0}`);
+    }
+    for (const g of this.facingGhosts) {
+      const filled = occupied.has(`${g.slotId}:${g.col}`);
+      if (filled && g.ghost.visible) {
+        this.tweens.add({ targets: g.ghost, alpha: 0, duration: 160, onComplete: () => g.ghost.setVisible(false) });
+      } else if (!filled) {
+        g.ghost.setVisible(true).setAlpha(1);
+      }
+    }
+  }
+
+  // Restock payoff: detect when a whole shelf row just became fully & correctly
+  // stocked, and reward it once. This is the "face up a full row" satisfaction
+  // that makes restocking fun — a sweep of sparkles across the shelf, a callout,
+  // and bonus coins that scale with how many rows you complete in a streak.
+  checkShelfCompletions(slotId) {
+    const plan = this.level?.planogram;
+    if (!plan?.length || slotId == null) return;
+    const shelf = plan.find((s) => s.slotId === slotId);
+    if (!shelf) return;
+    this._clearedShelves = this._clearedShelves || new Set();
+    if (this._clearedShelves.has(slotId)) return;
+
+    const snap = this.engine.snapshot();
+    const occupied = new Set();
+    for (const entry of Object.values(snap.items)) {
+      if (entry.status === "packed" && entry.slotId != null) occupied.add(`${entry.slotId}:${entry.col ?? 0}`);
+    }
+    const full = shelf.products.every((_, col) => occupied.has(`${slotId}:${col}`));
+    if (!full) return;
+
+    this._clearedShelves.add(slotId);
+    this._shelfStreak = (this._shelfStreak || 0) + 1;
+    const streak = this._shelfStreak;
+    const bonus = 15 + (streak - 1) * 10; // 15, 25, 35… for back-to-back rows
+
+    const slot = this.findSlot(slotId);
+    if (slot) this.playShelfClear(slot, shelf.products.length, streak);
+
+    const tag = this.i18n.ui.shelfCleared || "Shelf faced up!";
+    this.playCallout(streak >= 3 ? this.i18n.ui.shelfClearStreak?.(streak) || tag : tag, streak >= 3 ? "fire" : "gold");
+    this.setToastMessage((this.i18n.ui.shelfBonus && this.i18n.ui.shelfBonus(bonus)) || `Full shelf! +${bonus} coins`);
+    this.events.emit("shelf-clear", { slotId, bonus, streak });
+  }
+
+  // A left-to-right sweep of sparkle stars along a completed shelf + a soft
+  // banner sheen, so a finished row reads as an achievement, not just "done".
+  playShelfClear(slot, facings, streak = 1) {
+    const layer = this.add.layer().setDepth(965);
+    const y = slot.y - (slot.h ? slot.h * 0.12 : 24);
+    const x0 = slot.x - (slot.w ? slot.w / 2 : 120);
+    const span = slot.w || 240;
+    const starColors = [0xfff8df, 0xbdf5dc, 0xffe9a8, 0xffd166];
+
+    // Warm sheen bar that wipes across the shelf.
+    const bar = this.add.rectangle(x0, y, span, slot.h ? slot.h * 0.9 : 70, 0xffe9a8, 0.0).setOrigin(0, 0.5);
+    layer.add(bar);
+    this.tweens.add({ targets: bar, alpha: { from: 0.28, to: 0 }, duration: 520, ease: "Sine.out" });
+
+    const count = Math.max(6, facings * 3);
+    for (let i = 0; i < count; i += 1) {
+      const t = i / (count - 1);
+      const sx = x0 + span * t;
+      const size = 5 + Math.random() * 5;
+      const star = this.add.star(sx, y + (Math.random() - 0.5) * 30, 4, size * 0.42, size, starColors[i % starColors.length], 0.95).setDepth(966);
+      star.setScale(0);
+      layer.add(star);
+      this.tweens.add({
+        targets: star,
+        scale: { from: 0, to: 1 },
+        y: star.y - (24 + Math.random() * 20),
+        alpha: { from: 1, to: 0 },
+        delay: Math.round(t * 260),
+        duration: 480,
+        ease: "Quad.out",
+      });
+    }
+    if (streak >= 2) this.cameras.main.flash(120, 255, 233, 168, false);
+    this.time.delayedCall(900, () => layer.destroy());
   }
 
   buildItems() {
@@ -1090,44 +1298,30 @@ export class StorageScene extends Phaser.Scene {
 
     if (!this.editMode) {
       if (this.topDown && (cols > 1 || rows > 1)) {
-        // Clear packing lattice: a rounded playfield with visible cell borders so
-        // players can read exactly which cells they still need to fill.
+        // Cozy packing tray: instead of a hard "spreadsheet" lattice we render
+        // each cell as its own soft, rounded recessed tile. This reads as a set
+        // of inviting little pockets to fill, matching the fridge's soft look.
         const cellW = slot.w / cols;
         const cellH = slot.h / rows;
-        const inset = 6;
-        const pfL = left + inset;
-        const pfT = top + inset;
-        const pfW = slot.w - inset * 2;
-        const pfH = slot.h - inset * 2;
-        // Soft inset panel lightens the busy backdrop so the grid reads clearly.
-        slot.guide.fillStyle(0xffffff, 0.20);
-        slot.guide.fillRoundedRect(pfL, pfT, pfW, pfH, 16);
-        // Grid lines drawn twice (dark halo + light core) so they stand out on
-        // any backdrop colour instead of vanishing into the pattern.
-        const drawLine = (x1, y1, x2, y2) => {
-          slot.guide.lineStyle(4, 0x3a2410, 0.16);
-          slot.guide.lineBetween(x1, y1, x2, y2);
-          slot.guide.lineStyle(1.5, 0xffffff, 0.6);
-          slot.guide.lineBetween(x1, y1, x2, y2);
-        };
-        for (let col = 1; col < cols; col += 1) {
-          const x = left + cellW * col;
-          drawLine(x, pfT + 4, x, pfT + pfH - 4);
-        }
-        for (let row = 1; row < rows; row += 1) {
-          const y = top + cellH * row;
-          drawLine(pfL + 4, y, pfL + pfW - 4, y);
-        }
-        // Dots at cell intersections read as a tidy grid.
-        slot.guide.fillStyle(0x3a2410, 0.28);
-        for (let col = 1; col < cols; col += 1) {
-          for (let row = 1; row < rows; row += 1) {
-            slot.guide.fillCircle(left + cellW * col, top + cellH * row, 2.6);
+        const pad = Math.min(cellW, cellH) * 0.09;
+        const radius = Math.min(cellW, cellH) * 0.22;
+        for (let col = 0; col < cols; col += 1) {
+          for (let row = 0; row < rows; row += 1) {
+            const cx = left + cellW * col + pad;
+            const cy = top + cellH * row + pad;
+            const cw = cellW - pad * 2;
+            const ch = cellH - pad * 2;
+            // Soft shadow lip for a gentle recessed feel.
+            slot.guide.fillStyle(0x3a2410, 0.1);
+            slot.guide.fillRoundedRect(cx, cy + 2, cw, ch, radius);
+            // Light inner pocket.
+            slot.guide.fillStyle(0xffffff, 0.22);
+            slot.guide.fillRoundedRect(cx, cy, cw, ch, radius);
+            // Faint outline to keep each pocket legible on busy backdrops.
+            slot.guide.lineStyle(1.5, 0xffffff, 0.4);
+            slot.guide.strokeRoundedRect(cx, cy, cw, ch, radius);
           }
         }
-        // Rounded frame around the whole playfield.
-        slot.guide.lineStyle(3, 0x7a4a22, 0.4);
-        slot.guide.strokeRoundedRect(pfL, pfT, pfW, pfH, 16);
       } else if (rows > 1) {
         slot.guide.lineStyle(1, 0xffffff, 0.18);
         for (let row = 1; row < rows; row += 1) {
@@ -1247,6 +1441,44 @@ export class StorageScene extends Phaser.Scene {
     return { visibleHeight, visibleWidth };
   }
 
+  shelfSeatOffset(item, entry) {
+    const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
+    if (entry?.status !== "packed") return { x: 0, y: 0 };
+    if (slot?.zone !== "shelf" && slot?.zone !== "chill") return { x: 0, y: 0 };
+    // The engine's baseline sits at the cell bottom, which visually lands on the
+    // glass shelf's FRONT EDGE — so items look like they press through the pane.
+    // Lift every shelf/chill item up by the plank thickness so its base rests on
+    // the shelf's top surface instead. Tied to slot height so it scales with the
+    // fridge art, and capped to a sensible plank thickness.
+    const lift = Math.max(8, Math.min(15, Math.round((slot.h || 120) * 0.12)));
+    return { x: 0, y: -lift };
+  }
+
+  // Subtle "just set down by hand" lean for items resting on open surfaces
+  // (shelves/chill). A dead-upright grid reads as stiff and fake; a tiny, fixed
+  // tilt per item gives the scene a natural, lived-in feel. The angle is derived
+  // deterministically from the item id so it never jitters between renders or
+  // re-placements, and it is capped small (±3°) so it never looks messy and the
+  // few pixels of horizontal spread stay well inside the slot (no overflow).
+  restTiltFor(item, entry) {
+    if (this.topDown) return 0;
+    if (entry?.status !== "packed") return 0;
+    const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
+    // Doors and drawers hold items snugly against a rail/wall, so a lean there
+    // looks like floating. Only open shelf surfaces get the natural tilt.
+    if (slot?.zone !== "shelf" && slot?.zone !== "chill") return 0;
+    const id = item?.id || "";
+    let h = 0;
+    for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) & 0xffff;
+    const max = 3; // ±3° — "轻微自然"
+    const t = ((h % 1000) / 999) * 2 - 1; // deterministic value in [-1, 1]
+    const tilt = t * max;
+    // Keep a touch of life even for near-zero draws.
+    const min = 0.8;
+    const signed = Math.abs(tilt) < min ? (tilt >= 0 ? min : -min) : tilt;
+    return Number(signed.toFixed(2));
+  }
+
   doorSeatOffset(item, entry) {
     const slot = entry?.slotId ? this.findSlot(entry.slotId) : null;
     if (entry?.status !== "packed" || slot?.zone !== "door") return { x: 0, y: 0 };
@@ -1271,10 +1503,11 @@ export class StorageScene extends Phaser.Scene {
   visualOffsetFor(item, entry) {
     const seatOffset = this.drawerSeatOffset(item, entry);
     const doorOffset = this.doorSeatOffset(item, entry);
+    const shelfOffset = this.shelfSeatOffset(item, entry);
     const renderNudge = this.renderNudgeFor(item, entry);
     return {
-      x: seatOffset.x + doorOffset.x + renderNudge.x,
-      y: seatOffset.y + doorOffset.y + renderNudge.y,
+      x: seatOffset.x + doorOffset.x + shelfOffset.x + renderNudge.x,
+      y: seatOffset.y + doorOffset.y + shelfOffset.y + renderNudge.y,
     };
   }
 
@@ -1339,6 +1572,9 @@ export class StorageScene extends Phaser.Scene {
   }
 
   displayScaleFor(item, entry) {
+    // Defensive: non-item sprites (ghosts/decorations) have no scale of their
+    // own. Never throw here — a crash in create() would freeze the whole scene.
+    if (!item) return 1;
     if (this.topDown) return this.topDownScale(item, entry);
     if (entry?.status === "outside") {
       return Number((item.scale * 1.08).toFixed(3));
@@ -1446,16 +1682,17 @@ export class StorageScene extends Phaser.Scene {
       }
     }
 
-    // Mood emoji label
-    const moodEmoji = preview.mood === "happy" ? "😊" : preview.mood === "ok" ? "😐" : "😟";
+    // Clean, emoji-free, number-free fit label. The colored footprint already
+    // communicates quality (green/amber/red); the text just names it in words.
     const placementLabel = this.previewPlacementLabel(preview);
-    const scoreLabel = `${moodEmoji} ${sc}%`;
-    const dropHint = this.i18n.ui.dropHere;
-    const supportText = preview.valid
-      ? `${dropHint} · ${scoreLabel}${placementLabel ? ` · ${placementLabel}` : ""}`
-      : (preview.alwaysPlaceable
-        ? `${this.i18n.ui.dropHere} ${moodEmoji} ${sc}%`
-        : this.translateReason(preview.reason || "reject.generic"));
+    const fitWord = preview.mood === "happy"
+      ? (this.i18n.ui.fitGreat || this.i18n.ui.dropHere)
+      : preview.mood === "ok"
+        ? (this.i18n.ui.fitOk || this.i18n.ui.dropHere)
+        : (this.i18n.ui.fitPoor || this.i18n.ui.dropHere);
+    const supportText = (preview.valid || preview.alwaysPlaceable)
+      ? `${fitWord}${placementLabel ? ` · ${placementLabel}` : ""}`
+      : this.translateReason(preview.reason || "reject.generic");
     this.previewText
       .setText(supportText)
       .setPosition(preview.x, drawY - 8)
@@ -1557,6 +1794,17 @@ export class StorageScene extends Phaser.Scene {
     if (primary.type === "visible") return { kind: "visible", need: "visible", text: w.wishVisible };
     if (primary.type === "zone") {
       return { kind: "zone", need: "zone", zone: primary.zone, text: w.wishZone?.[primary.zone] || w.wishVisible };
+    }
+    if (primary.type === "category") {
+      const label = w.shelfCategory?.[primary.category] || "";
+      const text = label ? `${w.wishCategory} (${label})` : w.wishCategory;
+      return { kind: "category", need: "category", category: primary.category, text };
+    }
+    if (primary.type === "heavy") return { kind: "heavy", need: "heavy", text: w.wishHeavy };
+    if (primary.type === "light") return { kind: "light", need: "light", text: w.wishLight };
+    if (primary.type === "mustNeighbor") {
+      const pal = primary.keys.find((k) => this.textures.exists(k)) || primary.keys[0];
+      return { kind: "mustNeighbor", need: "mustNeighbor", text: w.wishMustNeighbor, friendKey: pal };
     }
     if (primary.type === "hates") {
       const foe = primary.keys.find((k) => this.textures.exists(k)) || primary.keys[0];
@@ -1757,7 +2005,26 @@ export class StorageScene extends Phaser.Scene {
     this.tweens.add({ targets: obj, scale: obj.scale * (this.topDown ? 1.1 : 1.06), duration: 90, ease: "Sine.out" });
     if (this.topDown) this.events.emit("pickup");
     const item = obj.getData("item");
+    // Reveal where THIS item belongs the moment it's lifted, so players always
+    // know which zones accept it (green) vs. which do not (faint neutral).
+    this.revealDropZones(item);
     if (item && !this.topDown) this.showWishBubble(obj, item);
+  }
+
+  // Persistent affordance shown while an item is held: recommended slots get a
+  // soft green glow, the rest a barely-there neutral outline. Live targeting in
+  // refreshHoverZone layers the exact-fit color on top of whichever slot is hovered.
+  revealDropZones(item) {
+    this.goodSlotIds = new Set();
+    if (!item) return;
+    this.slots.forEach((slot) => {
+      const good = this.engine.canUseSlot(item, slot);
+      if (good) this.goodSlotIds.add(slot.id);
+      slot.marker
+        .setScale(1)
+        .setFillStyle(good ? 0x61e7b0 : 0x9fb4c9, good ? 0.1 : 0.001)
+        .setStrokeStyle(good ? 3 : 2, good ? 0x72efc0 : 0x9fb4c9, good ? 0.72 : 0.26);
+    });
   }
 
   onDrag(pointer, obj, x, y) {
@@ -1768,9 +2035,40 @@ export class StorageScene extends Phaser.Scene {
     const previewPoint = this.logicalDragPoint(item, pointer.worldX, pointer.worldY, home);
     const preview = this.engine.previewMove(item.id, previewPoint.x, previewPoint.y, this.level.tuning.magnetPreviewDistance, this.dragRot || 0);
     this.hoverPlacement = preview;
+    // Magnetic lock-on: while the finger is over a real target cell, gently pull
+    // the sprite toward the EXACT resting spot so placement reads as precise and
+    // snapped rather than floaty. Away from any slot it still follows the finger.
+    if (preview && preview.inside) {
+      const target = this.snapTargetPoint(item, preview);
+      if (target) {
+        obj.x += (target.x - obj.x) * 0.4;
+        obj.y += (target.y - obj.y) * 0.4;
+      }
+    }
     this.drawPlacementPreview(item, preview);
     this.refreshHoverZone(preview?.slotId || null, !!preview?.valid, preview?.score ?? 50);
     if (!this.topDown) this.updateWishBubble(obj, preview);
+  }
+
+  // The exact display position an item will rest at for a given preview, matching
+  // displayPointFor so the drag magnet and the final settle agree pixel-for-pixel.
+  snapTargetPoint(item, preview) {
+    if (!preview || !preview.slotId) return null;
+    if (this.topDown) return { x: preview.x, y: preview.y };
+    const offset = this.visualOffsetFor(item, {
+      // Use "packed" so door/drawer seat offsets match the final resting spot
+      // exactly — the magnet target and the settle land on the same pixel.
+      status: "packed",
+      slotId: preview.slotId,
+      col: preview.col,
+      row: preview.row,
+      layer: preview.layer,
+      rot: preview.rot,
+      x: preview.x,
+      y: preview.y,
+      itemId: item.id,
+    });
+    return { x: preview.x + offset.x, y: preview.y + offset.y };
   }
 
   onDragEnd(obj) {
@@ -1811,6 +2109,10 @@ export class StorageScene extends Phaser.Scene {
     const display = this.displayPointFor(item, entry);
     const targetScale = this.displayScaleFor(item, entry);
     obj.setData("home", entry);
+    this.updateFacingGhosts();
+    // Restock payoff: if this placement just completed an entire shelf row,
+    // celebrate it and award bonus coins (see checkShelfCompletions).
+    this.checkShelfCompletions(entry?.slotId);
 
     // Show mood animation
     const mood = result.mood || "ok";
@@ -1827,6 +2129,8 @@ export class StorageScene extends Phaser.Scene {
       targets: obj,
       x: display.x,
       y: display.y,
+      // On open shelves, settle into a subtle natural lean instead of dead-upright.
+      ...(this.topDown ? {} : { angle: this.restTiltFor(item, entry) }),
       scaleX: targetScale * 1.05,
       scaleY: targetScale * 0.94,
       duration: Math.round(this.level.tuning.snapDuration * 0.72),
@@ -1888,52 +2192,67 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
-  showItemMood(x, y, mood, score) {
-    const emoji = mood === "happy" ? "😊" : mood === "ok" ? "😐" : "😟";
-    const color = mood === "happy" ? "#67edb8" : mood === "ok" ? "#ffd166" : "#ff7d62";
-    const moodText = this.add.text(x, y - 50, `${emoji} ${score}%`, {
-      fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-      fontSize: 22,
-      color,
-      fontStyle: "bold",
-      stroke: "#2d1f14",
-      strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(955).setAlpha(0);
+  // Placement feedback — intentionally emoji-free and number-free to keep the
+  // cozy, premium feel. "happy" floats a cluster of soft vector sparkle stars,
+  // "ok" gives a gentle single ripple, and "sad" is a soft muted puff that never
+  // feels punishing. The exact score still drives combos/callouts elsewhere.
+  showItemMood(x, y, mood /* , score */) {
+    const layer = this.add.layer().setDepth(950);
+    const haloColor = mood === "happy" ? 0x67edb8 : mood === "ok" ? 0xffe6a3 : 0xffd0c2;
 
-    // Halo ring
-    const haloColor = mood === "happy" ? 0x67edb8 : mood === "ok" ? 0xffd166 : 0xff7d62;
-    const halo = this.add.circle(x, y - 14, 20, haloColor, 0.18).setDepth(950);
-    halo.setStrokeStyle(2, haloColor, 0.7);
-
-    this.tweens.add({
-      targets: [moodText],
-      alpha: { from: 0, to: 1 },
-      y: y - 70,
-      scale: { from: 0.6, to: 1.1 },
-      duration: 200,
-      ease: "Back.out(1.5)",
-      onComplete: () => {
-        this.tweens.add({
-          targets: [moodText],
-          alpha: 0,
-          y: y - 100,
-          scale: 0.8,
-          duration: 500,
-          delay: 400,
-          ease: "Sine.in",
-          onComplete: () => moodText.destroy(),
-        });
-      },
-    });
-
+    const halo = this.add.circle(x, y - 14, 18, haloColor, 0.16);
+    halo.setStrokeStyle(2, haloColor, 0.72);
+    layer.add(halo);
     this.tweens.add({
       targets: halo,
-      alpha: { from: 0.8, to: 0 },
-      scale: { from: 1, to: 1.6 },
-      duration: 350,
+      alpha: { from: 0.75, to: 0 },
+      scale: { from: 0.9, to: mood === "happy" ? 1.7 : 1.4 },
+      duration: mood === "happy" ? 380 : 300,
       ease: "Sine.out",
       onComplete: () => halo.destroy(),
     });
+
+    if (mood === "happy") {
+      // A little constellation of 4-point sparkle stars drifting up and out.
+      const starColors = [0xfff8df, 0xbdf5dc, 0xffe9a8];
+      const sparkles = 5;
+      for (let i = 0; i < sparkles; i += 1) {
+        const ang = (Math.PI * 2 * i) / sparkles - Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+        const dist = 20 + Math.random() * 20;
+        const size = 5 + Math.random() * 4;
+        const star = this.add
+          .star(x, y - 16, 4, size * 0.42, size, starColors[i % starColors.length], 0.96)
+          .setDepth(951);
+        layer.add(star);
+        this.tweens.add({
+          targets: star,
+          x: x + Math.cos(ang) * dist,
+          y: y - 16 + Math.sin(ang) * dist - 14,
+          angle: (Math.random() - 0.5) * 180,
+          alpha: { from: 1, to: 0 },
+          scale: { from: 1.15, to: 0.4 },
+          duration: 460 + Math.random() * 160,
+          delay: i * 18,
+          ease: "Quad.out",
+          onComplete: () => star.destroy(),
+        });
+      }
+    } else if (mood === "sad") {
+      // Gentle, non-punishing: a soft puff that sinks slightly and fades.
+      const puff = this.add.circle(x, y - 10, 10, 0xffd0c2, 0.5).setDepth(951);
+      layer.add(puff);
+      this.tweens.add({
+        targets: puff,
+        y: y + 4,
+        alpha: { from: 0.5, to: 0 },
+        scale: { from: 0.8, to: 1.3 },
+        duration: 340,
+        ease: "Sine.in",
+        onComplete: () => puff.destroy(),
+      });
+    }
+
+    this.time.delayedCall(900, () => layer.destroy());
   }
 
   // ---- CALLOUT: big animated text for "Double Kill" moments ----
@@ -2276,16 +2595,25 @@ export class StorageScene extends Phaser.Scene {
   }
 
   refreshHoverZone(slotId, valid, score = 50) {
+    let line;
+    if (score >= 70) line = 0x65e7b3;
+    else if (score >= 40) line = 0xffd166;
+    else line = 0xff8667;
+    const good = this.goodSlotIds;
     this.slots.forEach((slot) => {
       const selected = slot.id === slotId;
-      let line;
-      if (score >= 70) line = 0x65e7b3;
-      else if (score >= 40) line = 0xffd166;
-      else line = 0xff8667;
+      if (selected) {
+        // Live-targeted slot: strong exact-fit color + slight lift.
+        slot.marker.setScale(1.02).setFillStyle(line, 0.16).setStrokeStyle(5, line, 0.92);
+        return;
+      }
+      // Non-targeted slots keep the "held item" affordance so the player still
+      // sees every valid home while dragging, instead of them all going blank.
+      const isGood = good ? good.has(slot.id) : false;
       slot.marker
-        .setScale(selected ? 1.02 : 1)
-        .setFillStyle(selected ? line : 0x61e7b0, selected ? 0.16 : 0.001)
-        .setStrokeStyle(selected ? 5 : 3, selected ? line : 0x72efc0, selected ? 0.92 : (this.editMode ? 0.7 : 0));
+        .setScale(1)
+        .setFillStyle(isGood ? 0x61e7b0 : 0x9fb4c9, isGood ? 0.1 : 0.001)
+        .setStrokeStyle(isGood ? 3 : 2, isGood ? 0x72efc0 : 0x9fb4c9, isGood ? 0.6 : (this.editMode ? 0.7 : 0.22));
     });
   }
 
@@ -2314,11 +2642,14 @@ export class StorageScene extends Phaser.Scene {
     if (this.topDown && restored.status !== "packed") restored.rot = keepRot;
     obj.setData("home", restored);
     if (this.topDown) obj.setAngle(this.topDownAngle(restored));
+    this.updateFacingGhosts();
     this.playMissFeedback(obj.x, obj.y);
     this.tweens.add({
       targets: obj,
       x: display.x,
       y: display.y,
+      // Straighten back up as it returns to the tray (tilt only lives on shelves).
+      ...(this.topDown ? {} : { angle: this.restTiltFor(item, restored) }),
       scaleX: targetScale,
       scaleY: targetScale,
       duration: 220,
@@ -2336,6 +2667,7 @@ export class StorageScene extends Phaser.Scene {
     this.previewGraphic.clear();
     this.previewText.setVisible(false);
     if (this.previewSprite) this.previewSprite.setVisible(false);
+    this.goodSlotIds = null;
     this.slots.forEach((slot) => {
       slot.marker
         .setScale(1)
@@ -2597,6 +2929,10 @@ export class StorageScene extends Phaser.Scene {
       }
       const home = child.getData("home");
       const item = child.getData("item");
+      // Facing ghosts / decorative sprites live in itemLayer without "item"
+      // data. They must never be size/depth-sorted as goods (and calling
+      // displayScaleFor on them throws), so skip them like the preview sprite.
+      if (!item) continue;
       const targetScale = this.displayScaleFor(item, home);
       if (child !== this.previewSprite && child.getData("item")?.id !== this.remainingSpotlightId) {
         child.clearTint();
@@ -2677,6 +3013,57 @@ export class StorageScene extends Phaser.Scene {
       g.beginPath();
       g.moveTo(-4.9, -4.9);
       g.lineTo(4.9, 4.9);
+      g.strokePath();
+      return;
+    }
+    if (desc.need === "category") {
+      // A little tag/label: rounded box with a punch hole — "this has a home".
+      g.strokeRoundedRect(-7, -5, 13, 10, 2.5);
+      g.strokeCircle(-4, 0, 1.4);
+      return;
+    }
+    if (desc.need === "heavy") {
+      // Down-chevron over a baseline — "keep me low".
+      g.beginPath();
+      g.moveTo(-6, -6);
+      g.lineTo(6, -6);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(-5, 0.5);
+      g.lineTo(0, 6);
+      g.lineTo(5, 0.5);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(0, 6);
+      g.lineTo(0, -3);
+      g.strokePath();
+      return;
+    }
+    if (desc.need === "light") {
+      // Up-chevron over a baseline — "keep me high" (mirror of heavy).
+      g.beginPath();
+      g.moveTo(-6, 6);
+      g.lineTo(6, 6);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(-5, -0.5);
+      g.lineTo(0, -6);
+      g.lineTo(5, -0.5);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(0, -6);
+      g.lineTo(0, 3);
+      g.strokePath();
+      return;
+    }
+    if (desc.need === "mustNeighbor") {
+      // Two linked dots — "stay paired".
+      g.fillStyle(ink, 1);
+      g.fillCircle(-4, 0, 2.2);
+      g.fillCircle(4, 0, 2.2);
+      g.beginPath();
+      g.moveTo(-2, 0);
+      g.lineTo(2, 0);
       g.strokePath();
       return;
     }
@@ -2980,6 +3367,8 @@ export class StorageScene extends Phaser.Scene {
       if (this.topDown) {
         sprite.setAngle(this.topDownAngle(entry));
         sprite.setScale(this.displayScaleFor(item, entry));
+      } else {
+        sprite.setAngle(this.restTiltFor(item, entry));
       }
       sprite.setData("home", entry);
     }
