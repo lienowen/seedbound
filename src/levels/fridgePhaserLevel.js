@@ -84,7 +84,7 @@ const FRIDGE_FRONTS = [
 const FRIDGE_ASSETS = {
   // Shared supermarket-aisle backdrop, fit to width & anchored top (no stretch),
   // with the store floor continuing below. The cooler stands in the aisle.
-  back: { key: "market-aisle-bg", file: "market-aisle-bg.png", coverTop: true, floorFill: 0xe7cea0 },
+  back: { key: "aisle-bg-a", file: "shop-aisle-a.png", coverTop: true, floorFill: 0xe7cea0 },
 };
 
 const FRIDGE_SLOTS = [
@@ -562,7 +562,7 @@ const PANTRY_STAGE = { width: 750, height: 1334, shapes: buildPantryStageShapes(
 // floor rect (see buildPantryStageShapes) continue the floor below it. The
 // gondola shelf is drawn on top so it reads as a shelf inside the store.
 const PANTRY_ASSETS = {
-  back: { key: "market-aisle-bg", file: "market-aisle-bg.png", coverTop: true, floorFill: 0xe7cea0 },
+  back: { key: "aisle-bg-b", file: "shop-aisle-b.png", coverTop: true, floorFill: 0xe7cea0 },
 };
 
 // One wide placement bay per shelf (cols:2 => two items side-by-side, exactly
@@ -993,8 +993,10 @@ const PANTRY_BLUEPRINTS = [
 // Real hand-drawn shelving art (5 planks each). `fracs` = the goods-resting
 // surface of each plank as a fraction of the DISPLAYED image height, hand
 // calibrated against the PNG. Rotating the art across the arc adds variety.
+// Lead with the bold, high-contrast wooden gondola so the shelf fixture reads
+// as the clear focal point in front of the busy aisle backdrop (beige is too
+// pale to stand out, so it is dropped from the rotation).
 const AISLE_SHELF_ART = [
-  { key: "fx-shelf-beige", file: "shelf-beige.png", aspect: 980 / 735, fracs: [0.235, 0.375, 0.515, 0.655, 0.79] },
   { key: "fx-shelf-wood", file: "shelf-wood.png", aspect: 980 / 735, fracs: [0.235, 0.375, 0.515, 0.655, 0.79] },
   { key: "fx-shelf-metal", file: "shelf-metal.png", aspect: 980 / 735, fracs: [0.235, 0.375, 0.515, 0.655, 0.79] },
 ];
@@ -1006,8 +1008,10 @@ const AISLE_SHELF_ART = [
 function aisleSections(shelves, i) {
   const n = shelves.length;
   const art = AISLE_SHELF_ART[i % AISLE_SHELF_ART.length];
-  const w = i <= 1 ? 620 : i <= 4 ? 690 : 738;
-  const top = 156;
+  // Keep the gondola large so it dominates the frame (it sits like an endcap in
+  // front of the aisle backdrop); it still grows a touch with campaign depth.
+  const w = i <= 1 ? 712 : 744;
+  const top = 150;
   // Center the n used planks among the 5 available.
   const startPlank = Math.max(0, Math.floor((art.fracs.length - n) / 2));
   const shelfFracs = art.fracs.slice(startPlank, startPlank + n);

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { assetUrl } from "../assetBase.js";
 
-const HOME_HERO_SRC = assetUrl("tidy/home-hero.png");
+const HOME_HERO_SRC = assetUrl("tidy/home-hero-market.png");
 
 const svgProps = {
   viewBox: "0 0 24 24",
