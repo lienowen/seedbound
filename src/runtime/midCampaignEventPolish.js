@@ -167,7 +167,7 @@ function prepareWaves(scene, spec) {
 }
 
 function triggerPickup(scene, state) {
-  if (state.pickupDone || !state.spec.pickupAfter) return;
+  if (state.pickupDone || state.pickupPending || !state.spec.pickupAfter) return;
   if (packedMovableCount(scene) < state.spec.pickupAfter) return;
   if (scene.engine.validate().complete) return;
 
@@ -177,13 +177,23 @@ function triggerPickup(scene, state) {
   const id = candidates[0];
   if (!id) return;
 
-  state.pickupDone = true;
-  writeEventSave(scene, { pickupDone: true });
+  state.pickupPending = true;
   scene.time.delayedCall(420, () => {
-    if (!scene.scene.isActive() || scene.engine.validate().complete) return;
+    if (!scene.scene.isActive() || scene.engine.validate().complete) {
+      state.pickupPending = false;
+      return;
+    }
+    if (scene.engine.state.items[id]?.status !== "packed") {
+      state.pickupPending = false;
+      return;
+    }
+
     const sprite = scene.sprites.get(id);
     if (sprite) scene.tweens.killTweensOf(sprite);
     scene.engine.moveOutside(id);
+    state.pickupPending = false;
+    state.pickupDone = true;
+    writeEventSave(scene, { pickupDone: true });
     scene.playCallout("CUSTOMER PICKUP!", "ice");
     scene.setToastMessage(state.spec.pickupLabel);
   });
@@ -216,6 +226,7 @@ export function applyMidCampaignEventPolish() {
       spec,
       waves: prepareWaves(this, spec),
       pickupDone: !!saved.pickupDone,
+      pickupPending: false,
       wrongDone: !!saved.wrongDone,
       lastPlacedId: null,
     };
