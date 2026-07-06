@@ -35,7 +35,7 @@ function patchFirstLevel() {
     type: "fill-zone",
     zone: "door",
     count: 4,
-    tags: ["bottle"],
+    itemImages: ["green-soda", "red-soda", "juice", "milk"],
   };
 
   // Invalidate any saved board state created with the old six-item tutorial.
