@@ -39,7 +39,7 @@ function patchFirstLevel() {
   };
 
   // Invalidate any saved board state created with the old six-item tutorial.
-  first.revision = Math.max(2, Number(first.revision || 1) + 1);
+  first.revision = Math.max(2, Number(first.revision || 1));
 }
 
 function buildLegacyLayout() {
@@ -79,11 +79,14 @@ function migrateProgressRecord(key) {
     if (!parsed || typeof parsed !== "object") return;
     if (parsed.coreConsistencyMigration >= MIGRATION_TAG) return;
 
-    // Layout 3 was used by both the nine-pack-insert build and the later pantry
-    // build. Their indices are identical through the insert after fridge 16; only
-    // the removed insert after fridge 18 diverges. Mapping by stable level token
-    // therefore preserves progress while fixing the late-campaign offset.
-    if ((parsed.layout || 1) === 3) {
+    const starIds = Object.keys(parsed.stars && typeof parsed.stars === "object" ? parsed.stars : {});
+    const hasPantryProgress = starIds.some((id) => id.startsWith("pantry-"));
+
+    // Layout 3 was used by both the old nine-pack-insert build and the current
+    // pantry build. Pantry star IDs prove the save already uses the current order,
+    // so only legacy-looking records are remapped. This avoids regressing a current
+    // late-game save around the removed insert after fridge 18.
+    if ((parsed.layout || 1) === 3 && !hasPantryProgress) {
       const legacy = buildLegacyLayout();
       const oldCurrent = Math.max(0, Math.min(legacy.length - 1, Number(parsed.current || 0)));
       const current = currentIndexForLegacyToken(legacy[oldCurrent]);
@@ -96,9 +99,12 @@ function migrateProgressRecord(key) {
 
       parsed.current = Math.max(0, Math.min(FRIDGE_BR_CAMPAIGN.length - 1, current));
       parsed.unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, unlocked));
-      parsed.currentLevelId = FRIDGE_BR_CAMPAIGN[parsed.current]?.id || "fridge-br-1";
+    } else {
+      parsed.current = Math.max(0, Math.min(FRIDGE_BR_CAMPAIGN.length - 1, Number(parsed.current || 0)));
+      parsed.unlocked = Math.max(1, Math.min(FRIDGE_BR_CAMPAIGN.length, Number(parsed.unlocked || 1)));
     }
 
+    parsed.currentLevelId = FRIDGE_BR_CAMPAIGN[parsed.current]?.id || "fridge-br-1";
     parsed.coreConsistencyMigration = MIGRATION_TAG;
     localStorage.setItem(key, JSON.stringify(parsed));
   } catch {
