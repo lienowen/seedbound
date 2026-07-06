@@ -115,6 +115,7 @@ function returnDecoy(scene, state, obj) {
   scene.playCallout("RETURNED!", "gold");
   scene.setToastMessage("Wrong delivery returned! +10 coins");
   scene.events.emit("shelf-clear", { bonus: 10, streak: 0, source: "wrong-delivery" });
+  scene.events.emit("mid-event", { type: "wrong-delivery-returned" });
 }
 
 function revealWave(scene, wave, animate = true) {
@@ -135,6 +136,7 @@ function revealWave(scene, wave, animate = true) {
   if (animate) {
     scene.playCallout("NEW STOCK!", "gold");
     scene.setToastMessage(wave.label);
+    scene.events.emit("mid-event", { type: "wave-revealed", ids: [...wave.ids] });
   }
 }
 
@@ -196,6 +198,7 @@ function triggerPickup(scene, state) {
     writeEventSave(scene, { pickupDone: true });
     scene.playCallout("CUSTOMER PICKUP!", "ice");
     scene.setToastMessage(state.spec.pickupLabel);
+    scene.events.emit("mid-event", { type: "customer-pickup", itemId: id });
   });
 }
 
