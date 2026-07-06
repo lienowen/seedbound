@@ -2,10 +2,16 @@ import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
 import { applyCoreConsistencyPatches } from "./runtime/coreConsistencyBootstrap.js";
+import { applyEngineConsistency } from "./runtime/engineConsistency.js";
+import { applyPreviewConstraintPolish } from "./runtime/previewConstraintPolish.js";
+import { applyDragSnapPolish } from "./runtime/dragSnapPolish.js";
 import "./fridge-phaser.css";
 
-// Apply data/save migrations before the game module reads campaign progress.
+// Apply campaign/data consistency before the game module reads progress.
 applyCoreConsistencyPatches();
+applyEngineConsistency();
+applyPreviewConstraintPolish();
+applyDragSnapPolish();
 
 const fridgePhaserGameImport = import("./FridgePhaserGame.jsx");
 const FridgePhaserGame = lazy(() =>
