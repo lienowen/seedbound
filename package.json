@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "node scripts/audit-early-campaign.mjs && vite build",
+    "build": "node scripts/audit-early-campaign.mjs && node scripts/audit-zone-capacity.mjs && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "validate:fridge": "node scripts/validate-fridge-campaign.mjs",
-    "audit:early": "node scripts/audit-early-campaign.mjs",
+    "audit:early": "node scripts/audit-early-campaign.mjs && node scripts/audit-zone-capacity.mjs",
     "autopilot": "node scripts/autopilot.mjs",
     "autopilot:status": "node scripts/autopilot.mjs --status",
     "autopilot:complete": "node scripts/autopilot.mjs --complete"
