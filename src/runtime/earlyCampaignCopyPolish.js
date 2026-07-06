@@ -1,5 +1,6 @@
 import { CAMPAIGN_I18N } from "../i18n/campaign.js";
 import { applyBonusChallengePolish } from "./bonusChallengePolish.js";
+import "./skipSafety.css";
 
 let applied = false;
 
