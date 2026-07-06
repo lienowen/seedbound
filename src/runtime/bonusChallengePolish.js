@@ -8,6 +8,26 @@ import { applySkipConsistencyPolish } from "./skipConsistencyPolish.js";
 import { applyBonusProgressPolish } from "./bonusProgressPolish.js";
 
 let applied = false;
+const CLAIMED_KEY = "cozyshelf.secret-bonus.claimed.v1";
+
+function claimedIds() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CLAIMED_KEY) || "[]");
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markClaimed(id) {
+  try {
+    const ids = claimedIds();
+    ids.add(id);
+    localStorage.setItem(CLAIMED_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Storage failure must never interrupt gameplay.
+  }
+}
 
 function stateFor(scene) {
   const levelId = scene.level?.id;
@@ -23,6 +43,14 @@ function stateFor(scene) {
 function award(scene, state) {
   if (!state.spec || state.completed) return;
   state.completed = true;
+
+  if (claimedIds().has(state.spec.id)) {
+    scene.playCallout("BONUS MASTERED!", "ice");
+    scene.setToastMessage("Secret challenge mastered");
+    return;
+  }
+
+  markClaimed(state.spec.id);
   scene.playCallout("SECRET BONUS!", "gold");
   scene.setToastMessage(`Secret bonus! +${state.spec.bonus} coins`);
   scene.events.emit("shelf-clear", {
