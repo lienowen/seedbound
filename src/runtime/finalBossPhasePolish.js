@@ -33,13 +33,13 @@ export function applyFinalBossPhasePolish() {
     const moveToPhase2 = () => {
       if (!this.finalBossState || this.finalBossState.phase >= 2) return;
       this.finalBossState.phase = 2;
-      this.time.delayedCall(140, () => announce(this, "BOSS PHASE 2", "Last delivery! Re-plan around the new stock.", "gold"));
+      this.time.delayedCall(140, () => announce(this, "SHIFT 2: LAST DELIVERY", "New stock is here. Re-plan without losing the base.", "gold"));
     };
 
     const moveToPhase3 = () => {
       if (!this.finalBossState || this.finalBossState.phase >= 3) return;
       this.finalBossState.phase = 3;
-      this.time.delayedCall(140, () => announce(this, "FINAL PHASE", "Restore the missing item and close the perfect fridge.", "ice"));
+      this.time.delayedCall(140, () => announce(this, "SHIFT 3: RECOVERY", "One last pickup changed the cabinet. Restore it cleanly.", "ice"));
     };
 
     const onMidEvent = (event) => {
@@ -49,7 +49,7 @@ export function applyFinalBossPhasePolish() {
 
     const onSnap = () => {
       if (this.finalBossState?.phase === 3 && packedCount(this) >= 5 && !this.engine.validate().complete) {
-        this.setToastMessage("Final stretch: one clean finish.");
+        this.setToastMessage("Final stretch of the night: one clean finish.");
       }
     };
 
@@ -62,9 +62,9 @@ export function applyFinalBossPhasePolish() {
 
     this.time.delayedCall(1150, () => {
       const phase = this.finalBossState?.phase || 1;
-      if (phase === 1) announce(this, "BOSS PHASE 1", "Build a stable base. More stock is coming.", "fire");
-      else if (phase === 2) announce(this, "BOSS PHASE 2", "Last delivery is active. Re-plan the cabinet.", "gold");
-      else announce(this, "FINAL PHASE", "Restore the missing item and close the perfect fridge.", "ice");
+      if (phase === 1) announce(this, "SHIFT 1: BUILD THE BASE", "Festival night starts now. More stock is coming.", "fire");
+      else if (phase === 2) announce(this, "SHIFT 2: LAST DELIVERY", "New stock is active. Re-plan the cabinet.", "gold");
+      else announce(this, "SHIFT 3: RECOVERY", "Restore the missing item and finish the night strong.", "ice");
     });
     return result;
   };
