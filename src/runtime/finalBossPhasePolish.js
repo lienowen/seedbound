@@ -10,6 +10,7 @@ function packedCount(scene) {
 }
 
 function announce(scene, title, message, tone = "gold") {
+  if (!scene.scene.isActive() || scene.engine.validate().complete) return;
   scene.playCallout(title, tone);
   scene.setToastMessage(message);
 }
@@ -19,51 +20,52 @@ export function applyFinalBossPhasePolish() {
   applied = true;
 
   const originalCreate = StorageScene.prototype.create;
-  const originalDragEnd = StorageScene.prototype.onDragEnd;
 
   StorageScene.prototype.create = function createWithBossPhases(data) {
     const result = originalCreate.call(this, data);
     if (this.level?.id !== "fridge-br-20" || this.editMode) return result;
 
-    this.finalBossState = { phase: 1 };
-    this.time.delayedCall(1150, () => {
-      if (!this.scene.isActive() || this.engine.validate().complete) return;
-      announce(this, "BOSS PHASE 1", "Build a stable base. More stock is coming.", "fire");
-    });
-    return result;
-  };
-
-  StorageScene.prototype.onDragEnd = function dragEndWithBossPhases(obj) {
-    const result = originalDragEnd.call(this, obj);
-    const boss = this.finalBossState;
-    if (!boss || this.engine.validate().complete) return result;
-
     const eventState = this.midEventState;
-    const firstWave = eventState?.waves?.[0];
+    const waveAlreadyShown = !!eventState?.waves?.[0]?.revealed;
+    const pickupAlreadyDone = !!eventState?.pickupDone;
+    this.finalBossState = { phase: pickupAlreadyDone ? 3 : waveAlreadyShown ? 2 : 1 };
 
-    if (boss.phase === 1 && firstWave?.revealed) {
-      boss.phase = 2;
-      this.time.delayedCall(180, () => {
-        if (this.scene.isActive() && !this.engine.validate().complete) {
-          announce(this, "BOSS PHASE 2", "Last delivery! Re-plan around the new stock.", "gold");
-        }
-      });
-      return result;
-    }
+    const moveToPhase2 = () => {
+      if (!this.finalBossState || this.finalBossState.phase >= 2) return;
+      this.finalBossState.phase = 2;
+      this.time.delayedCall(140, () => announce(this, "BOSS PHASE 2", "Last delivery! Re-plan around the new stock.", "gold"));
+    };
 
-    if (boss.phase === 2 && eventState?.pickupDone) {
-      boss.phase = 3;
-      this.time.delayedCall(180, () => {
-        if (this.scene.isActive() && !this.engine.validate().complete) {
-          announce(this, "FINAL PHASE", "Restore the missing item and close the perfect fridge.", "ice");
-        }
-      });
-      return result;
-    }
+    const moveToPhase3 = () => {
+      if (!this.finalBossState || this.finalBossState.phase >= 3) return;
+      this.finalBossState.phase = 3;
+      this.time.delayedCall(140, () => announce(this, "FINAL PHASE", "Restore the missing item and close the perfect fridge.", "ice"));
+    };
 
-    if (boss.phase === 3 && packedCount(this) >= 5) {
-      this.setToastMessage("Final stretch: one clean finish.");
-    }
+    const onMidEvent = (event) => {
+      if (event?.type === "wave-revealed") moveToPhase2();
+      if (event?.type === "customer-pickup") moveToPhase3();
+    };
+
+    const onSnap = () => {
+      if (this.finalBossState?.phase === 3 && packedCount(this) >= 5 && !this.engine.validate().complete) {
+        this.setToastMessage("Final stretch: one clean finish.");
+      }
+    };
+
+    this.events.on("mid-event", onMidEvent);
+    this.events.on("snap", onSnap);
+    this.events.once("shutdown", () => {
+      this.events.off("mid-event", onMidEvent);
+      this.events.off("snap", onSnap);
+    });
+
+    this.time.delayedCall(1150, () => {
+      const phase = this.finalBossState?.phase || 1;
+      if (phase === 1) announce(this, "BOSS PHASE 1", "Build a stable base. More stock is coming.", "fire");
+      else if (phase === 2) announce(this, "BOSS PHASE 2", "Last delivery is active. Re-plan the cabinet.", "gold");
+      else announce(this, "FINAL PHASE", "Restore the missing item and close the perfect fridge.", "ice");
+    });
     return result;
   };
 }
