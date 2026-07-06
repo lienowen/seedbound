@@ -2,22 +2,55 @@ import { StorageScene } from "../game/StorageScene.js";
 
 let applied = false;
 
-function textFor(state) {
+function patternProgress(zones) {
+  if (zones.length >= 2 && zones.at(-2) === "shelf" && zones.at(-1) === "shelf") return 2;
+  if (zones.at(-1) === "shelf") return 1;
+  return 0;
+}
+
+function textFor(state, now = Date.now()) {
   const id = state?.spec?.id;
   if (!id) return "";
-  if (id === "clean-start") return `Clean start ${Math.min(state.successCount, 4)}/4`;
-  if (id === "shelf-first") return `Shelf start ${Math.min(state.successCount, 2)}/2`;
+
+  if (id === "clean-start") {
+    if (state.misses > 0) return "Clean-start bonus missed";
+    return `Clean start ${Math.min(state.successCount, 4)}/4`;
+  }
+
+  if (id === "shelf-first") {
+    const zones = state.recentZones;
+    if (zones[0] && zones[0] !== "shelf") return "Shelf-start bonus missed";
+    if (zones[1] && zones[1] !== "shelf") return "Shelf-start bonus missed";
+    const progress = zones[0] === "shelf" ? (zones[1] === "shelf" ? 2 : 1) : 0;
+    return `Shelf start ${progress}/2`;
+  }
+
   if (id === "happy-streak") return `Happy streak ${Math.min(state.happyStreak, 3)}/3`;
   if (id === "zone-tour") return `Zone tour ${Math.min(state.zones.size, 3)}/3`;
+
   if (id === "rack-rush") {
     let streak = 0;
     for (let i = state.recentZones.length - 1; i >= 0 && state.recentZones[i] === "door"; i -= 1) streak += 1;
     return `Rack streak ${Math.min(streak, 3)}/3`;
   }
-  if (id === "perfect-five") return `Perfect run ${Math.min(state.successCount, 5)}/5`;
-  if (id === "shelf-shelf-rack") return `Pattern ${Math.min(state.recentZones.length, 3)}/3`;
+
+  if (id === "perfect-five") {
+    if (state.misses > 0) return "Perfect-run bonus missed";
+    return `Perfect run ${Math.min(state.successCount, 5)}/5`;
+  }
+
+  if (id === "shelf-shelf-rack") {
+    return `Pattern ${patternProgress(state.recentZones)}/3`;
+  }
+
   if (id === "calm-streak") return `Calm streak ${Math.min(state.happyStreak, 4)}/4`;
-  if (id === "quick-hands") return `Quick hands ${Math.min(state.successCount, 5)}/5`;
+
+  if (id === "quick-hands") {
+    if (state.misses > 1) return "Quick-hands bonus missed";
+    if (state.startedAt != null && now - state.startedAt > state.spec.seconds * 1000) return "Quick-hands bonus expired";
+    return `Quick hands ${Math.min(state.successCount, 5)}/5`;
+  }
+
   if (id === "grand-tour") return `Grand tour ${Math.min(state.zones.size, 4)}/4`;
   return "";
 }
