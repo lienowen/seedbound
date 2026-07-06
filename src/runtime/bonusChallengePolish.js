@@ -74,13 +74,17 @@ export function applyBonusChallengePolish() {
     const result = originalCreate.call(this, data);
     const state = stateFor(this);
     if (state.spec) {
-      this.time.delayedCall(1100, () => {
+      const revealWhenReady = () => {
         const current = stateFor(this);
-        if (!current.shown && !current.completed) {
-          current.shown = true;
-          this.setToastMessage(current.spec.text);
+        if (current.shown || current.completed) return;
+        if (this.onboardingActive) {
+          this.time.delayedCall(700, revealWhenReady);
+          return;
         }
-      });
+        current.shown = true;
+        this.setToastMessage(current.spec.text);
+      };
+      this.time.delayedCall(1100, revealWhenReady);
     }
     return result;
   };
