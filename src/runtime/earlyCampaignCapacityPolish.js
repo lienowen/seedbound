@@ -18,4 +18,14 @@ export function applyEarlyCampaignCapacityPolish() {
       slot.stackLayers = 1;
     }
   }
+
+  // Level 8 had two fixed meal boxes locking the middle plus a decorative fixed
+  // bread occupying the last full shelf. Watermelon (2 cells) + cheese (1 cell)
+  // therefore needed three shelf cells while only two remained. Remove the purely
+  // decorative blocker so the authored movable set has truthful capacity.
+  const level8 = FRIDGE_BR_CAMPAIGN.find((level) => level.id === "fridge-br-8");
+  if (level8) {
+    level8.items = level8.items.filter((item) => item.id !== "bread_fixed");
+    level8.revision = Math.max(11, Number(level8.revision || 1));
+  }
 }
