@@ -12,12 +12,14 @@ import "./fridge-phaser.css";
 applyCoreConsistencyPatches();
 applyPreviewConstraintPolish();
 
-// Keep Phaser and scene-level drag polish out of the initial UI bundle.
+// Keep Phaser and scene-level polish out of the initial UI bundle.
 const fridgePhaserGameImport = Promise.all([
   import("./runtime/dragSnapPolish.js"),
+  import("./runtime/supermarketRestockScenePolish.js"),
   import("./FridgePhaserGame.jsx"),
-]).then(([polish, gameModule]) => {
-  polish.applyDragSnapPolish();
+]).then(([dragPolish, restockPolish, gameModule]) => {
+  dragPolish.applyDragSnapPolish();
+  restockPolish.applySupermarketRestockScenePolish();
   return gameModule;
 });
 
