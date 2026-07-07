@@ -220,6 +220,16 @@ function packCategory(items, capacity) {
   return chunks;
 }
 
+function shelfKindForChunk(category, chunk, fallback) {
+  const kinds = new Set(chunk.items.map((item) => item.shelfKind).filter(Boolean));
+  if (kinds.has("bulk-produce")) return "bulk-produce";
+  if (kinds.has("bakery-shelf")) return "bakery-shelf";
+  if (kinds.size === 1) return [...kinds][0];
+  if (category === "fresh") return "produce-bin";
+  if (category === "groceries") return "grocery-shelf";
+  return fallback;
+}
+
 function rebuildPlanogram(level) {
   const slots = structuredClone(level.slots || []);
   for (const slot of slots) {
@@ -258,9 +268,10 @@ function rebuildPlanogram(level) {
     chunks.forEach((chunk, index) => {
       const slot = assigned[index];
       if (!slot) return;
+      const shelfKind = shelfKindForChunk(category, chunk, slotProfile.shelfKind);
       slot.__used = true;
       slot.category = category;
-      slot.shelfKind = slotProfile.shelfKind;
+      slot.shelfKind = shelfKind;
       slot.allow = [...slotProfile.allow];
       slot.empty = false;
       slot.cols = Math.max(1, chunk.usedCells);
@@ -282,7 +293,7 @@ function rebuildPlanogram(level) {
       planogram.push({
         slotId: slot.id,
         category,
-        shelfKind: slotProfile.shelfKind,
+        shelfKind,
         products: facings.map((facing) => facing.image),
         facings,
       });
@@ -296,7 +307,7 @@ function rebuildPlanogram(level) {
 
   const kinds = new Set(planogram.map((entry) => entry.shelfKind));
   if (kinds.has("produce-bin") || kinds.has("bulk-produce")) level.marketFixtureFamily = "produce-cooler";
-  else if (kinds.has("grocery-shelf") || kinds.has("condiment-shelf")) level.marketFixtureFamily = "mixed-aisle";
+  else if (kinds.has("grocery-shelf") || kinds.has("condiment-shelf") || kinds.has("bakery-shelf")) level.marketFixtureFamily = "mixed-aisle";
   else if (kinds.has("ready-chill")) level.marketFixtureFamily = "meal-cooler";
   else level.marketFixtureFamily = "cold-aisle";
 }
@@ -380,6 +391,6 @@ export function applySupermarketRestockProgressionPolish() {
     rebuildPlanogram(level);
     applyFirstLevelFocus(level);
     applyFeelCurve(level, number);
-    level.revision = Math.max(38, Number(level.revision || 1));
+    level.revision = Math.max(39, Number(level.revision || 1));
   }
 }
