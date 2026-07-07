@@ -171,11 +171,27 @@ export function applySupermarketRestockScenePolish() {
       const sample = slots[0];
       const category = sample.category;
       const name = names[category] || category;
+
+      if (isFirstFocus(this)) {
+        const top = Math.min(...slots.map((slot) => slot.y - slot.h / 2));
+        const centerX = slots.reduce((sum, slot) => sum + slot.x, 0) / slots.length;
+        const tag = this.add.text(centerX, top - 20, name, {
+          fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+          fontSize: 17,
+          fontStyle: "bold",
+          color: CATEGORY_COLOR[category] || "#745d43",
+          backgroundColor: "rgba(255, 250, 240, 0.97)",
+          padding: { x: 12, y: 5 },
+        }).setOrigin(0.5, 1).setDepth(62);
+        this.categoryTags.push(tag);
+        continue;
+      }
+
       const left = Math.min(...slots.map((slot) => slot.x - slot.w / 2));
       const y = Math.min(...slots.map((slot) => slot.y)) + 14;
       const tag = this.add.text(left + 8, y, name, {
         fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-        fontSize: isFirstFocus(this) ? 15 : 13,
+        fontSize: 13,
         fontStyle: "bold",
         color: CATEGORY_COLOR[category] || "#745d43",
         backgroundColor: "rgba(255, 250, 240, 0.96)",
@@ -203,7 +219,6 @@ export function applySupermarketRestockScenePolish() {
         const fakeEntry = { status: "packed", slotId: slot.id, col, row: 0, layer: 0, rot: 0, x: anchor.x, y: anchor.y, itemId: def.id };
         const point = this.displayPointFor(def, fakeEntry);
 
-        // Shelf-edge vacancy ticks, not product-sized collision rectangles.
         const marker = this.add.graphics();
         marker.fillStyle(0x8d7358, isTutorial(this) ? 0.22 : 0.16);
         marker.fillRoundedRect(-19, -3, 38, 6, 3);
@@ -221,17 +236,18 @@ export function applySupermarketRestockScenePolish() {
     if (!isRestock(this)) return originalLayoutGoalCard.call(this, goal);
 
     const text = goal || "";
+    const first = isFirstFocus(this);
     const tutorial = isTutorial(this);
     const twoLine = text.length > (tutorial ? 30 : 38) || text.includes("，") || text.includes("；") || text.includes(";");
-    const cardW = tutorial ? 540 : 620;
-    const cardH = twoLine ? 58 : 48;
+    const cardW = first ? 470 : tutorial ? 540 : 620;
+    const cardH = first ? 46 : twoLine ? 58 : 48;
     const cardX = 375 - cardW / 2;
-    const cardY = 148;
+    const cardY = first ? 136 : 148;
     const centerY = cardY + cardH / 2;
 
     this.goalBg?.clear();
-    this.goalBg?.fillStyle(0xfffbf2, 0.94);
-    this.goalBg?.lineStyle(2, 0x67bca5, 0.48);
+    this.goalBg?.fillStyle(0xfffbf2, first ? 0.92 : 0.94);
+    this.goalBg?.lineStyle(first ? 1.5 : 2, 0x67bca5, first ? 0.36 : 0.48);
     this.goalBg?.fillRoundedRect(cardX, cardY, cardW, cardH, 18);
     this.goalBg?.strokeRoundedRect(cardX, cardY, cardW, cardH, 18);
 
@@ -239,9 +255,9 @@ export function applySupermarketRestockScenePolish() {
     this.goalText
       ?.setOrigin(0.5, 0.5)
       .setPosition(375, centerY)
-      .setFontSize(tutorial ? 16 : 17)
+      .setFontSize(first ? 15 : tutorial ? 16 : 17)
       .setColor("#684f3a")
-      .setWordWrapWidth(cardW - 44, true)
+      .setWordWrapWidth(cardW - 38, true)
       .setText(text);
     this.goalCardBottom = cardY + cardH;
   };
@@ -262,7 +278,6 @@ export function applySupermarketRestockScenePolish() {
     const line = valid ? 0xbfe7da : 0xf3b4aa;
     const drawY = rect.y - Math.max(0, preview.layer || 0) * 8;
 
-    // A soft shelf glow is enough. No debug lattice, baseline or center dot.
     this.previewGraphic.fillStyle(fill, valid ? 0.10 : 0.11);
     this.previewGraphic.lineStyle(2, line, valid ? 0.58 : 0.64);
     this.previewGraphic.fillRoundedRect(rect.x + 3, drawY + 3, rect.w - 6, rect.h - 6, Math.max(12, rect.r - 4));
@@ -294,8 +309,8 @@ export function applySupermarketRestockScenePolish() {
       if (good) this.goodSlotIds.add(slot.id);
       slot.marker
         .setScale(1)
-        .setFillStyle(good ? 0x69b79f : 0x9fb4c9, good ? 0.045 : 0)
-        .setStrokeStyle(good ? 2 : 1, good ? 0x9bd6c5 : 0x9fb4c9, good ? 0.34 : 0);
+        .setFillStyle(good ? 0x69b79f : 0x9fb4c9, good ? (isFirstFocus(this) ? 0.03 : 0.045) : 0)
+        .setStrokeStyle(good ? 2 : 1, good ? 0x9bd6c5 : 0x9fb4c9, good ? (isFirstFocus(this) ? 0.24 : 0.34) : 0);
     });
   };
 
@@ -311,21 +326,23 @@ export function applySupermarketRestockScenePolish() {
       this.i18n.ui.coachReleased = copy.released;
     }
 
-    this.titleText?.setFontSize(32).setColor("#5f402d").setY(84);
+    this.titleText
+      ?.setFontSize(isFirstFocus(this) ? 28 : 32)
+      .setColor("#5f402d")
+      .setY(isFirstFocus(this) ? 76 : 84);
     this.subtitleText?.setColor("#8b735f");
 
     if (isTutorial(this)) {
-      // Keep the learning screen calm: level + progress + one goal.
       this.subtitleText?.setVisible(false);
       this.goalLabel?.setVisible(false);
       this.coinPill?.bg?.setVisible(false);
       this.coinPill?.text?.setVisible(false);
       this.progressPill?.bg?.setPosition(110, 0);
       this.progressPill?.text?.setX(505);
-      const intro = isFirstFocus(this)
-        ? firstLevelCopy(this.i18n?.locale || "en").intro
-        : copy.intro;
-      this.setToastMessage(intro);
+
+      // First level already has one goal card + one hand animation. A second toast
+      // duplicates the instruction and floats over the play path, so do not show it.
+      if (!isFirstFocus(this)) this.setToastMessage(copy.intro);
     }
 
     this.events.once("shutdown", clearRootMode);
@@ -354,9 +371,10 @@ export function applySupermarketRestockScenePolish() {
     const result = originalStartOnboarding.call(this, sprite, hint);
     if (!isRestock(this) || !this.onboarding) return result;
 
-    // Move the instruction out of the product area.
-    this.onboarding.banner?.setPosition(0, -210);
-    this.onboarding.bannerText?.setY(292).setFontSize(18);
+    this.onboarding.banner?.setPosition(0, isFirstFocus(this) ? -232 : -210);
+    this.onboarding.bannerText
+      ?.setY(isFirstFocus(this) ? 270 : 292)
+      .setFontSize(isFirstFocus(this) ? 16 : 18);
     return result;
   };
 
@@ -364,6 +382,9 @@ export function applySupermarketRestockScenePolish() {
     const base = originalDisplayScaleFor.call(this, item, entry);
     if (!isRestock(this) || !item) return base;
 
+    if (isFirstFocus(this)) {
+      return Number((base * (entry?.status === "outside" ? 1.46 : 1.16)).toFixed(3));
+    }
     if (entry?.status === "outside") {
       return Number((base * (isTutorial(this) ? 1.38 : 1.26)).toFixed(3));
     }
