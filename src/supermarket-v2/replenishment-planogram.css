@@ -1,0 +1,24 @@
+.sv2-gap.is-wrong,
+.sv2-gap:disabled {
+  opacity: 0.34;
+  filter: grayscale(0.35);
+  cursor: not-allowed;
+  animation: none;
+  border-color: rgba(117, 96, 78, 0.24);
+  background: rgba(145, 124, 105, 0.08);
+}
+
+.sv2-gap.is-wrong span,
+.sv2-gap:disabled span {
+  background: rgba(117, 96, 78, 0.09);
+}
+
+.sv2-gap.is-wrong small,
+.sv2-gap:disabled small {
+  color: #8a7564;
+}
+
+.sv2-gap.is-ready {
+  opacity: 1;
+  filter: none;
+}
