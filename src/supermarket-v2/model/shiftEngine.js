@@ -1,4 +1,11 @@
-import { TASK_KIND, fixtureCanTakeSku, getSku, isShelfFull, visibleGapCount } from "./storeModel.js";
+import {
+  TASK_KIND,
+  firstAvailableCell,
+  fixtureCanTakeSku,
+  getSku,
+  isShelfFull,
+  visibleGapCount,
+} from "./storeModel.js";
 
 function clone(value) {
   return structuredClone(value);
@@ -75,7 +82,7 @@ export class ShiftEngine {
     return { ok: true, loadedUnits: stockCase.quantity };
   }
 
-  placeUnit(unitId, bayId, facingIndex = null) {
+  placeUnit(unitId, bayId, requestedCell = null) {
     if (this.state.phase !== "working") return { ok: false, reason: "shift-not-working" };
     const unitIndex = this.state.cart.findIndex((entry) => entry.id === unitId);
     if (unitIndex < 0) return { ok: false, reason: "unit-not-on-cart" };
@@ -93,20 +100,56 @@ export class ShiftEngine {
     const footprint = Math.max(1, Number(sku?.footprint || 1));
     if (visibleGapCount(bay) < footprint) return { ok: false, reason: "no-shelf-capacity" };
 
-    const index = facingIndex == null ? bay.facings.length : facingIndex;
+    const autoCell = firstAvailableCell(bay, footprint);
+    const cell = Number.isInteger(requestedCell) ? requestedCell : autoCell;
+    if (cell < 0) return { ok: false, reason: "no-contiguous-shelf-gap" };
+
+    // A requested drop cell still has to be physically valid. We reuse a cloned
+    // probe bay so the same contiguous-gap rule applies to pointer-directed drops.
+    const probe = {
+      ...bay,
+      facings: bay.facings.filter((facing) => facing.unitId !== unit.id),
+    };
+    const validRequestedCell = Number.isInteger(requestedCell)
+      ? firstAvailableCell({
+        ...probe,
+        facings: [
+          ...probe.facings,
+          { unitId: "__probe__", skuId: unit.skuId, footprint, cell },
+        ],
+      }, 1) >= -1
+      : true;
+
+    if (!validRequestedCell || cell + footprint > bay.capacity) {
+      return { ok: false, reason: "no-contiguous-shelf-gap" };
+    }
+
+    const occupied = new Set();
+    for (const facing of bay.facings) {
+      const start = Math.max(0, Number(facing.cell || 0));
+      const width = Math.max(1, Number(facing.footprint || 1));
+      for (let offset = 0; offset < width; offset += 1) occupied.add(start + offset);
+    }
+    for (let offset = 0; offset < footprint; offset += 1) {
+      if (occupied.has(cell + offset)) return { ok: false, reason: "no-contiguous-shelf-gap" };
+    }
+
     const facing = {
       unitId: unit.id,
       skuId: unit.skuId,
       footprint,
       expiryDay: unit.expiryDay,
+      cell,
     };
-    bay.facings.splice(Math.max(0, Math.min(index, bay.facings.length)), 0, facing);
+    bay.facings.push(facing);
+    bay.facings.sort((a, b) => Number(a.cell || 0) - Number(b.cell || 0));
+    bay.faced = false;
     this.state.cart.splice(unitIndex, 1);
     this.state.metrics.correctPlacements += 1;
     this.state.clockSeconds += 2;
 
     this.completeMatchingTask(TASK_KIND.REPLENISH, { bayId, skuId: unit.skuId });
-    return { ok: true, bayFull: isShelfFull(bay) };
+    return { ok: true, bayFull: isShelfFull(bay), cell };
   }
 
   faceBay(bayId) {
@@ -116,12 +159,9 @@ export class ShiftEngine {
     if (bay.sceneId !== this.state.currentSceneId) return { ok: false, reason: "wrong-scene" };
     if (!bay.facings.length) return { ok: false, reason: "nothing-to-face" };
 
-    bay.facings = [...bay.facings].sort((a, b) => {
-      if (a.skuId !== b.skuId) return a.skuId.localeCompare(b.skuId);
-      const aExpiry = a.expiryDay ?? Infinity;
-      const bExpiry = b.expiryDay ?? Infinity;
-      return aExpiry - bExpiry;
-    });
+    // Facing means pulling products forward and straightening them, not sorting
+    // the assortment alphabetically. Keep the physical planogram cell positions.
+    bay.facings.sort((a, b) => Number(a.cell || 0) - Number(b.cell || 0));
     bay.faced = true;
     this.state.metrics.facingsCompleted += 1;
     this.state.clockSeconds += 3;
@@ -136,7 +176,7 @@ export class ShiftEngine {
     if (index < 0) return { ok: false, reason: "sku-not-on-bay" };
     const [removed] = bay.facings.splice(index, 1);
     bay.faced = false;
-    return { ok: true, removed };
+    return { ok: true, removed, gapCell: removed.cell };
   }
 
   markUnitDamaged(unitId) {
