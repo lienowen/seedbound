@@ -102,25 +102,7 @@ export class ShiftEngine {
 
     const autoCell = firstAvailableCell(bay, footprint);
     const cell = Number.isInteger(requestedCell) ? requestedCell : autoCell;
-    if (cell < 0) return { ok: false, reason: "no-contiguous-shelf-gap" };
-
-    // A requested drop cell still has to be physically valid. We reuse a cloned
-    // probe bay so the same contiguous-gap rule applies to pointer-directed drops.
-    const probe = {
-      ...bay,
-      facings: bay.facings.filter((facing) => facing.unitId !== unit.id),
-    };
-    const validRequestedCell = Number.isInteger(requestedCell)
-      ? firstAvailableCell({
-        ...probe,
-        facings: [
-          ...probe.facings,
-          { unitId: "__probe__", skuId: unit.skuId, footprint, cell },
-        ],
-      }, 1) >= -1
-      : true;
-
-    if (!validRequestedCell || cell + footprint > bay.capacity) {
+    if (cell < 0 || cell + footprint > bay.capacity) {
       return { ok: false, reason: "no-contiguous-shelf-gap" };
     }
 
@@ -159,8 +141,6 @@ export class ShiftEngine {
     if (bay.sceneId !== this.state.currentSceneId) return { ok: false, reason: "wrong-scene" };
     if (!bay.facings.length) return { ok: false, reason: "nothing-to-face" };
 
-    // Facing means pulling products forward and straightening them, not sorting
-    // the assortment alphabetically. Keep the physical planogram cell positions.
     bay.facings.sort((a, b) => Number(a.cell || 0) - Number(b.cell || 0));
     bay.faced = true;
     this.state.metrics.facingsCompleted += 1;
