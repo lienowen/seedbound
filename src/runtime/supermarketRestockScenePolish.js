@@ -29,6 +29,32 @@ function isTutorial(scene) {
   return isRestock(scene) && TUTORIAL_IDS.has(scene?.level?.id);
 }
 
+function isFirstFocus(scene) {
+  return isRestock(scene) && scene?.level?.id === "fridge-br-1";
+}
+
+function firstLevelCopy(locale = "en") {
+  if (locale === "cn") {
+    return {
+      title: "第一批到货",
+      goal: "把 3 个饮料补到“饮料”货架。",
+      intro: "三个饮料，一排货架。补齐这一排就完成。",
+    };
+  }
+  if (locale === "pt") {
+    return {
+      title: "Primeira Entrega",
+      goal: "Reponha as 3 bebidas na prateleira BEBIDAS.",
+      intro: "Tres bebidas, uma fileira. Complete a prateleira.",
+    };
+  }
+  return {
+    title: "First Delivery",
+    goal: "Restock all 3 drinks on the DRINKS shelf.",
+    intro: "Three drinks. One shelf. Fill the row.",
+  };
+}
+
 function coachingCopy(locale = "en") {
   if (locale === "cn") {
     return {
@@ -63,11 +89,38 @@ function clearRootMode() {
   document.documentElement.classList.remove("restock-game", "restock-tutorial");
 }
 
+function applyFixtureCuts(scene) {
+  const fixtures = scene?.level?.stage?.fixtures;
+  if (!Array.isArray(fixtures)) return;
+
+  for (const fx of fixtures) {
+    if (!fx?.crop || !fx.key) continue;
+    const images = scene.children?.list?.filter((child) => child?.texture?.key === fx.key) || [];
+    const image = images.find((child) => child.depth === (fx.depth ?? 2)) || images.at(-1);
+    if (!image?.setCrop) continue;
+
+    const source = scene.textures.get(fx.key)?.getSourceImage?.();
+    const sourceW = source?.width || 1;
+    const sourceH = source?.height || 1;
+    const x = Math.max(0, Math.min(sourceW - 1, Math.round(fx.crop.x || 0)));
+    const y = Math.max(0, Math.min(sourceH - 1, Math.round(fx.crop.y || 0)));
+    const w = Math.max(1, Math.min(sourceW - x, Math.round(fx.crop.w || sourceW)));
+    const h = Math.max(1, Math.min(sourceH - y, Math.round(fx.crop.h || sourceH)));
+
+    image
+      .setCrop(x, y, w, h)
+      .setPosition(fx.cx, fx.cy)
+      .setOrigin(0.5, fx.originY ?? 0.5)
+      .setDisplaySize(fx.w, fx.h);
+  }
+}
+
 export function applySupermarketRestockScenePolish() {
   if (applied) return;
   applied = true;
 
   const originalCreate = StorageScene.prototype.create;
+  const originalUpdateChrome = StorageScene.prototype.updateChrome;
   const originalHasOnboarded = StorageScene.prototype.hasOnboarded;
   const originalMarkOnboarded = StorageScene.prototype.markOnboarded;
   const originalStartOnboarding = StorageScene.prototype.startOnboarding;
@@ -76,9 +129,26 @@ export function applySupermarketRestockScenePolish() {
   const originalBuildFacingGhosts = StorageScene.prototype.buildFacingGhosts;
   const originalLayoutGoalCard = StorageScene.prototype.layoutGoalCard;
   const originalDrawPlacementPreview = StorageScene.prototype.drawPlacementPreview;
+  const originalShowWishBubble = StorageScene.prototype.showWishBubble;
+  const originalRevealDropZones = StorageScene.prototype.revealDropZones;
   const originalUpdateCampaignControls = StorageScene.prototype.updateCampaignControls;
   const originalSlotHintLabel = StorageScene.prototype.slotHintLabel;
   const originalDrawSettleBar = StorageScene.prototype.drawSettleBar;
+
+  StorageScene.prototype.updateChrome = function updateRestockChrome(patch = {}) {
+    if (isFirstFocus(this)) {
+      const locale = patch.locale || this.i18n?.locale || this.chromeData?.locale || "en";
+      const copy = firstLevelCopy(locale);
+      patch = {
+        ...patch,
+        title: copy.title,
+        subtitle: "",
+        goal: copy.goal,
+        total: 3,
+      };
+    }
+    return originalUpdateChrome.call(this, patch);
+  };
 
   StorageScene.prototype.buildShelfCategoryTags = function buildRestockCategoryTags() {
     if (!isRestock(this)) return originalBuildShelfCategoryTags.call(this);
@@ -105,7 +175,7 @@ export function applySupermarketRestockScenePolish() {
       const y = Math.min(...slots.map((slot) => slot.y)) + 14;
       const tag = this.add.text(left + 8, y, name, {
         fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
-        fontSize: 13,
+        fontSize: isFirstFocus(this) ? 15 : 13,
         fontStyle: "bold",
         color: CATEGORY_COLOR[category] || "#745d43",
         backgroundColor: "rgba(255, 250, 240, 0.96)",
@@ -133,8 +203,7 @@ export function applySupermarketRestockScenePolish() {
         const fakeEntry = { status: "packed", slotId: slot.id, col, row: 0, layer: 0, rot: 0, x: anchor.x, y: anchor.y, itemId: def.id };
         const point = this.displayPointFor(def, fakeEntry);
 
-        // A small shelf-edge notch reads like a missing facing/price position. It
-        // guides the eye without drawing a product-sized collision rectangle.
+        // Shelf-edge vacancy ticks, not product-sized collision rectangles.
         const marker = this.add.graphics();
         marker.fillStyle(0x8d7358, isTutorial(this) ? 0.22 : 0.16);
         marker.fillRoundedRect(-19, -3, 38, 6, 3);
@@ -193,8 +262,7 @@ export function applySupermarketRestockScenePolish() {
     const line = valid ? 0xbfe7da : 0xf3b4aa;
     const drawY = rect.y - Math.max(0, preview.layer || 0) * 8;
 
-    // A soft shelf glow is enough. No full debug lattice, baseline, center dot or
-    // score-colored engineering overlay.
+    // A soft shelf glow is enough. No debug lattice, baseline or center dot.
     this.previewGraphic.fillStyle(fill, valid ? 0.10 : 0.11);
     this.previewGraphic.lineStyle(2, line, valid ? 0.58 : 0.64);
     this.previewGraphic.fillRoundedRect(rect.x + 3, drawY + 3, rect.w - 6, rect.h - 6, Math.max(12, rect.r - 4));
@@ -208,10 +276,34 @@ export function applySupermarketRestockScenePolish() {
     }
   };
 
+  StorageScene.prototype.showWishBubble = function showRestockWishBubble(obj, item) {
+    if (isTutorial(this)) {
+      this.hideWishBubble?.();
+      return;
+    }
+    return originalShowWishBubble.call(this, obj, item);
+  };
+
+  StorageScene.prototype.revealDropZones = function revealRestockDropZones(item) {
+    if (!isRestock(this)) return originalRevealDropZones.call(this, item);
+
+    this.goodSlotIds = new Set();
+    if (!item) return;
+    this.slots.forEach((slot) => {
+      const good = this.engine.canUseSlot(item, slot);
+      if (good) this.goodSlotIds.add(slot.id);
+      slot.marker
+        .setScale(1)
+        .setFillStyle(good ? 0x69b79f : 0x9fb4c9, good ? 0.045 : 0)
+        .setStrokeStyle(good ? 2 : 1, good ? 0x9bd6c5 : 0x9fb4c9, good ? 0.34 : 0);
+    });
+  };
+
   StorageScene.prototype.create = function createRestockScene(data) {
     const result = originalCreate.call(this, data);
     if (!isRestock(this)) return result;
 
+    applyFixtureCuts(this);
     setRootMode(this);
     const copy = coachingCopy(this.i18n?.locale || "en");
     if (this.i18n?.ui) {
@@ -223,15 +315,17 @@ export function applySupermarketRestockScenePolish() {
     this.subtitleText?.setColor("#8b735f");
 
     if (isTutorial(this)) {
-      // Keep the learning screen calm: level + progress + one goal. Coins and
-      // duplicate subtitle copy return after the player understands the loop.
+      // Keep the learning screen calm: level + progress + one goal.
       this.subtitleText?.setVisible(false);
       this.goalLabel?.setVisible(false);
       this.coinPill?.bg?.setVisible(false);
       this.coinPill?.text?.setVisible(false);
       this.progressPill?.bg?.setPosition(110, 0);
       this.progressPill?.text?.setX(505);
-      this.setToastMessage(copy.intro);
+      const intro = isFirstFocus(this)
+        ? firstLevelCopy(this.i18n?.locale || "en").intro
+        : copy.intro;
+      this.setToastMessage(intro);
     }
 
     this.events.once("shutdown", clearRootMode);
@@ -260,8 +354,7 @@ export function applySupermarketRestockScenePolish() {
     const result = originalStartOnboarding.call(this, sprite, hint);
     if (!isRestock(this) || !this.onboarding) return result;
 
-    // Move the instruction out of the product area. The animated hand and target
-    // already teach the action; the banner should support them, not cover shelves.
+    // Move the instruction out of the product area.
     this.onboarding.banner?.setPosition(0, -210);
     this.onboarding.bannerText?.setY(292).setFontSize(18);
     return result;
@@ -271,10 +364,6 @@ export function applySupermarketRestockScenePolish() {
     const base = originalDisplayScaleFor.call(this, item, entry);
     if (!isRestock(this) || !item) return base;
 
-    // The legacy closed-cooler layout shrank authored item scales. Reusing that
-    // exact scale in the delivery tray made real products look like tiny stickers.
-    // Tray stock is deliberately larger and easier to grab; shelf stock gets only
-    // a small lift so neighboring facings never collide.
     if (entry?.status === "outside") {
       return Number((base * (isTutorial(this) ? 1.38 : 1.26)).toFixed(3));
     }
@@ -284,8 +373,6 @@ export function applySupermarketRestockScenePolish() {
   StorageScene.prototype.updateCampaignControls = function updateRestockCampaignControls() {
     if (!isRestock(this)) return originalUpdateCampaignControls.call(this);
 
-    // The vertical 1..5 jump dots made the playfield look like a debug navigator.
-    // The real level map already handles navigation, so keep the active game clean.
     this.phaseButtons?.forEach((button) => {
       button?.circle?.setVisible(false);
       button?.hit?.setVisible(false);
@@ -306,8 +393,6 @@ export function applySupermarketRestockScenePolish() {
 
   StorageScene.prototype.drawSettleBar = function drawRestockProgress(count, goal) {
     if (isTutorial(this)) {
-      // Early tutorial levels already have a truthful placed/total counter. Hiding
-      // the second meter keeps the first screen focused on drag -> snap -> row clear.
       this.harmonyBarBg?.clear();
       this.harmonyBarFill?.clear();
       this.harmonyLabel?.setText("");
