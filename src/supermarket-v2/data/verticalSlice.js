@@ -13,7 +13,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
     briefing: {
       clock: "07:00",
       role: "Morning Replenishment",
-      priorities: ["Drinks bay: 3 visible gaps"],
+      priorities: ["Drinks wall: recover 3 visible gaps"],
     },
     scenes: [
       { id: "backroom-small", kind: "backroom", travelSeconds: 0 },
@@ -31,9 +31,13 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         sceneId: "drinks-wall",
         department: DEPARTMENT.DRINKS,
         kind: FIXTURE_KIND.WALL_COOLER,
-        capacity: 3,
-        facings: [],
-        position: { x: 375, y: 510, width: 330, height: 120, wallMounted: true },
+        capacity: 6,
+        facings: [
+          { unitId: "existing-green-1", skuId: "green-soda", footprint: 1, expiryDay: null },
+          { unitId: "existing-red-1", skuId: "red-soda", footprint: 1, expiryDay: null },
+          { unitId: "existing-juice-1", skuId: "juice", footprint: 1, expiryDay: null },
+        ],
+        position: { x: 375, y: 510, width: 420, height: 132, wallMounted: true },
       }),
     ],
     tasks: [
@@ -54,8 +58,8 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
       clock: "07:15",
       role: "Morning Replenishment",
       priorities: [
-        "Breakfast aisle: bread gap",
-        "Dairy wall: milk, yogurt and cheese gaps",
+        "Breakfast aisle: recover the bread gap",
+        "Dairy wall: recover 3 chilled gaps",
       ],
     },
     scenes: [
@@ -76,18 +80,24 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         sceneId: "breakfast-aisle",
         department: DEPARTMENT.BREAKFAST,
         kind: FIXTURE_KIND.DRY_SHELF,
-        capacity: 2,
-        facings: [],
-        position: { x: 375, y: 500, width: 300, height: 130, againstWall: true },
+        capacity: 4,
+        facings: [
+          { unitId: "existing-bread-1", skuId: "bread", footprint: 2, expiryDay: null },
+        ],
+        position: { x: 375, y: 500, width: 390, height: 136, againstWall: true },
       }),
       createShelfBay({
         id: "dairy-bay-a",
         sceneId: "dairy-wall",
         department: DEPARTMENT.DAIRY,
         kind: FIXTURE_KIND.WALL_COOLER,
-        capacity: 3,
-        facings: [],
-        position: { x: 375, y: 500, width: 360, height: 140, wallMounted: true },
+        capacity: 6,
+        facings: [
+          { unitId: "existing-milk-1", skuId: "milk", footprint: 1, expiryDay: 7 },
+          { unitId: "existing-yogurt-1", skuId: "yogurt", footprint: 1, expiryDay: 8 },
+          { unitId: "existing-cheese-1", skuId: "cheese", footprint: 1, expiryDay: 12 },
+        ],
+        position: { x: 375, y: 500, width: 430, height: 146, wallMounted: true },
       }),
     ],
     tasks: [
