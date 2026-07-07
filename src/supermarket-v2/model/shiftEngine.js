@@ -33,6 +33,10 @@ export class ShiftEngine {
     return clone(this.state);
   }
 
+  currentScene() {
+    return this.definition.scenes?.find((entry) => entry.id === this.state.currentSceneId) || null;
+  }
+
   startShift() {
     if (this.state.phase !== "briefing") return { ok: false, reason: "shift-already-started" };
     this.state.phase = "working";
@@ -40,6 +44,7 @@ export class ShiftEngine {
   }
 
   moveToScene(sceneId) {
+    if (this.state.phase !== "working") return { ok: false, reason: "shift-not-working" };
     const scene = this.definition.scenes?.find((entry) => entry.id === sceneId);
     if (!scene) return { ok: false, reason: "scene-not-found" };
     this.state.currentSceneId = sceneId;
@@ -48,6 +53,10 @@ export class ShiftEngine {
   }
 
   loadCase(caseId) {
+    if (this.state.phase !== "working") return { ok: false, reason: "shift-not-working" };
+    const scene = this.currentScene();
+    if (scene?.kind !== "backroom") return { ok: false, reason: "must-load-in-backroom" };
+
     const stockCase = this.state.cases.find((entry) => entry.id === caseId);
     if (!stockCase) return { ok: false, reason: "case-not-found" };
     if (stockCase.loaded) return { ok: false, reason: "case-already-loaded" };
@@ -67,11 +76,13 @@ export class ShiftEngine {
   }
 
   placeUnit(unitId, bayId, facingIndex = null) {
+    if (this.state.phase !== "working") return { ok: false, reason: "shift-not-working" };
     const unitIndex = this.state.cart.findIndex((entry) => entry.id === unitId);
     if (unitIndex < 0) return { ok: false, reason: "unit-not-on-cart" };
     const unit = this.state.cart[unitIndex];
     const bay = this.state.bays[bayId];
     if (!bay) return { ok: false, reason: "bay-not-found" };
+    if (bay.sceneId !== this.state.currentSceneId) return { ok: false, reason: "wrong-scene" };
     if (unit.damaged) return { ok: false, reason: "damaged-unit-cannot-be-stocked" };
     if (!fixtureCanTakeSku(bay, unit.skuId)) {
       this.state.metrics.wrongPlacements += 1;
@@ -99,8 +110,10 @@ export class ShiftEngine {
   }
 
   faceBay(bayId) {
+    if (this.state.phase !== "working") return { ok: false, reason: "shift-not-working" };
     const bay = this.state.bays[bayId];
     if (!bay) return { ok: false, reason: "bay-not-found" };
+    if (bay.sceneId !== this.state.currentSceneId) return { ok: false, reason: "wrong-scene" };
     if (!bay.facings.length) return { ok: false, reason: "nothing-to-face" };
 
     bay.facings = [...bay.facings].sort((a, b) => {
@@ -196,7 +209,7 @@ export class ShiftEngine {
       availability,
       accuracy,
       facing,
-      wasteControl: metrics.damagedRemoved > 0 ? 100 : 100,
+      wasteControl: 100,
       elapsedSeconds: this.state.clockSeconds,
     };
   }
