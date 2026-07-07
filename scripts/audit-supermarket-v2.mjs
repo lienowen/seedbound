@@ -31,6 +31,11 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
   }
   if (!shift.scenes?.some((scene) => scene.kind === "backroom")) fail(`${shift.id}:missing-backroom`);
   if (!shift.tasks?.some((task) => task.kind === "load-case")) fail(`${shift.id}:missing-load-case-work`);
+
+  const sceneIds = new Set((shift.scenes || []).map((scene) => scene.id));
+  for (const bay of shift.bays || []) {
+    if (!bay.sceneId || !sceneIds.has(bay.sceneId)) fail(`${shift.id}:${bay.id}:invalid-scene=${bay.sceneId || "missing"}`);
+  }
 }
 
 // Shift 1: three physical units, one compact wall bay, one complete row.
@@ -38,8 +43,12 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
   const engine = new ShiftEngine(shift1);
   expectOk(engine.startShift(), "shift1:start");
   for (const stockCase of shift1.cases) expectOk(engine.loadCase(stockCase.id), `shift1:load:${stockCase.id}`);
-  expectOk(engine.moveToScene("drinks-wall"), "shift1:move-drinks");
 
+  const remoteUnit = unitBySku(engine, "green-soda");
+  const remotePlace = engine.placeUnit(remoteUnit.id, "drinks-bay-a");
+  if (remotePlace.ok || remotePlace.reason !== "wrong-scene") fail(`shift1:remote-place=${remotePlace.reason}`);
+
+  expectOk(engine.moveToScene("drinks-wall"), "shift1:move-drinks");
   for (const skuId of ["green-soda", "red-soda", "juice"]) {
     const unit = unitBySku(engine, skuId);
     if (!unit) fail(`shift1:missing-unit=${skuId}`);
@@ -52,8 +61,18 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
   if ((finish.score?.accuracy || 0) !== 100) fail(`shift1:accuracy=${finish.score?.accuracy}`);
 }
 
+// Loading must be a real backroom action, not a remote inventory button.
+{
+  const engine = new ShiftEngine(shift1);
+  expectOk(engine.startShift(), "shift1-location:start");
+  expectOk(engine.loadCase("case-drinks-1"), "shift1-location:first-load");
+  expectOk(engine.moveToScene("drinks-wall"), "shift1-location:move");
+  const remoteLoad = engine.loadCase("case-drinks-2");
+  if (remoteLoad.ok || remoteLoad.reason !== "must-load-in-backroom") fail(`shift1:remote-load=${remoteLoad.reason}`);
+}
+
 // Shift 2: bread and dairy must be physically separate. Wrong cross-department
-// placement is intentionally tested before the correct workflow.
+// placement is intentionally tested while the worker is standing at the dairy wall.
 {
   const breakfastBay = shift2.bays.find((bay) => bay.id === "breakfast-bread-bay");
   const dairyBay = shift2.bays.find((bay) => bay.id === "dairy-bay-a");
@@ -76,6 +95,10 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
   for (const stockCase of shift2.cases) expectOk(engine.loadCase(stockCase.id), `shift2:load:${stockCase.id}`);
 
   const breadUnit = unitBySku(engine, "bread");
+  const remoteBread = engine.placeUnit(breadUnit.id, "breakfast-bread-bay");
+  if (remoteBread.ok || remoteBread.reason !== "wrong-scene") fail(`shift2:remote-bread=${remoteBread.reason}`);
+
+  expectOk(engine.moveToScene("dairy-wall"), "shift2:move-dairy-first");
   const wrong = engine.placeUnit(breadUnit.id, "dairy-bay-a");
   if (wrong.ok || wrong.reason !== "wrong-department-or-fixture") fail(`shift2:wrong-placement-not-rejected=${wrong.reason}`);
 
@@ -118,5 +141,5 @@ if (errors.length) {
   errors.forEach((error) => console.error(`FAIL ${error}`));
   process.exitCode = 1;
 } else {
-  console.log("OK supermarket-v2 shifts=3 backroom=true departments=physical capacity=footprint-aware customer-gap=true");
+  console.log("OK supermarket-v2 shifts=3 backroom=true scenes=physical capacity=footprint-aware customer-gap=true");
 }
