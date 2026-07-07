@@ -1,20 +1,16 @@
 import { CAMPAIGN_CHAPTERS, CAMPAIGN_FINALE, CAMPAIGN_I18N } from "../src/i18n/campaign.js";
 import { FRIDGE_BR_CAMPAIGN } from "../src/levels/fridgePhaserLevel.js";
 import { applyCoreConsistencyPatches } from "../src/runtime/coreConsistencyBootstrap.js";
-import { applyEngineConsistency } from "../src/runtime/engineConsistency.js";
-import { applyMidCampaignCapacityPolish } from "../src/runtime/midCampaignCapacityPolish.js";
-import { applyChapterContinuityPolish } from "../src/runtime/chapterContinuityPolish.js";
 
 applyCoreConsistencyPatches();
-applyMidCampaignCapacityPolish();
-applyEngineConsistency();
-applyChapterContinuityPolish();
 
 const errors = [];
 const levelIds = FRIDGE_BR_CAMPAIGN.map((level) => level.id);
 const levelIdSet = new Set(levelIds);
+const restockLevels = FRIDGE_BR_CAMPAIGN.filter((level) => level.id?.startsWith("fridge-br-"));
 
 if (levelIdSet.size !== levelIds.length) errors.push("duplicate-level-id");
+if (restockLevels.length !== 20) errors.push(`restock-level-count:${restockLevels.length}`);
 if (FRIDGE_BR_CAMPAIGN.at(-1)?.id !== "fridge-br-20") {
   errors.push(`final-level:${FRIDGE_BR_CAMPAIGN.at(-1)?.id || "missing"}`);
 }
@@ -35,6 +31,12 @@ for (const level of FRIDGE_BR_CAMPAIGN) {
     if (item.fixed && item.slot && !slots.has(item.slot)) {
       errors.push(`missing-fixed-slot:${level.id}:${item.id}:${item.slot}`);
     }
+  }
+
+  if (level.id?.startsWith("fridge-br-")) {
+    if (level.theme?.key !== "restock-cooler") errors.push(`restock-theme:${level.id}`);
+    if (!level.planogram?.length) errors.push(`restock-planogram:${level.id}`);
+    if ((level.items || []).some((item) => !item.prefs?.category)) errors.push(`restock-category:${level.id}`);
   }
 }
 
@@ -59,10 +61,10 @@ for (const locale of ["en", "cn", "pt"]) {
   const copy = CAMPAIGN_FINALE[locale];
   if (!copy?.title || !copy?.body || !copy?.cta) errors.push(`finale-copy:${locale}`);
 }
-if (CAMPAIGN_FINALE.id !== "season-1-finale") errors.push(`finale-id:${CAMPAIGN_FINALE.id}`);
+if (CAMPAIGN_FINALE.id !== "season-1-restock-finale") errors.push(`finale-id:${CAMPAIGN_FINALE.id}`);
 if (!CAMPAIGN_FINALE.image) errors.push("finale-image-missing");
 
-const storyAnchors = ["fridge-br-10", "fridge-br-11", "fridge-br-15", "fridge-br-16", "fridge-br-19", "fridge-br-20"];
+const storyAnchors = ["fridge-br-1", "fridge-br-3", "fridge-br-10", "fridge-br-11", "fridge-br-15", "fridge-br-18", "fridge-br-20"];
 for (const locale of ["en", "cn"]) {
   for (const levelId of storyAnchors) {
     const copy = CAMPAIGN_I18N[locale]?.[levelId];
@@ -78,5 +80,5 @@ if (errors.length) {
   for (const error of errors) console.error(`FAIL ${error}`);
   process.exitCode = 1;
 } else {
-  console.log(`OK release-readiness levels=${FRIDGE_BR_CAMPAIGN.length} chapters=${CAMPAIGN_CHAPTERS.length} finale=${CAMPAIGN_FINALE.id}`);
+  console.log(`OK release-readiness campaign=${FRIDGE_BR_CAMPAIGN.length} restock=${restockLevels.length} chapters=${CAMPAIGN_CHAPTERS.length} finale=${CAMPAIGN_FINALE.id}`);
 }
