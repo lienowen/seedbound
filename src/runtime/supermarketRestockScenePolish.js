@@ -61,6 +61,7 @@ export function applySupermarketRestockScenePolish() {
   const originalCreate = StorageScene.prototype.create;
   const originalHasOnboarded = StorageScene.prototype.hasOnboarded;
   const originalMarkOnboarded = StorageScene.prototype.markOnboarded;
+  const originalDisplayScaleFor = StorageScene.prototype.displayScaleFor;
   const originalUpdateCampaignControls = StorageScene.prototype.updateCampaignControls;
   const originalSlotHintLabel = StorageScene.prototype.slotHintLabel;
   const originalDrawSettleBar = StorageScene.prototype.drawSettleBar;
@@ -105,6 +106,20 @@ export function applySupermarketRestockScenePolish() {
     } catch {
       // Storage failure must never interrupt play.
     }
+  };
+
+  StorageScene.prototype.displayScaleFor = function restockDisplayScale(item, entry) {
+    const base = originalDisplayScaleFor.call(this, item, entry);
+    if (!isRestock(this) || !item) return base;
+
+    // The legacy closed-cooler layout shrank authored item scales. Reusing that
+    // exact scale in the delivery tray made real products look like tiny stickers.
+    // Tray stock is deliberately larger and easier to grab; shelf stock gets only
+    // a small lift so neighboring facings never collide.
+    if (entry?.status === "outside") {
+      return Number((base * (isTutorial(this) ? 1.38 : 1.26)).toFixed(3));
+    }
+    return Number((base * 1.06).toFixed(3));
   };
 
   StorageScene.prototype.updateCampaignControls = function updateRestockCampaignControls() {
