@@ -22,3 +22,51 @@
   opacity: 1;
   filter: none;
 }
+
+.sv2-complete-shift {
+  display: inline-flex;
+  margin: 2px auto 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #e2eee9;
+  color: #35695f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sv2-complete-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.sv2-complete-actions .sv2-primary,
+.sv2-complete-actions .sv2-secondary {
+  width: 100%;
+}
+
+.sv2-secondary {
+  appearance: none;
+  border: 1px solid rgba(79, 68, 57, 0.16);
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: #f1e9db;
+  color: #4a4037;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sv2-secondary:hover {
+  background: #e9ddcb;
+}
+
+@media (max-width: 520px) {
+  .sv2-complete-actions {
+    grid-template-columns: 1fr;
+  }
+}
