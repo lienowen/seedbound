@@ -34,6 +34,18 @@ function productUrl(skuId) {
   return assetUrl(`tidy/${skuId}.png`);
 }
 
+function formatShiftClock(baseClock, elapsedSeconds) {
+  const [rawHours, rawMinutes] = String(baseClock || "07:00").split(":").map(Number);
+  const hours = Number.isFinite(rawHours) ? rawHours : 7;
+  const minutes = Number.isFinite(rawMinutes) ? rawMinutes : 0;
+  const baseSeconds = (hours * 60 + minutes) * 60;
+  const totalSeconds = baseSeconds + Math.max(0, Math.floor(Number(elapsedSeconds || 0)));
+  const hh = String(Math.floor(totalSeconds / 3600) % 24).padStart(2, "0");
+  const mm = String(Math.floor(totalSeconds / 60) % 60).padStart(2, "0");
+  const ss = String(totalSeconds % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
 function ProductArt({ skuId, className = "" }) {
   const [failed, setFailed] = useState(false);
   const sku = getSku(skuId);
@@ -108,6 +120,7 @@ function ShiftHeader({ shift, shiftNumber, maxShift, state, scene }) {
       </div>
       <div className="sv2-header-status">
         <span>{sceneLabel(scene)}</span>
+        <span aria-label="Shift clock">{formatShiftClock(shift.briefing.clock, state.clockSeconds)}</span>
         <b>{progress.done}/{progress.total}</b>
       </div>
     </header>
@@ -353,7 +366,6 @@ export function ReplenishmentShiftGame() {
   const [message, setMessage] = useState("Read the priority list, then clock in.");
   const [selectedUnitId, setSelectedUnitId] = useState(null);
   const [score, setScore] = useState(null);
-  const engine = engineRef.current;
 
   const scene = shift.scenes.find((entry) => entry.id === state.currentSceneId) || null;
   const currentBay = Object.values(state.bays).find((bay) => bay.sceneId === state.currentSceneId) || null;
