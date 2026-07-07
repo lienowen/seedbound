@@ -1,5 +1,6 @@
 import "./replenishment-root.css";
 import "./replenishment-planogram.css";
+import "./t1-game-ui.css";
 import { ReplenishmentShiftGame } from "./ReplenishmentShiftGame.jsx";
 
 export function SupermarketV2Entry() {
