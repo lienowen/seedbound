@@ -1,38 +1,9 @@
 import { FRIDGE_BR_CAMPAIGN } from "../levels/fridgePhaserLevel.js";
 import { LOCALES, progressStorageKey } from "../i18n/locale.js";
+import { applySupermarketRestockPolish } from "./supermarketRestockPolish.js";
 
-const MIGRATION_TAG = 2;
+const MIGRATION_TAG = 3;
 const LEGACY_PACK_INSERT_AFTER = [2, 4, 6, 8, 10, 12, 14, 16, 18];
-
-function patchFirstLevel() {
-  const first = FRIDGE_BR_CAMPAIGN.find((level) => level.id === "fridge-br-1");
-  if (!first) return;
-
-  first.items = first.items.filter((item) => (
-    item.fixed || !["strawberries", "cake"].includes(item.image)
-  ));
-
-  first.items = first.items.map((item) => {
-    if (item.fixed || !["milk", "juice"].includes(item.image)) return item;
-    return {
-      ...item,
-      prefs: {
-        ...(item.prefs || {}),
-        zone: "door",
-        needsCold: false,
-      },
-    };
-  });
-
-  first.objective = {
-    type: "fill-zone",
-    zone: "door",
-    count: 4,
-    itemImages: ["green-soda", "red-soda", "juice", "milk"],
-  };
-
-  first.revision = Math.max(2, Number(first.revision || 1));
-}
 
 function buildLegacyLayout() {
   const sequence = [];
@@ -109,9 +80,6 @@ function migrateProgressRecord(key) {
     } else if ((parsed.layout || 1) === 3 && !hasPantryProgress && explicitLegacyEvidence) {
       migrateLegacyLayout3(parsed);
     } else {
-      // Layout 3 is ambiguous: both the old pack-insert build and the current pantry
-      // build used it. Without positive legacy evidence, preserving the current index
-      // is safer than guessing and moving a valid modern save to another level.
       clampCurrent(parsed);
     }
 
@@ -130,6 +98,9 @@ function migrateSavedProgress() {
 }
 
 export function applyCoreConsistencyPatches() {
-  patchFirstLevel();
+  // The product is now one coherent supermarket-restock game. Apply the data
+  // model first so every later audit, localization pass and scene sees the same
+  // category-labelled commercial shelving rules.
+  applySupermarketRestockPolish();
   migrateSavedProgress();
 }
