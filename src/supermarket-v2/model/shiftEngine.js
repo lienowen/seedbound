@@ -4,6 +4,7 @@ import {
   fixtureCanTakeSku,
   getSku,
   isShelfFull,
+  planogramAllowsSkuAtCell,
   visibleGapCount,
 } from "./storeModel.js";
 
@@ -101,10 +102,14 @@ export class ShiftEngine {
     const footprint = Math.max(1, Number(sku?.footprint || 1));
     if (visibleGapCount(bay) < footprint) return { ok: false, reason: "no-shelf-capacity" };
 
-    const autoCell = firstAvailableCell(bay, footprint);
+    const autoCell = firstAvailableCell(bay, footprint, unit.skuId);
     const cell = Number.isInteger(requestedCell) ? requestedCell : autoCell;
     if (cell < 0 || cell + footprint > bay.capacity) {
       return { ok: false, reason: "no-contiguous-shelf-gap" };
+    }
+    if (!planogramAllowsSkuAtCell(bay, unit.skuId, cell, footprint)) {
+      this.state.metrics.wrongPlacements += 1;
+      return { ok: false, reason: "wrong-planogram-facing" };
     }
 
     const occupied = new Set();
