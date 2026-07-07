@@ -9,8 +9,8 @@ import "./fridge-phaser.css";
 
 // Apply the supermarket-restock data model before campaign progress is read.
 // Old door-capacity and cold-door compatibility patches are intentionally gone:
-// commercial cooler levels now use category-labelled shelf facings as the single
-// source of truth.
+// commercial cooler levels now use typed category shelves and real SKU footprints
+// as the single source of truth.
 applyCoreConsistencyPatches();
 applySupermarketRestockProgressionPolish();
 applySupermarketRestockVisualPolish();
@@ -20,10 +20,12 @@ applyPreviewConstraintPolish();
 const fridgePhaserGameImport = Promise.all([
   import("./runtime/dragSnapPolish.js"),
   import("./runtime/supermarketRestockScenePolish.js"),
+  import("./runtime/supermarketRestockFacingPolish.js"),
   import("./FridgePhaserGame.jsx"),
-]).then(([dragPolish, restockPolish, gameModule]) => {
+]).then(([dragPolish, restockPolish, facingPolish, gameModule]) => {
   dragPolish.applyDragSnapPolish();
   restockPolish.applySupermarketRestockScenePolish();
+  facingPolish.applySupermarketRestockFacingPolish();
   return gameModule;
 });
 
