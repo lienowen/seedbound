@@ -13,7 +13,8 @@ export async function loadLegacyGame() {
   applySupermarketRestockSpacingPolish();
   applyPreviewConstraintPolish();
 
-  const [dragPolish, restockPolish, facingPolish, gameModule] = await Promise.all([
+  const [, dragPolish, restockPolish, facingPolish, gameModule] = await Promise.all([
+    import("./fridge-phaser.css"),
     import("./runtime/dragSnapPolish.js"),
     import("./runtime/supermarketRestockScenePolish.js"),
     import("./runtime/supermarketRestockFacingPolish.js"),
