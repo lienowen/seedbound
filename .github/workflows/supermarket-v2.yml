@@ -1,0 +1,42 @@
+name: Supermarket V2
+
+on:
+  pull_request:
+    paths:
+      - "src/supermarket-v2/**"
+      - "src/mainRouter.jsx"
+      - "scripts/audit-supermarket-v2*.mjs"
+      - ".github/workflows/supermarket-v2.yml"
+  push:
+    branches:
+      - "supermarket-v2-rebuild-20260707"
+
+permissions:
+  contents: read
+
+jobs:
+  audit-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Simulate real replenishment shifts
+        run: node scripts/audit-supermarket-v2.mjs
+
+      - name: Audit SKU planogram facings
+        run: node scripts/audit-supermarket-v2-planogram.mjs
+
+      - name: Compile production app
+        run: npm run build
