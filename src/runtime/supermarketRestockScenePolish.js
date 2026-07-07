@@ -74,6 +74,7 @@ export function applySupermarketRestockScenePolish() {
   const originalDisplayScaleFor = StorageScene.prototype.displayScaleFor;
   const originalBuildShelfCategoryTags = StorageScene.prototype.buildShelfCategoryTags;
   const originalLayoutGoalCard = StorageScene.prototype.layoutGoalCard;
+  const originalDrawPlacementPreview = StorageScene.prototype.drawPlacementPreview;
   const originalUpdateCampaignControls = StorageScene.prototype.updateCampaignControls;
   const originalSlotHintLabel = StorageScene.prototype.slotHintLabel;
   const originalDrawSettleBar = StorageScene.prototype.drawSettleBar;
@@ -140,6 +141,37 @@ export function applySupermarketRestockScenePolish() {
       .setWordWrapWidth(cardW - 44, true)
       .setText(text);
     this.goalCardBottom = cardY + cardH;
+  };
+
+  StorageScene.prototype.drawPlacementPreview = function drawRestockPlacementPreview(item, preview) {
+    if (!isRestock(this)) return originalDrawPlacementPreview.call(this, item, preview);
+
+    this.previewGraphic?.clear();
+    this.previewText?.setVisible(false);
+    this.previewSprite?.setVisible(false);
+    if (!preview || (!preview.inside && !preview.valid)) return;
+
+    const rect = this.placementRect(preview);
+    if (!rect) return;
+
+    const valid = !!preview.valid;
+    const fill = valid ? 0x69b79f : 0xd9796a;
+    const line = valid ? 0xbfe7da : 0xf3b4aa;
+    const drawY = rect.y - Math.max(0, preview.layer || 0) * 8;
+
+    // A soft shelf glow is enough. No full debug lattice, baseline, center dot or
+    // score-colored engineering overlay.
+    this.previewGraphic.fillStyle(fill, valid ? 0.10 : 0.11);
+    this.previewGraphic.lineStyle(2, line, valid ? 0.58 : 0.64);
+    this.previewGraphic.fillRoundedRect(rect.x + 3, drawY + 3, rect.w - 6, rect.h - 6, Math.max(12, rect.r - 4));
+    this.previewGraphic.strokeRoundedRect(rect.x + 3, drawY + 3, rect.w - 6, rect.h - 6, Math.max(12, rect.r - 4));
+
+    if (!valid) {
+      this.previewText
+        ?.setText(this.translateReason(preview.reason || "reject.generic"))
+        .setPosition(preview.x, drawY - 6)
+        .setVisible(true);
+    }
   };
 
   StorageScene.prototype.create = function createRestockScene(data) {
