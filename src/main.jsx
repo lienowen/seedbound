@@ -2,19 +2,17 @@ import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
 import { applyCoreConsistencyPatches } from "./runtime/coreConsistencyBootstrap.js";
-import { applyEngineConsistency } from "./runtime/engineConsistency.js";
-import { applyMidCampaignCapacityPolish } from "./runtime/midCampaignCapacityPolish.js";
 import { applyPreviewConstraintPolish } from "./runtime/previewConstraintPolish.js";
 import "./fridge-phaser.css";
 
-// Apply data and engine consistency before campaign progress is read.
+// Apply the supermarket-restock data model before campaign progress is read.
+// Old door-capacity and cold-door compatibility patches are intentionally gone:
+// commercial cooler levels now use category-labelled shelf facings as the single
+// source of truth.
 applyCoreConsistencyPatches();
-applyMidCampaignCapacityPolish();
-applyEngineConsistency();
 applyPreviewConstraintPolish();
 
-// Keep Phaser and scene-level polish out of the initial UI bundle. Both chunks
-// load together, then scene patches are applied before React mounts the game.
+// Keep Phaser and scene-level drag polish out of the initial UI bundle.
 const fridgePhaserGameImport = Promise.all([
   import("./runtime/dragSnapPolish.js"),
   import("./FridgePhaserGame.jsx"),
