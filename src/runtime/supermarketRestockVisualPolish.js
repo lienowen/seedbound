@@ -121,38 +121,69 @@ function slotMetric(slot) {
   };
 }
 
+function categoryBlocks(slots) {
+  const byCategory = new Map();
+  for (const slot of slots) {
+    if (!byCategory.has(slot.category)) byCategory.set(slot.category, []);
+    byCategory.get(slot.category).push(slot);
+  }
+  return [...byCategory.values()].map((group) => ({
+    category: group[0].category,
+    entries: group.map((slot) => ({ slot, metric: slotMetric(slot) })),
+  }));
+}
+
 function layoutGeneratedSlots(level) {
   if (TUTORIAL_IDS.has(level.id)) return;
   const slots = activeSlots(level).sort((a, b) => ((a.tier ?? 0) - (b.tier ?? 0)) || (a.x - b.x));
   if (!slots.length) return;
 
+  const SLOT_GAP = 18;
+  const CATEGORY_GAP = 30;
+  const MAX_WIDTH = 650;
   const rows = [];
-  const gap = 18;
-  for (const slot of slots) {
-    const metric = slotMetric(slot);
-    let row = rows.at(-1);
-    const nextWidth = row ? row.width + gap + metric.w : metric.w;
-    if (!row || row.entries.length >= 3 || nextWidth > 650) {
-      row = { entries: [], width: 0 };
+
+  // Keep a category block indivisible. A DRINKS block may share a row with DAIRY,
+  // but it is never cut in half by the row wrapper. This preserves the player's
+  // visual rule: one category reads as one continuous shelf band.
+  for (const block of categoryBlocks(slots)) {
+    const blockWidth = block.entries.reduce((sum, entry) => sum + entry.metric.w, 0)
+      + SLOT_GAP * Math.max(0, block.entries.length - 1);
+    let row = rows[rows.length - 1];
+    const addWidth = row?.entries.length ? CATEGORY_GAP + blockWidth : blockWidth;
+
+    if (!row || row.width + addWidth > MAX_WIDTH) {
+      row = { entries: [], width: 0, categories: [] };
       rows.push(row);
     }
-    row.entries.push({ slot, metric });
-    row.width += (row.entries.length > 1 ? gap : 0) + metric.w;
+
+    block.entries.forEach((entry, index) => {
+      const gapBefore = row.entries.length === 0
+        ? 0
+        : index === 0
+          ? CATEGORY_GAP
+          : SLOT_GAP;
+      row.entries.push({ ...entry, gapBefore, category: block.category });
+      row.width += gapBefore + entry.metric.w;
+    });
+    row.categories.push(block.category);
   }
 
-  const yStart = rows.length === 1 ? 520 : rows.length === 2 ? 410 : rows.length === 3 ? 350 : 320;
-  const yEnd = rows.length === 1 ? 520 : rows.length === 2 ? 650 : rows.length === 3 ? 730 : 755;
+  const yStart = rows.length === 1 ? 520 : rows.length === 2 ? 410 : rows.length === 3 ? 350 : 315;
+  const yEnd = rows.length === 1 ? 520 : rows.length === 2 ? 640 : rows.length === 3 ? 710 : 742;
   const yStep = rows.length <= 1 ? 0 : (yEnd - yStart) / (rows.length - 1);
 
   rows.forEach((row, rowIndex) => {
-    const available = 650 - gap * Math.max(0, row.entries.length - 1);
+    const gapTotal = row.entries.reduce((sum, entry) => sum + entry.gapBefore, 0);
+    const availableForModules = Math.max(300, MAX_WIDTH - gapTotal);
     const rawWidth = row.entries.reduce((sum, entry) => sum + entry.metric.w, 0);
-    const scale = Math.min(1, available / Math.max(1, rawWidth));
+    const scale = Math.min(1, availableForModules / Math.max(1, rawWidth));
     const widths = row.entries.map((entry) => Math.round(entry.metric.w * scale));
-    const total = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, widths.length - 1);
+    const total = widths.reduce((sum, width) => sum + width, 0) + gapTotal;
     let cursor = 375 - total / 2;
 
     row.entries.forEach((entry, index) => {
+      cursor += entry.gapBefore;
       const width = widths[index];
       entry.slot.w = width;
       entry.slot.h = entry.metric.h;
@@ -160,11 +191,12 @@ function layoutGeneratedSlots(level) {
       entry.slot.y = Math.round(yStart + yStep * rowIndex);
       entry.slot.baseline = entry.metric.baseline;
       entry.slot.depth = 120 + rowIndex * 28 + index;
-      cursor += width + gap;
+      cursor += width;
     });
   });
 
   level.generatedSlotLayout = true;
+  level.generatedCategoryRows = rows.map((row) => [...row.categories]);
 }
 
 function applyDeliveryLayout(level) {
@@ -283,6 +315,6 @@ export function applySupermarketRestockVisualPolish() {
     applyMarketFixtureFamily(level);
     applyFirstFocusFront(level);
     softenTutorial(level);
-    level.revision = Math.max(41, Number(level.revision || 1));
+    level.revision = Math.max(42, Number(level.revision || 1));
   }
 }
