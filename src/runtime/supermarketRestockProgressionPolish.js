@@ -2,8 +2,46 @@ import { FRIDGE_BR_CAMPAIGN } from "../levels/fridgePhaserLevel.js";
 
 let applied = false;
 
-const ALL_TAGS = ["carton", "dairy", "box", "bottle", "food", "jar", "can", "tube"];
 const CATEGORY_ORDER = ["beverages", "dairy", "fresh", "meals", "sauces", "groceries"];
+
+const SKU_PROFILE = {
+  juice: { category: "beverages", size: [1, 1], shelfKind: "beverage-cooler" },
+  "green-soda": { category: "beverages", size: [1, 1], shelfKind: "beverage-cooler" },
+  "red-soda": { category: "beverages", size: [1, 1], shelfKind: "beverage-cooler" },
+
+  milk: { category: "dairy", size: [1, 1], shelfKind: "dairy-chill" },
+  yogurt: { category: "dairy", size: [1, 1], shelfKind: "dairy-chill" },
+  cheese: { category: "dairy", size: [1, 1], shelfKind: "dairy-chill" },
+  butter: { category: "dairy", size: [2, 1], shelfKind: "dairy-chill" },
+
+  lettuce: { category: "fresh", size: [1, 1], shelfKind: "produce-bin" },
+  strawberries: { category: "fresh", size: [2, 1], shelfKind: "produce-bin" },
+  apple: { category: "fresh", size: [1, 1], shelfKind: "produce-bin" },
+  broccoli: { category: "fresh", size: [1, 1], shelfKind: "produce-bin" },
+  tomato: { category: "fresh", size: [1, 1], shelfKind: "produce-bin" },
+  carrot: { category: "fresh", size: [1, 1], shelfKind: "produce-bin" },
+  watermelon: { category: "fresh", size: [2, 1], shelfKind: "bulk-produce", weight: "heavy" },
+  corn: { category: "fresh", size: [2, 1], shelfKind: "produce-bin" },
+
+  eggs: { category: "meals", size: [2, 1], shelfKind: "ready-chill" },
+  mealbox: { category: "meals", size: [2, 1], shelfKind: "ready-chill" },
+  fish: { category: "meals", size: [2, 1], shelfKind: "ready-chill" },
+
+  mustard: { category: "sauces", size: [1, 1], shelfKind: "condiment-shelf" },
+  ketchup: { category: "sauces", size: [1, 1], shelfKind: "condiment-shelf" },
+
+  bread: { category: "groceries", size: [2, 1], shelfKind: "bakery-shelf" },
+  cake: { category: "groceries", size: [2, 1], shelfKind: "bakery-shelf" },
+};
+
+const CATEGORY_SLOT_PROFILE = {
+  beverages: { allow: ["bottle", "carton"], capacity: 3, shelfKind: "beverage-cooler" },
+  dairy: { allow: ["dairy", "carton"], capacity: 2, shelfKind: "dairy-chill" },
+  fresh: { allow: ["food", "box"], capacity: 2, shelfKind: "produce-bin" },
+  meals: { allow: ["food", "box"], capacity: 2, shelfKind: "ready-chill" },
+  sauces: { allow: ["bottle", "jar", "tube"], capacity: 3, shelfKind: "condiment-shelf" },
+  groceries: { allow: ["food", "box", "jar", "can", "carton"], capacity: 2, shelfKind: "grocery-shelf" },
+};
 
 const CURVE = {
   4: { total: 8, fixed: 2 },
@@ -30,7 +68,31 @@ function levelNumber(level) {
 }
 
 function categoryOf(item) {
-  return item?.prefs?.category || "groceries";
+  return item?.prefs?.category || SKU_PROFILE[item?.image]?.category || "groceries";
+}
+
+function itemWidth(item) {
+  return Math.max(1, Number(item?.size?.[0] || 1));
+}
+
+function applySkuReality(level) {
+  level.items = (level.items || []).map((item) => {
+    const profile = SKU_PROFILE[item.image] || {
+      category: categoryOf(item),
+      size: item.size || [1, 1],
+      shelfKind: "grocery-shelf",
+    };
+    return {
+      ...item,
+      size: [...profile.size],
+      shelfKind: profile.shelfKind,
+      prefs: {
+        ...(item.prefs || {}),
+        category: profile.category,
+        ...(profile.weight ? { weight: profile.weight } : {}),
+      },
+    };
+  });
 }
 
 function balancedSelection(items, total) {
@@ -64,7 +126,6 @@ function applyEarlyCurve(level, number) {
 
   const all = (level.items || []).map((item) => structuredClone(item));
   const selected = balancedSelection(all, profile.total);
-
   const originalFixed = selected.filter((item) => item.fixed);
   const fixedIds = new Set(balancedSelection(originalFixed, profile.fixed).map((item) => item.id));
 
@@ -130,8 +191,7 @@ function allocateCategory(rows, category, slotNeed) {
   }
 
   const picked = [];
-  const rowOrder = preferredRows(category, rows.length);
-  for (const rowIndex of rowOrder) {
+  for (const rowIndex of preferredRows(category, rows.length)) {
     for (const slot of rows[rowIndex].slots) {
       if (slot.__used) continue;
       picked.push(slot);
@@ -141,14 +201,33 @@ function allocateCategory(rows, category, slotNeed) {
   return picked;
 }
 
+function packCategory(items, capacity) {
+  const chunks = [];
+  let current = [];
+  let used = 0;
+
+  for (const item of items) {
+    const width = Math.min(capacity, itemWidth(item));
+    if (current.length && used + width > capacity) {
+      chunks.push({ items: current, usedCells: used });
+      current = [];
+      used = 0;
+    }
+    current.push(item);
+    used += width;
+  }
+  if (current.length) chunks.push({ items: current, usedCells: used });
+  return chunks;
+}
+
 function rebuildPlanogram(level) {
   const slots = structuredClone(level.slots || []);
   for (const slot of slots) {
     slot.zone = "shelf";
-    slot.allow = [...ALL_TAGS];
     slot.rows = 1;
     slot.stackLayers = 1;
     slot.category = undefined;
+    slot.shelfKind = undefined;
     slot.empty = true;
     slot.cols = 1;
     slot.__used = false;
@@ -167,26 +246,45 @@ function rebuildPlanogram(level) {
   const planogram = [];
   const categories = CATEGORY_ORDER.filter((category) => byCategory.has(category));
   for (const category of categories) {
-    const items = [...byCategory.get(category)].sort((a, b) => Number(!!b.fixed) - Number(!!a.fixed));
-    const chunks = [];
-    for (let offset = 0; offset < items.length; offset += 2) chunks.push(items.slice(offset, offset + 2));
-
+    const slotProfile = CATEGORY_SLOT_PROFILE[category] || CATEGORY_SLOT_PROFILE.groceries;
+    const items = [...byCategory.get(category)].sort((a, b) => {
+      const fixedDiff = Number(!!b.fixed) - Number(!!a.fixed);
+      if (fixedDiff) return fixedDiff;
+      return itemWidth(b) - itemWidth(a);
+    });
+    const chunks = packCategory(items, slotProfile.capacity);
     const assigned = allocateCategory(rows, category, chunks.length);
+
     chunks.forEach((chunk, index) => {
       const slot = assigned[index];
       if (!slot) return;
       slot.__used = true;
       slot.category = category;
+      slot.shelfKind = slotProfile.shelfKind;
+      slot.allow = [...slotProfile.allow];
       slot.empty = false;
-      slot.cols = Math.max(1, chunk.length);
-      planogram.push({ slotId: slot.id, category, products: chunk.map((item) => item.image) });
+      slot.cols = Math.max(1, chunk.usedCells);
 
-      chunk.forEach((item, col) => {
-        if (!item.fixed) return;
-        item.slot = slot.id;
-        item.col = col;
-        item.row = 0;
-        item.layer = 0;
+      let col = 0;
+      const facings = [];
+      for (const item of chunk.items) {
+        const width = itemWidth(item);
+        facings.push({ itemId: item.id, image: item.image, col, width });
+        if (item.fixed) {
+          item.slot = slot.id;
+          item.col = col;
+          item.row = 0;
+          item.layer = 0;
+        }
+        col += width;
+      }
+
+      planogram.push({
+        slotId: slot.id,
+        category,
+        shelfKind: slotProfile.shelfKind,
+        products: facings.map((facing) => facing.image),
+        facings,
       });
     });
   }
@@ -194,10 +292,13 @@ function rebuildPlanogram(level) {
   for (const slot of slots) delete slot.__used;
   level.slots = slots;
   level.planogram = planogram;
-  level.objective = {
-    type: "restock-planogram",
-    categories,
-  };
+  level.objective = { type: "restock-planogram", categories };
+
+  const kinds = new Set(planogram.map((entry) => entry.shelfKind));
+  if (kinds.has("produce-bin") || kinds.has("bulk-produce")) level.marketFixtureFamily = "produce-cooler";
+  else if (kinds.has("grocery-shelf") || kinds.has("condiment-shelf")) level.marketFixtureFamily = "mixed-aisle";
+  else if (kinds.has("ready-chill")) level.marketFixtureFamily = "meal-cooler";
+  else level.marketFixtureFamily = "cold-aisle";
 }
 
 function applyFirstLevelFocus(level) {
@@ -208,6 +309,7 @@ function applyFirstLevelFocus(level) {
     .slice(0, 3)
     .map((item) => ({
       ...item,
+      size: [1, 1],
       fixed: false,
       slot: undefined,
       col: undefined,
@@ -219,8 +321,9 @@ function applyFirstLevelFocus(level) {
   level.slots = [{
     id: slotId,
     zone: "shelf",
-    allow: [...ALL_TAGS],
+    allow: [...CATEGORY_SLOT_PROFILE.beverages.allow],
     category: "beverages",
+    shelfKind: "beverage-cooler",
     empty: false,
     x: 375,
     y: 610,
@@ -233,16 +336,20 @@ function applyFirstLevelFocus(level) {
     depth: 150,
     tier: 1,
   }];
+  const facings = level.items.map((item, col) => ({ itemId: item.id, image: item.image, col, width: 1 }));
   level.planogram = [{
     slotId,
     category: "beverages",
-    products: level.items.map((item) => item.image),
+    shelfKind: "beverage-cooler",
+    products: facings.map((facing) => facing.image),
+    facings,
   }];
   level.objective = {
     type: "restock-planogram",
     categories: ["beverages"],
     count: 3,
   };
+  level.marketFixtureFamily = "cold-aisle";
   level.firstLevelFocus = true;
 }
 
@@ -268,10 +375,11 @@ export function applySupermarketRestockProgressionPolish() {
   for (const level of FRIDGE_BR_CAMPAIGN) {
     if (level?.theme?.key !== "restock-cooler") continue;
     const number = levelNumber(level);
+    applySkuReality(level);
     applyEarlyCurve(level, number);
     rebuildPlanogram(level);
     applyFirstLevelFocus(level);
     applyFeelCurve(level, number);
-    level.revision = Math.max(36, Number(level.revision || 1));
+    level.revision = Math.max(38, Number(level.revision || 1));
   }
 }
