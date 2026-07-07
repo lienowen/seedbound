@@ -1,5 +1,6 @@
 import { FRIDGE_BR_CAMPAIGN } from "../levels/fridgePhaserLevel.js";
 import { LOCALES, progressStorageKey } from "../i18n/locale.js";
+import { applyOpenDoorCoolerPolish } from "./openDoorCoolerPolish.js";
 
 const MIGRATION_TAG = 2;
 const LEGACY_PACK_INSERT_AFTER = [2, 4, 6, 8, 10, 12, 14, 16, 18];
@@ -130,6 +131,9 @@ function migrateSavedProgress() {
 }
 
 export function applyCoreConsistencyPatches() {
+  // Geometry must be corrected first so all later rules and audits see the same
+  // real open-door fridge that the player sees on screen.
+  applyOpenDoorCoolerPolish();
   patchFirstLevel();
   migrateSavedProgress();
 }
