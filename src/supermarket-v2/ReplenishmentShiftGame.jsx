@@ -3,6 +3,14 @@ import { assetUrl } from "../assetBase.js";
 import { SUPERMARKET_V2_VERTICAL_SLICE } from "./data/verticalSlice.js";
 import { ShiftEngine } from "./model/shiftEngine.js";
 import {
+  maxShiftNumber,
+  readShiftProgress,
+  replaceShiftInUrl,
+  resolveInitialShift,
+  saveShiftArrival,
+  saveShiftCompletion,
+} from "./model/shiftProgress.js";
+import {
   FIXTURE_KIND,
   getSku,
   occupiedCellSet,
@@ -69,10 +77,10 @@ function requiredTaskProgress(state) {
   };
 }
 
-function ShiftBriefing({ shift, onStart }) {
+function ShiftBriefing({ shift, shiftNumber, maxShift, onStart }) {
   return (
     <section className="sv2-briefing">
-      <span className="sv2-eyebrow">{shift.briefing.clock} · Staff entrance</span>
+      <span className="sv2-eyebrow">Shift {shiftNumber}/{maxShift} · {shift.briefing.clock} · Staff entrance</span>
       <h1>{shift.title}</h1>
       <p className="sv2-role">{shift.briefing.role}</p>
       <div className="sv2-priority-card">
@@ -90,12 +98,12 @@ function ShiftBriefing({ shift, onStart }) {
   );
 }
 
-function ShiftHeader({ shift, state, scene }) {
+function ShiftHeader({ shift, shiftNumber, maxShift, state, scene }) {
   const progress = requiredTaskProgress(state);
   return (
     <header className="sv2-header">
       <div>
-        <span>{shift.briefing.role}</span>
+        <span>{shift.briefing.role} · Shift {shiftNumber}/{maxShift}</span>
         <strong>{shift.title}</strong>
       </div>
       <div className="sv2-header-status">
@@ -306,26 +314,32 @@ function Department({ scene, state, bay, nextScene, selectedUnitId, onSelectUnit
   );
 }
 
-function CompleteCard({ shift, score, onReplay }) {
+function CompleteCard({ shift, shiftNumber, maxShift, score, onReplay, onNextShift }) {
+  const hasNext = shiftNumber < maxShift;
   return (
     <section className="sv2-complete">
       <span className="sv2-complete-check">✓</span>
+      <span className="sv2-complete-shift">Shift {shiftNumber}/{maxShift}</span>
       <h2>{shift.title} complete</h2>
-      <p>The priority bays are recovered, faced and ready for customers.</p>
+      <p>{hasNext ? "Priority bays are ready. The next department run is waiting." : "The three-shift vertical slice is complete."}</p>
       <div className="sv2-score-row">
         <div><strong>{score.availability}%</strong><span>Availability</span></div>
         <div><strong>{score.accuracy}%</strong><span>Accuracy</span></div>
         <div><strong>{score.facing}%</strong><span>Facing</span></div>
       </div>
-      <button className="sv2-primary" type="button" onClick={onReplay}>Replay shift</button>
+      <div className="sv2-complete-actions">
+        <button className="sv2-secondary" type="button" onClick={onReplay}>Replay shift</button>
+        {hasNext ? <button className="sv2-primary" type="button" onClick={onNextShift}>Next shift</button> : null}
+      </div>
     </section>
   );
 }
 
 export function ReplenishmentShiftGame() {
-  const params = useMemo(() => new URLSearchParams(window.location.search), []);
-  const requested = Number(params.get("shift") || 1);
-  const shiftNumber = Math.max(1, Math.min(3, Number.isFinite(requested) ? requested : 1));
+  const initialShiftNumber = useMemo(() => resolveInitialShift(window.location.search), []);
+  const [shiftNumber, setShiftNumber] = useState(initialShiftNumber);
+  const [progress, setProgress] = useState(() => readShiftProgress());
+  const maxShift = maxShiftNumber();
   const shift = SUPERMARKET_V2_VERTICAL_SLICE[shiftNumber - 1];
   const engineRef = useRef(new ShiftEngine(shift));
   const shiftIdRef = useRef(shift.id);
@@ -347,23 +361,38 @@ export function ReplenishmentShiftGame() {
   const nextScene = shift.scenes.find((entry) => entry.id === nextSceneId) || null;
 
   function sync(nextMessage = null) {
-    setState(engine.snapshot());
+    setState(engineRef.current.snapshot());
     if (nextMessage) setMessage(nextMessage);
   }
 
+  function enterShift(nextShiftNumber) {
+    const bounded = Math.max(1, Math.min(maxShift, Number(nextShiftNumber) || 1));
+    const nextShift = SUPERMARKET_V2_VERTICAL_SLICE[bounded - 1];
+    const nextEngine = new ShiftEngine(nextShift);
+    engineRef.current = nextEngine;
+    shiftIdRef.current = nextShift.id;
+    setShiftNumber(bounded);
+    setState(nextEngine.snapshot());
+    setSelectedUnitId(null);
+    setScore(null);
+    setMessage("Read the priority list, then clock in.");
+    setProgress(saveShiftArrival(bounded));
+    replaceShiftInUrl(bounded);
+  }
+
   function startShift() {
-    const result = engine.startShift();
+    const result = engineRef.current.startShift();
     sync(result.ok ? "Start in the backroom. Load the priority stock." : ERROR_COPY[result.reason] || result.reason);
   }
 
   function loadCase(caseId) {
-    const result = engine.loadCase(caseId);
+    const result = engineRef.current.loadCase(caseId);
     sync(result.ok ? "Priority stock loaded onto the replenishment cart." : ERROR_COPY[result.reason] || result.reason);
   }
 
   function moveToScene(sceneId) {
     if (!sceneId) return;
-    const result = engine.moveToScene(sceneId);
+    const result = engineRef.current.moveToScene(sceneId);
     const target = shift.scenes.find((entry) => entry.id === sceneId);
     setSelectedUnitId(null);
     sync(result.ok ? `Arrived at ${sceneLabel(target)}. Recover the visible gaps.` : ERROR_COPY[result.reason] || result.reason);
@@ -384,20 +413,20 @@ export function ReplenishmentShiftGame() {
       setMessage("Select a product from your cart first.");
       return;
     }
-    const result = engine.placeUnit(unitId, currentBay.id, cell);
+    const result = engineRef.current.placeUnit(unitId, currentBay.id, cell);
     if (!result.ok) {
       sync(ERROR_COPY[result.reason] || result.reason);
       return;
     }
     setSelectedUnitId(null);
-    const bay = engine.state.bays[currentBay.id];
+    const bay = engineRef.current.state.bays[currentBay.id];
     const gaps = visibleGapCount(bay);
     sync(result.bayFull ? "Bay stocked. Face the products before leaving." : `${gaps} visible gap${gaps === 1 ? "" : "s"} remain.`);
   }
 
   function faceBay() {
     if (!currentBay) return;
-    const result = engine.faceBay(currentBay.id);
+    const result = engineRef.current.faceBay(currentBay.id);
     if (!result.ok) {
       sync(ERROR_COPY[result.reason] || result.reason);
       return;
@@ -410,31 +439,27 @@ export function ReplenishmentShiftGame() {
       return;
     }
 
-    const finish = engine.finishShift();
+    const finish = engineRef.current.finishShift();
     if (finish.ok) {
       setScore(finish.score);
+      setProgress(saveShiftCompletion(shiftNumber));
       sync("Shift complete. Priority bays are ready for customers.");
       return;
     }
-    const upcomingId = nextWorkSceneId(engine.snapshot());
+    const upcomingId = nextWorkSceneId(engineRef.current.snapshot());
     const upcoming = shift.scenes.find((entry) => entry.id === upcomingId);
     sync(upcoming ? `Bay faced. Next priority: ${sceneLabel(upcoming)}.` : "Bay faced. Continue the priority list.");
   }
 
   function replay() {
-    engineRef.current = new ShiftEngine(shift);
-    shiftIdRef.current = shift.id;
-    setState(engineRef.current.snapshot());
-    setMessage("Read the priority list, then clock in.");
-    setSelectedUnitId(null);
-    setScore(null);
+    enterShift(shiftNumber);
   }
 
   return (
-    <main className="sv2-shell">
-      <ShiftHeader shift={shift} state={state} scene={scene} />
+    <main className="sv2-shell" data-unlocked-shifts={progress.unlocked}>
+      <ShiftHeader shift={shift} shiftNumber={shiftNumber} maxShift={maxShift} state={state} scene={scene} />
       {state.phase === "briefing" ? (
-        <ShiftBriefing shift={shift} onStart={startShift} />
+        <ShiftBriefing shift={shift} shiftNumber={shiftNumber} maxShift={maxShift} onStart={startShift} />
       ) : scene?.kind === "backroom" ? (
         <Backroom state={state} nextScene={nextScene} onLoadCase={loadCase} onLeave={() => moveToScene(nextScene?.id)} />
       ) : currentBay ? (
@@ -456,7 +481,16 @@ export function ReplenishmentShiftGame() {
       )}
 
       <div className="sv2-message" role="status">{message}</div>
-      {score ? <CompleteCard shift={shift} score={score} onReplay={replay} /> : null}
+      {score ? (
+        <CompleteCard
+          shift={shift}
+          shiftNumber={shiftNumber}
+          maxShift={maxShift}
+          score={score}
+          onReplay={replay}
+          onNextShift={() => enterShift(shiftNumber + 1)}
+        />
+      ) : null}
       <button className="sv2-reset" type="button" onClick={replay}>Reset shift</button>
     </main>
   );
