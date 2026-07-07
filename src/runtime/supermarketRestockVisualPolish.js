@@ -8,8 +8,6 @@ const COOLER_CUTS = {
   // cooler-glass3.png is 980x735. All crops below are calculated against the
   // real source size and keep roughly the same aspect ratio when displayed.
   "fridge-br-1": {
-    // Single focused cabinet bay: enough context to read as a cooler, no giant
-    // three-door void around a three-item tutorial.
     crop: { x: 285, y: 55, w: 410, h: 590 },
     cx: 375,
     cy: 145,
@@ -17,7 +15,6 @@ const COOLER_CUTS = {
     h: 720,
   },
   "fridge-br-2": {
-    // Two-bay view for the first two-category lesson.
     crop: { x: 180, y: 70, w: 620, h: 610 },
     cx: 375,
     cy: 165,
@@ -25,7 +22,6 @@ const COOLER_CUTS = {
     h: 640,
   },
   "fridge-br-3": {
-    // Wider view only when a third category is introduced.
     crop: { x: 90, y: 45, w: 800, h: 640 },
     cx: 375,
     cy: 175,
@@ -172,6 +168,39 @@ function applyCoolerCut(level) {
   level.fixtureCut = true;
 }
 
+function applyFirstFocusFront(level) {
+  if (level.id !== "fridge-br-1") return;
+
+  // A small foreground shelf lip seats the products into the cabinet instead of
+  // making them read like PNG stickers floating on glass. Replace legacy fronts
+  // because their geometry belongs to the old full three-door composition.
+  level.fronts = [
+    {
+      kind: "roundedRect",
+      x: 210,
+      y: 646,
+      w: 330,
+      h: 14,
+      r: 7,
+      fill: 0xd8e7e5,
+      alpha: 0.94,
+      line: { width: 1.5, color: 0xffffff, alpha: 0.72 },
+      depth: 310,
+    },
+    {
+      kind: "roundedRect",
+      x: 224,
+      y: 649,
+      w: 302,
+      h: 4,
+      r: 2,
+      fill: 0xffffff,
+      alpha: 0.42,
+      depth: 311,
+    },
+  ];
+}
+
 function softenTutorial(level) {
   if (!TUTORIAL_IDS.has(level.id)) return;
   level.tuning = {
@@ -190,7 +219,8 @@ export function applySupermarketRestockVisualPolish() {
     if (level?.theme?.key !== "restock-cooler") continue;
     applyCoolerCut(level);
     applyDeliveryLayout(level);
+    applyFirstFocusFront(level);
     softenTutorial(level);
-    level.revision = Math.max(35, Number(level.revision || 1));
+    level.revision = Math.max(37, Number(level.revision || 1));
   }
 }
