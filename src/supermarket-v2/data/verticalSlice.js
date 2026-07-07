@@ -33,9 +33,9 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 6,
         facings: [
-          { unitId: "existing-green-1", skuId: "green-soda", footprint: 1, expiryDay: null },
-          { unitId: "existing-red-1", skuId: "red-soda", footprint: 1, expiryDay: null },
-          { unitId: "existing-juice-1", skuId: "juice", footprint: 1, expiryDay: null },
+          { unitId: "existing-green-1", skuId: "green-soda", footprint: 1, cell: 0, expiryDay: null },
+          { unitId: "existing-red-1", skuId: "red-soda", footprint: 1, cell: 2, expiryDay: null },
+          { unitId: "existing-juice-1", skuId: "juice", footprint: 1, cell: 4, expiryDay: null },
         ],
         position: { x: 375, y: 510, width: 420, height: 132, wallMounted: true },
       }),
@@ -82,7 +82,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         kind: FIXTURE_KIND.DRY_SHELF,
         capacity: 4,
         facings: [
-          { unitId: "existing-bread-1", skuId: "bread", footprint: 2, expiryDay: null },
+          { unitId: "existing-bread-1", skuId: "bread", footprint: 2, cell: 0, expiryDay: null },
         ],
         position: { x: 375, y: 500, width: 390, height: 136, againstWall: true },
       }),
@@ -93,9 +93,9 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 6,
         facings: [
-          { unitId: "existing-milk-1", skuId: "milk", footprint: 1, expiryDay: 7 },
-          { unitId: "existing-yogurt-1", skuId: "yogurt", footprint: 1, expiryDay: 8 },
-          { unitId: "existing-cheese-1", skuId: "cheese", footprint: 1, expiryDay: 12 },
+          { unitId: "existing-milk-1", skuId: "milk", footprint: 1, cell: 0, expiryDay: 7 },
+          { unitId: "existing-yogurt-1", skuId: "yogurt", footprint: 1, cell: 2, expiryDay: 8 },
+          { unitId: "existing-cheese-1", skuId: "cheese", footprint: 1, cell: 4, expiryDay: 12 },
         ],
         position: { x: 375, y: 500, width: 430, height: 146, wallMounted: true },
       }),
@@ -143,7 +143,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 3,
         facings: [
-          { unitId: "existing-milk-1", skuId: "milk", footprint: 1, expiryDay: 8 },
+          { unitId: "existing-milk-1", skuId: "milk", footprint: 1, cell: 0, expiryDay: 8 },
         ],
         position: { x: 375, y: 500, width: 360, height: 140, wallMounted: true },
       }),
@@ -154,7 +154,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 3,
         facings: [
-          { unitId: "existing-juice-1", skuId: "juice", footprint: 1, expiryDay: null },
+          { unitId: "existing-juice-1", skuId: "juice", footprint: 1, cell: 0, expiryDay: null },
         ],
         position: { x: 375, y: 500, width: 340, height: 130, wallMounted: true },
       }),
