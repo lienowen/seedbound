@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { SupermarketShiftGame } from "./SupermarketShiftGame.jsx";
+import { ReplenishmentShiftGame } from "./ReplenishmentShiftGame.jsx";
 import { MorningRushGame } from "./MorningRushGame.jsx";
 
 export function SupermarketV2Entry() {
@@ -9,7 +9,7 @@ export function SupermarketV2Entry() {
     return Number.isFinite(requested) ? Math.max(1, Math.min(3, requested)) : 1;
   }, []);
 
-  return shift === 3 ? <MorningRushGame /> : <SupermarketShiftGame />;
+  return shift === 3 ? <MorningRushGame /> : <ReplenishmentShiftGame />;
 }
 
 export default SupermarketV2Entry;
