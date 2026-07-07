@@ -2,14 +2,17 @@ import { FRIDGE_BR_CAMPAIGN } from "../src/levels/fridgePhaserLevel.js";
 import { StorageEngine } from "../src/game/StorageEngine.js";
 import { applyCoreConsistencyPatches } from "../src/runtime/coreConsistencyBootstrap.js";
 import { applySupermarketRestockProgressionPolish } from "../src/runtime/supermarketRestockProgressionPolish.js";
+import { applySupermarketRestockVisualPolish } from "../src/runtime/supermarketRestockVisualPolish.js";
 
 applyCoreConsistencyPatches();
 applySupermarketRestockProgressionPolish();
+applySupermarketRestockVisualPolish();
 
 const errors = [];
 const restockLevels = FRIDGE_BR_CAMPAIGN.filter((level) => level.id?.startsWith("fridge-br-"));
 const forbiddenPrefs = ["zone", "needsCold", "needsWarm", "topShelf", "likesVisible", "mustNeighbors", "hatesNeighbors"];
 const expectedTotals = new Map([[4, 8], [5, 9], [6, 10], [7, 10], [8, 11], [9, 12], [10, 12]]);
+const COOLER_SOURCE = { w: 980, h: 735 };
 
 function levelNumber(level) {
   const match = /^fridge-br-(\d+)$/.exec(level?.id || "");
@@ -77,6 +80,24 @@ function auditCategoryContinuity(level) {
   }
 }
 
+function auditFixtureCut(level) {
+  if (!level.fixtureCut) return;
+  const fx = level.stage?.fixtures?.find((entry) => entry?.crop);
+  if (!fx) {
+    errors.push(`${level.id}:fixture-cut-missing`);
+    return;
+  }
+  const { x = 0, y = 0, w = 0, h = 0 } = fx.crop;
+  if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > COOLER_SOURCE.w || y + h > COOLER_SOURCE.h) {
+    errors.push(`${level.id}:fixture-crop-out-of-bounds=${x},${y},${w},${h}`);
+  }
+  const cropRatio = w / Math.max(1, h);
+  const displayRatio = Number(fx.w || 0) / Math.max(1, Number(fx.h || 0));
+  if (Math.abs(cropRatio - displayRatio) > 0.08) {
+    errors.push(`${level.id}:fixture-aspect-distortion=${cropRatio.toFixed(3)}/${displayRatio.toFixed(3)}`);
+  }
+}
+
 for (const level of restockLevels) {
   const number = levelNumber(level);
   if (level.theme?.key !== "restock-cooler") errors.push(`${level.id}:theme=${level.theme?.key || "missing"}`);
@@ -116,6 +137,7 @@ for (const level of restockLevels) {
   }
 
   auditCategoryContinuity(level);
+  auditFixtureCut(level);
 
   const engine = new StorageEngine(level, { forceFresh: true, saveId: `__restock_audit_${level.id}` });
   for (const item of level.items.filter((entry) => !entry.fixed)) {
@@ -139,11 +161,20 @@ else {
   if (movable.some((item) => item.prefs?.category !== "beverages")) errors.push("fridge-br-1:not-drinks-only");
   if (first.items.some((item) => item.fixed)) errors.push("fridge-br-1:must-have-no-fixed-clutter");
   if (first.slots.length !== 1) errors.push(`fridge-br-1:target-slot-count=${first.slots.length}`);
+
   const target = first.slots[0];
   if (target?.category !== "beverages") errors.push(`fridge-br-1:target-category=${target?.category || "missing"}`);
   if (Number(target?.cols || 0) !== 3) errors.push(`fridge-br-1:target-capacity=${target?.cols || 0}`);
   if (first.planogram?.length !== 1 || first.planogram[0]?.products?.length !== 3) {
     errors.push("fridge-br-1:planogram-must-be-one-row-of-three");
+  }
+
+  const itemYs = first.deliveryLayout?.itemYs || [];
+  const nearestTrayY = itemYs.length ? Math.min(...itemYs) : Infinity;
+  if (!Number.isFinite(nearestTrayY)) errors.push("fridge-br-1:delivery-layout-missing");
+  if (Number(first.deliveryLayout?.y || Infinity) > 850) errors.push(`fridge-br-1:delivery-too-low=${first.deliveryLayout?.y}`);
+  if (Number.isFinite(nearestTrayY) && Math.abs(nearestTrayY - Number(target?.y || 0)) > 330) {
+    errors.push(`fridge-br-1:drag-reach-too-long=${Math.abs(nearestTrayY - Number(target?.y || 0))}`);
   }
 }
 
@@ -153,5 +184,5 @@ if (errors.length) {
   for (const error of errors) console.error(`FAIL ${error}`);
   process.exitCode = 1;
 } else {
-  console.log(`OK supermarket-restock levels=${restockLevels.length} tutorial=one-shelf-of-three progression=comfortable planogram=contiguous`);
+  console.log(`OK supermarket-restock levels=${restockLevels.length} tutorial=one-shelf-of-three reach=comfortable crops=bounded planogram=contiguous`);
 }
