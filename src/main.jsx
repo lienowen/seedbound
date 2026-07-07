@@ -5,6 +5,7 @@ import { applyCoreConsistencyPatches } from "./runtime/coreConsistencyBootstrap.
 import { applySupermarketRestockProgressionPolish } from "./runtime/supermarketRestockProgressionPolish.js";
 import { applySupermarketRestockNudgePolish } from "./runtime/supermarketRestockNudgePolish.js";
 import { applySupermarketRestockVisualPolish } from "./runtime/supermarketRestockVisualPolish.js";
+import { applySupermarketRestockSpacingPolish } from "./runtime/supermarketRestockSpacingPolish.js";
 import { applyPreviewConstraintPolish } from "./runtime/previewConstraintPolish.js";
 import "./fridge-phaser.css";
 
@@ -16,6 +17,7 @@ applyCoreConsistencyPatches();
 applySupermarketRestockProgressionPolish();
 applySupermarketRestockNudgePolish();
 applySupermarketRestockVisualPolish();
+applySupermarketRestockSpacingPolish();
 applyPreviewConstraintPolish();
 
 // Keep Phaser and scene-level polish out of the initial UI bundle.
