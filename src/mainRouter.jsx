@@ -13,8 +13,8 @@ const LegacyGame = lazy(() =>
 );
 
 const SupermarketV2Game = lazy(() =>
-  import("./supermarket-v2/SupermarketV2Game.jsx")
-    .then((module) => ({ default: module.SupermarketV2Game })),
+  import("./supermarket-v2/SupermarketShiftGame.jsx")
+    .then((module) => ({ default: module.SupermarketShiftGame })),
 );
 
 function BootFallback({ v2 }) {
