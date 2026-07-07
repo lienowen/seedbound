@@ -32,6 +32,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         department: DEPARTMENT.DRINKS,
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 6,
+        planogram: ["green-soda", "green-soda", "red-soda", "red-soda", "juice", "juice"],
         facings: [
           { unitId: "existing-green-1", skuId: "green-soda", footprint: 1, cell: 0, expiryDay: null },
           { unitId: "existing-red-1", skuId: "red-soda", footprint: 1, cell: 2, expiryDay: null },
@@ -81,6 +82,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         department: DEPARTMENT.BREAKFAST,
         kind: FIXTURE_KIND.DRY_SHELF,
         capacity: 4,
+        planogram: ["bread", "bread", "bread", "bread"],
         facings: [
           { unitId: "existing-bread-1", skuId: "bread", footprint: 2, cell: 0, expiryDay: null },
         ],
@@ -92,6 +94,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         department: DEPARTMENT.DAIRY,
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 6,
+        planogram: ["milk", "milk", "yogurt", "yogurt", "cheese", "cheese"],
         facings: [
           { unitId: "existing-milk-1", skuId: "milk", footprint: 1, cell: 0, expiryDay: 7 },
           { unitId: "existing-yogurt-1", skuId: "yogurt", footprint: 1, cell: 2, expiryDay: 8 },
@@ -143,6 +146,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         department: DEPARTMENT.DAIRY,
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 3,
+        planogram: ["milk", "milk", "milk"],
         facings: [
           { unitId: "existing-milk-1", skuId: "milk", footprint: 1, cell: 0, expiryDay: 8 },
         ],
@@ -154,6 +158,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
         department: DEPARTMENT.DRINKS,
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 3,
+        planogram: ["juice", "juice", "juice"],
         facings: [
           { unitId: "existing-juice-1", skuId: "juice", footprint: 1, cell: 0, expiryDay: null },
         ],
