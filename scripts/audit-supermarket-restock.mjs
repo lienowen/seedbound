@@ -137,6 +137,14 @@ else {
   const movable = first.items.filter((item) => !item.fixed);
   if (movable.length !== 3) errors.push(`fridge-br-1:tutorial-count=${movable.length}`);
   if (movable.some((item) => item.prefs?.category !== "beverages")) errors.push("fridge-br-1:not-drinks-only");
+  if (first.items.some((item) => item.fixed)) errors.push("fridge-br-1:must-have-no-fixed-clutter");
+  if (first.slots.length !== 1) errors.push(`fridge-br-1:target-slot-count=${first.slots.length}`);
+  const target = first.slots[0];
+  if (target?.category !== "beverages") errors.push(`fridge-br-1:target-category=${target?.category || "missing"}`);
+  if (Number(target?.cols || 0) !== 3) errors.push(`fridge-br-1:target-capacity=${target?.cols || 0}`);
+  if (first.planogram?.length !== 1 || first.planogram[0]?.products?.length !== 3) {
+    errors.push("fridge-br-1:planogram-must-be-one-row-of-three");
+  }
 }
 
 if (restockLevels.length !== 20) errors.push(`restock-level-count=${restockLevels.length}`);
@@ -145,5 +153,5 @@ if (errors.length) {
   for (const error of errors) console.error(`FAIL ${error}`);
   process.exitCode = 1;
 } else {
-  console.log(`OK supermarket-restock levels=${restockLevels.length} tutorial=drinks-only progression=comfortable planogram=contiguous`);
+  console.log(`OK supermarket-restock levels=${restockLevels.length} tutorial=one-shelf-of-three progression=comfortable planogram=contiguous`);
 }
