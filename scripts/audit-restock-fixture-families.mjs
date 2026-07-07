@@ -3,11 +3,13 @@ import { applyCoreConsistencyPatches } from "../src/runtime/coreConsistencyBoots
 import { applySupermarketRestockProgressionPolish } from "../src/runtime/supermarketRestockProgressionPolish.js";
 import { applySupermarketRestockNudgePolish } from "../src/runtime/supermarketRestockNudgePolish.js";
 import { applySupermarketRestockVisualPolish } from "../src/runtime/supermarketRestockVisualPolish.js";
+import { applySupermarketRestockSpacingPolish } from "../src/runtime/supermarketRestockSpacingPolish.js";
 
 applyCoreConsistencyPatches();
 applySupermarketRestockProgressionPolish();
 applySupermarketRestockNudgePolish();
 applySupermarketRestockVisualPolish();
+applySupermarketRestockSpacingPolish();
 
 const errors = [];
 const families = new Set(["cold-aisle", "produce-cooler", "meal-cooler", "mixed-aisle"]);
@@ -58,6 +60,9 @@ for (const level of FRIDGE_BR_CAMPAIGN.filter((entry) => entry.id?.startsWith("f
   if (!Number.isFinite(deliveryTop)) errors.push(`${level.id}:missing-delivery-layout`);
   else if (deliveryTop - fixtureBottom < 60) {
     errors.push(`${level.id}:fixture-delivery-gap=${Math.round(deliveryTop - fixtureBottom)}`);
+  }
+  if (Number(level.fixtureDeliveryGap || 0) < 60) {
+    errors.push(`${level.id}:recorded-gap=${level.fixtureDeliveryGap || 0}`);
   }
 }
 
