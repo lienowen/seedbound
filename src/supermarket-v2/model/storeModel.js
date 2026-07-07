@@ -93,6 +93,7 @@ export function fixtureCanTakeSku(fixture, skuId) {
 
 export function createShelfBay({
   id,
+  sceneId,
   department,
   kind,
   capacity,
@@ -100,12 +101,14 @@ export function createShelfBay({
   position,
 }) {
   if (!id) throw new Error("Shelf bay id is required");
+  if (!sceneId) throw new Error(`Shelf bay ${id} requires a sceneId`);
   if (!Object.values(DEPARTMENT).includes(department)) throw new Error(`Unknown department: ${department}`);
   if (!Object.values(FIXTURE_KIND).includes(kind)) throw new Error(`Unknown fixture kind: ${kind}`);
   if (!Number.isInteger(capacity) || capacity <= 0) throw new Error("Shelf bay capacity must be a positive integer");
 
   return {
     id,
+    sceneId,
     department,
     kind,
     capacity,
