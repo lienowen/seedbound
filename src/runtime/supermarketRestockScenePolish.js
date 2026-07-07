@@ -9,6 +9,15 @@ const CATEGORY_COPY = {
   pt: { beverages: "BEBIDAS", dairy: "LATICINIOS", fresh: "FRESCOS", meals: "REFEICOES", sauces: "MOLHOS", groceries: "MERCADO" },
 };
 
+const CATEGORY_COLOR = {
+  beverages: "#397d79",
+  dairy: "#567b9c",
+  fresh: "#4f8259",
+  meals: "#a5673d",
+  sauces: "#a9574e",
+  groceries: "#7b674b",
+};
+
 const TUTORIAL_IDS = new Set(["fridge-br-1", "fridge-br-2", "fridge-br-3"]);
 const ONBOARDING_KEY = "cozyshelf_restock_onboarded_v1";
 
@@ -61,10 +70,77 @@ export function applySupermarketRestockScenePolish() {
   const originalCreate = StorageScene.prototype.create;
   const originalHasOnboarded = StorageScene.prototype.hasOnboarded;
   const originalMarkOnboarded = StorageScene.prototype.markOnboarded;
+  const originalStartOnboarding = StorageScene.prototype.startOnboarding;
   const originalDisplayScaleFor = StorageScene.prototype.displayScaleFor;
+  const originalBuildShelfCategoryTags = StorageScene.prototype.buildShelfCategoryTags;
+  const originalLayoutGoalCard = StorageScene.prototype.layoutGoalCard;
   const originalUpdateCampaignControls = StorageScene.prototype.updateCampaignControls;
   const originalSlotHintLabel = StorageScene.prototype.slotHintLabel;
   const originalDrawSettleBar = StorageScene.prototype.drawSettleBar;
+
+  StorageScene.prototype.buildShelfCategoryTags = function buildRestockCategoryTags() {
+    if (!isRestock(this)) return originalBuildShelfCategoryTags.call(this);
+
+    if (this.categoryTags) this.categoryTags.forEach((tag) => tag.destroy());
+    this.categoryTags = [];
+    if (this.editMode) return;
+
+    const names = this.i18n?.ui?.shelfCategory || {};
+    const groups = new Map();
+    for (const slot of this.slots) {
+      if (!slot.category) continue;
+      const band = Math.round(slot.y / 18);
+      const key = `${slot.category}:${band}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(slot);
+    }
+
+    for (const slots of groups.values()) {
+      const sample = slots[0];
+      const category = sample.category;
+      const name = names[category] || category;
+      const left = Math.min(...slots.map((slot) => slot.x - slot.w / 2));
+      const y = Math.min(...slots.map((slot) => slot.y)) + 14;
+      const tag = this.add.text(left + 8, y, name, {
+        fontFamily: "Trebuchet MS, Segoe UI, sans-serif",
+        fontSize: 13,
+        fontStyle: "bold",
+        color: CATEGORY_COLOR[category] || "#745d43",
+        backgroundColor: "rgba(255, 250, 240, 0.96)",
+        padding: { x: 8, y: 3 },
+      }).setOrigin(0, 0).setDepth(62);
+      this.categoryTags.push(tag);
+    }
+  };
+
+  StorageScene.prototype.layoutGoalCard = function layoutRestockGoalCard(goal = "") {
+    if (!isRestock(this)) return originalLayoutGoalCard.call(this, goal);
+
+    const text = goal || "";
+    const tutorial = isTutorial(this);
+    const twoLine = text.length > (tutorial ? 30 : 38) || text.includes("，") || text.includes("；") || text.includes(";");
+    const cardW = tutorial ? 540 : 620;
+    const cardH = twoLine ? 58 : 48;
+    const cardX = 375 - cardW / 2;
+    const cardY = 148;
+    const centerY = cardY + cardH / 2;
+
+    this.goalBg?.clear();
+    this.goalBg?.fillStyle(0xfffbf2, 0.94);
+    this.goalBg?.lineStyle(2, 0x67bca5, 0.48);
+    this.goalBg?.fillRoundedRect(cardX, cardY, cardW, cardH, 18);
+    this.goalBg?.strokeRoundedRect(cardX, cardY, cardW, cardH, 18);
+
+    this.goalLabel?.setVisible(false);
+    this.goalText
+      ?.setOrigin(0.5, 0.5)
+      .setPosition(375, centerY)
+      .setFontSize(tutorial ? 16 : 17)
+      .setColor("#684f3a")
+      .setWordWrapWidth(cardW - 44, true)
+      .setText(text);
+    this.goalCardBottom = cardY + cardH;
+  };
 
   StorageScene.prototype.create = function createRestockScene(data) {
     const result = originalCreate.call(this, data);
@@ -77,12 +153,18 @@ export function applySupermarketRestockScenePolish() {
       this.i18n.ui.coachReleased = copy.released;
     }
 
+    this.titleText?.setFontSize(32).setColor("#5f402d").setY(84);
+    this.subtitleText?.setColor("#8b735f");
+
     if (isTutorial(this)) {
-      // First sessions should read as a game, not a dashboard. The goal card and
-      // placed/total counter already tell the truth, so remove duplicate subtitle
-      // clutter while the player learns drag -> label -> snap.
+      // Keep the learning screen calm: level + progress + one goal. Coins and
+      // duplicate subtitle copy return after the player understands the loop.
       this.subtitleText?.setVisible(false);
       this.goalLabel?.setVisible(false);
+      this.coinPill?.bg?.setVisible(false);
+      this.coinPill?.text?.setVisible(false);
+      this.progressPill?.bg?.setPosition(110, 0);
+      this.progressPill?.text?.setX(505);
       this.setToastMessage(copy.intro);
     }
 
@@ -106,6 +188,17 @@ export function applySupermarketRestockScenePolish() {
     } catch {
       // Storage failure must never interrupt play.
     }
+  };
+
+  StorageScene.prototype.startOnboarding = function startRestockOnboarding(sprite, hint) {
+    const result = originalStartOnboarding.call(this, sprite, hint);
+    if (!isRestock(this) || !this.onboarding) return result;
+
+    // Move the instruction out of the product area. The animated hand and target
+    // already teach the action; the banner should support them, not cover shelves.
+    this.onboarding.banner?.setPosition(0, -210);
+    this.onboarding.bannerText?.setY(292).setFontSize(18);
+    return result;
   };
 
   StorageScene.prototype.displayScaleFor = function restockDisplayScale(item, entry) {
