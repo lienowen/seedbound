@@ -114,8 +114,15 @@ export function createShelfBay({
   };
 }
 
+export function occupiedFacingCells(bay) {
+  return (bay?.facings || []).reduce(
+    (sum, facing) => sum + Math.max(1, Number(facing?.footprint || 1)),
+    0,
+  );
+}
+
 export function visibleGapCount(bay) {
-  return Math.max(0, bay.capacity - bay.facings.length);
+  return Math.max(0, Number(bay?.capacity || 0) - occupiedFacingCells(bay));
 }
 
 export function isShelfFull(bay) {
