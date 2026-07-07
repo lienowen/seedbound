@@ -5,28 +5,32 @@ let applied = false;
 const TUTORIAL_IDS = new Set(["fridge-br-1", "fridge-br-2", "fridge-br-3"]);
 
 const COOLER_CUTS = {
-  // Cut from the existing 1448x1086 cooler art instead of forcing the whole
-  // three-door illustration into every level. These are scene-specific crops.
+  // cooler-glass3.png is 980x735. All crops below are calculated against the
+  // real source size and keep roughly the same aspect ratio when displayed.
   "fridge-br-1": {
-    crop: { x: 430, y: 160, w: 588, h: 850 },
+    // Single focused cabinet bay: enough context to read as a cooler, no giant
+    // three-door void around a three-item tutorial.
+    crop: { x: 285, y: 55, w: 410, h: 590 },
     cx: 375,
-    cy: 180,
-    w: 520,
-    h: 750,
+    cy: 145,
+    w: 500,
+    h: 720,
   },
   "fridge-br-2": {
-    crop: { x: 205, y: 120, w: 1038, h: 900 },
+    // Two-bay view for the first two-category lesson.
+    crop: { x: 180, y: 70, w: 620, h: 610 },
     cx: 375,
-    cy: 200,
+    cy: 165,
     w: 650,
-    h: 565,
+    h: 640,
   },
   "fridge-br-3": {
-    crop: { x: 85, y: 95, w: 1278, h: 930 },
+    // Wider view only when a third category is introduced.
+    crop: { x: 90, y: 45, w: 800, h: 640 },
     cx: 375,
-    cy: 205,
+    cy: 175,
     w: 690,
-    h: 502,
+    h: 552,
   },
 };
 
@@ -34,28 +38,49 @@ function movableItems(level) {
   return (level.items || []).filter((item) => !item.fixed);
 }
 
-function layoutForCount(count, tutorial = false) {
+function rowXs(count, gap) {
+  const start = 375 - ((count - 1) * gap) / 2;
+  return Array.from({ length: count }, (_, index) => Math.round(start + index * gap));
+}
+
+function layoutForCount(count, tutorial = false, firstFocus = false) {
+  if (firstFocus) {
+    return {
+      rows: [3],
+      xs: [[265, 375, 485]],
+      ys: [918],
+      bounds: { x: 165, y: 830, w: 420, h: 170, r: 30 },
+      pocket: { w: 94, h: 92, r: 18 },
+    };
+  }
+
   if (count <= 3) {
     return {
       rows: [count],
-      xs: [[245, 375, 505].slice(0, count)],
-      ys: [1050],
-      bounds: { x: 145, y: 942, w: 460, h: 202, r: 34 },
-      pocket: { w: 108, h: 118, r: 20 },
+      xs: [rowXs(count, 118)],
+      ys: [tutorial ? 920 : 1050],
+      bounds: tutorial
+        ? { x: 150, y: 830, w: 450, h: 176, r: 32 }
+        : { x: 145, y: 942, w: 460, h: 202, r: 34 },
+      pocket: { w: 100, h: 96, r: 18 },
     };
   }
 
   if (count <= 6) {
     const first = Math.ceil(count / 2);
     const second = count - first;
-    const rowXs = (n) => {
-      const gap = tutorial ? 132 : 122;
-      const start = 375 - ((n - 1) * gap) / 2;
-      return Array.from({ length: n }, (_, index) => Math.round(start + index * gap));
-    };
+    if (tutorial) {
+      return {
+        rows: [first, second],
+        xs: [rowXs(first, 124), rowXs(second, 124)],
+        ys: [868, 964],
+        bounds: { x: 102, y: 790, w: 546, h: 254, r: 36 },
+        pocket: { w: 100, h: 82, r: 17 },
+      };
+    }
     return {
       rows: [first, second],
-      xs: [rowXs(first), rowXs(second)],
+      xs: [rowXs(first, 122), rowXs(second, 122)],
       ys: [980, 1092],
       bounds: { x: 92, y: 886, w: 566, h: 292, r: 38 },
       pocket: { w: 104, h: 96, r: 18 },
@@ -64,14 +89,10 @@ function layoutForCount(count, tutorial = false) {
 
   const first = Math.ceil(count / 2);
   const second = count - first;
-  const rowXs = (n) => {
-    const gap = Math.min(108, 520 / Math.max(1, n - 1));
-    const start = 375 - ((n - 1) * gap) / 2;
-    return Array.from({ length: n }, (_, index) => Math.round(start + index * gap));
-  };
+  const denseXs = (n) => rowXs(n, Math.min(108, 520 / Math.max(1, n - 1)));
   return {
     rows: [first, second],
-    xs: [rowXs(first), rowXs(second)],
+    xs: [denseXs(first), denseXs(second)],
     ys: [972, 1094],
     bounds: { x: 62, y: 874, w: 626, h: 310, r: 40 },
     pocket: { w: 88, h: 102, r: 17 },
@@ -81,12 +102,9 @@ function layoutForCount(count, tutorial = false) {
 function deliveryShapes(layout) {
   const { bounds, pocket } = layout;
   const shapes = [
-    // Grounding shadow gives the delivery cart physical weight without a heavy frame.
-    { kind: "roundedRect", x: bounds.x + 10, y: bounds.y + bounds.h - 8, w: bounds.w - 20, h: 34, r: 17, fill: 0x3c2b1d, alpha: 0.10 },
-    // Warm neutral cart surface. No loud border, no debug-grid feeling.
-    { kind: "roundedRect", x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h, r: bounds.r, fill: 0xfff4dc, alpha: 0.96, line: { width: 2, color: 0xffffff, alpha: 0.68 } },
-    // Slim delivery header rail; visually separates incoming stock from the playfield.
-    { kind: "roundedRect", x: bounds.x + 18, y: bounds.y + 16, w: bounds.w - 36, h: 18, r: 9, fill: 0xe8bd79, alpha: 0.34 },
+    { kind: "roundedRect", x: bounds.x + 10, y: bounds.y + bounds.h - 8, w: bounds.w - 20, h: 30, r: 15, fill: 0x3c2b1d, alpha: 0.09 },
+    { kind: "roundedRect", x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h, r: bounds.r, fill: 0xfff4dc, alpha: 0.96, line: { width: 2, color: 0xffffff, alpha: 0.62 } },
+    { kind: "roundedRect", x: bounds.x + 18, y: bounds.y + 14, w: bounds.w - 36, h: 14, r: 7, fill: 0xe8bd79, alpha: 0.28 },
   ];
 
   layout.rows.forEach((rowCount, row) => {
@@ -102,8 +120,8 @@ function deliveryShapes(layout) {
         h: pocket.h,
         r: pocket.r,
         fill: 0xffffff,
-        alpha: 0.28,
-        line: { width: 1.5, color: 0xe6c68f, alpha: 0.30 },
+        alpha: 0.22,
+        line: { width: 1.25, color: 0xe6c68f, alpha: 0.24 },
       });
     }
   });
@@ -113,7 +131,11 @@ function deliveryShapes(layout) {
 
 function applyDeliveryLayout(level) {
   const loose = movableItems(level);
-  const layout = layoutForCount(loose.length, TUTORIAL_IDS.has(level.id));
+  const layout = layoutForCount(
+    loose.length,
+    TUTORIAL_IDS.has(level.id),
+    level.id === "fridge-br-1" || level.firstLevelFocus === true,
+  );
   let cursor = 0;
 
   layout.rows.forEach((rowCount, row) => {
@@ -129,6 +151,7 @@ function applyDeliveryLayout(level) {
     ...(level.stage || {}),
     shapes: deliveryShapes(layout),
   };
+  level.deliveryLayout = { ...layout.bounds, itemYs: [...layout.ys] };
   level.visualMode = "restock-market";
 }
 
@@ -153,9 +176,9 @@ function softenTutorial(level) {
   if (!TUTORIAL_IDS.has(level.id)) return;
   level.tuning = {
     ...(level.tuning || {}),
-    magnetPreviewDistance: 156,
-    snapDistance: 104,
-    snapDuration: 220,
+    magnetPreviewDistance: level.id === "fridge-br-1" ? 174 : 156,
+    snapDistance: level.id === "fridge-br-1" ? 118 : 104,
+    snapDuration: 210,
   };
 }
 
@@ -168,6 +191,6 @@ export function applySupermarketRestockVisualPolish() {
     applyCoolerCut(level);
     applyDeliveryLayout(level);
     softenTutorial(level);
-    level.revision = Math.max(34, Number(level.revision || 1));
+    level.revision = Math.max(35, Number(level.revision || 1));
   }
 }
