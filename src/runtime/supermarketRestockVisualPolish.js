@@ -5,8 +5,6 @@ let applied = false;
 const TUTORIAL_IDS = new Set(["fridge-br-1", "fridge-br-2", "fridge-br-3"]);
 
 const COOLER_CUTS = {
-  // cooler-glass3.png is 980x735. All crops below are calculated against the
-  // real source size and keep roughly the same aspect ratio when displayed.
   "fridge-br-1": {
     crop: { x: 285, y: 55, w: 410, h: 590 },
     cx: 375,
@@ -28,6 +26,24 @@ const COOLER_CUTS = {
     w: 690,
     h: 552,
   },
+};
+
+const FAMILY_PALETTE = {
+  "cold-aisle": { body: 0xe9f2ef, frame: 0x9dbcb5, accent: 0x6fa99d, header: 0xc9e2dc },
+  "produce-cooler": { body: 0xf2e7cd, frame: 0xb88d58, accent: 0x6f9a62, header: 0xd9e6bf },
+  "meal-cooler": { body: 0xe8edf1, frame: 0x95a8b5, accent: 0x718b9d, header: 0xd5e0e7 },
+  "mixed-aisle": { body: 0xf2e1c4, frame: 0xb7814d, accent: 0xa96841, header: 0xead0a7 },
+};
+
+const MODULE_PALETTE = {
+  "beverage-cooler": { fill: 0xe5f1ee, rail: 0x9cc9be, line: 0xffffff },
+  "dairy-chill": { fill: 0xe8eef5, rail: 0xaabed1, line: 0xffffff },
+  "produce-bin": { fill: 0xe6eed8, rail: 0x87a66f, line: 0xfbf7ea },
+  "bulk-produce": { fill: 0xead7af, rail: 0xa77b45, line: 0xfff6df },
+  "ready-chill": { fill: 0xe8edf0, rail: 0x93a9b6, line: 0xffffff },
+  "condiment-shelf": { fill: 0xf4e0bf, rail: 0xb47742, line: 0xfff8e8 },
+  "grocery-shelf": { fill: 0xf0dfc2, rail: 0xa9784a, line: 0xfff7e6 },
+  "bakery-shelf": { fill: 0xf5e3c9, rail: 0xb88355, line: 0xfff8ea },
 };
 
 function movableItems(level) {
@@ -143,10 +159,12 @@ function applyDeliveryLayout(level) {
     }
   });
 
+  const incomingShapes = deliveryShapes(layout);
   level.stage = {
     ...(level.stage || {}),
-    shapes: deliveryShapes(layout),
+    shapes: incomingShapes,
   };
+  level.deliveryShapes = incomingShapes;
   level.deliveryLayout = { ...layout.bounds, itemYs: [...layout.ys] };
   level.visualMode = "restock-market";
 }
@@ -168,12 +186,159 @@ function applyCoolerCut(level) {
   level.fixtureCut = true;
 }
 
+function activeSlots(level) {
+  return (level.slots || []).filter((slot) => slot.category && !slot.empty);
+}
+
+function boundsForSlots(slots) {
+  if (!slots.length) return { x: 90, y: 250, w: 570, h: 560 };
+  const left = Math.min(...slots.map((slot) => slot.x - slot.w / 2));
+  const right = Math.max(...slots.map((slot) => slot.x + slot.w / 2));
+  const top = Math.min(...slots.map((slot) => slot.y - slot.h / 2));
+  const bottom = Math.max(...slots.map((slot) => slot.y + slot.h / 2));
+  return {
+    x: Math.max(38, left - 30),
+    y: Math.max(220, top - 52),
+    w: Math.min(674, right - left + 60),
+    h: Math.min(650, bottom - top + 82),
+  };
+}
+
+function moduleColors(kind) {
+  return MODULE_PALETTE[kind] || MODULE_PALETTE["grocery-shelf"];
+}
+
+function marketFixtureShapes(level) {
+  const slots = activeSlots(level);
+  const family = level.marketFixtureFamily || "cold-aisle";
+  const palette = FAMILY_PALETTE[family] || FAMILY_PALETTE["cold-aisle"];
+  const bounds = boundsForSlots(slots);
+  const shapes = [
+    { kind: "roundedRect", x: bounds.x + 8, y: bounds.y + bounds.h - 2, w: bounds.w - 16, h: 30, r: 15, fill: 0x2e241c, alpha: 0.10 },
+    { kind: "roundedRect", x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h, r: 28, fill: palette.body, alpha: 0.98, line: { width: 3, color: 0xffffff, alpha: 0.62 } },
+    { kind: "roundedRect", x: bounds.x + 16, y: bounds.y + 14, w: bounds.w - 32, h: 30, r: 15, fill: palette.header, alpha: 0.96 },
+    { kind: "roundedRect", x: bounds.x + 28, y: bounds.y + 23, w: Math.max(72, bounds.w * 0.28), h: 10, r: 5, fill: palette.accent, alpha: 0.52 },
+  ];
+
+  for (const slot of slots) {
+    const colors = moduleColors(slot.shelfKind);
+    const left = slot.x - slot.w / 2;
+    const top = slot.y - slot.h / 2;
+    const kind = slot.shelfKind;
+
+    if (kind === "produce-bin" || kind === "bulk-produce") {
+      const deep = kind === "bulk-produce";
+      shapes.push({
+        kind: "roundedRect",
+        x: left - 7,
+        y: top - 8,
+        w: slot.w + 14,
+        h: slot.h + 24,
+        r: deep ? 18 : 15,
+        fill: colors.fill,
+        alpha: 0.98,
+        line: { width: 2, color: colors.line, alpha: 0.58 },
+      });
+      shapes.push({
+        kind: "roundedRect",
+        x: left + 4,
+        y: slot.y + slot.h * 0.12,
+        w: slot.w - 8,
+        h: deep ? 28 : 20,
+        r: deep ? 12 : 9,
+        fill: colors.rail,
+        alpha: deep ? 0.42 : 0.34,
+      });
+      continue;
+    }
+
+    shapes.push({
+      kind: "roundedRect",
+      x: left - 6,
+      y: top - 10,
+      w: slot.w + 12,
+      h: slot.h + 20,
+      r: 14,
+      fill: colors.fill,
+      alpha: 0.96,
+      line: { width: 2, color: colors.line, alpha: 0.58 },
+    });
+    shapes.push({
+      kind: "roundedRect",
+      x: left + 5,
+      y: top + 5,
+      w: slot.w - 10,
+      h: 12,
+      r: 6,
+      fill: 0xffffff,
+      alpha: kind.includes("chill") || kind.includes("cooler") ? 0.28 : 0.16,
+    });
+  }
+
+  return shapes;
+}
+
+function marketFronts(level) {
+  const fronts = [];
+  for (const slot of activeSlots(level)) {
+    const colors = moduleColors(slot.shelfKind);
+    const left = slot.x - slot.w / 2;
+    const kind = slot.shelfKind;
+
+    if (kind === "produce-bin" || kind === "bulk-produce") {
+      const deep = kind === "bulk-produce";
+      fronts.push({
+        kind: "roundedRect",
+        x: left - 4,
+        y: slot.y + slot.h / 2 - (deep ? 20 : 14),
+        w: slot.w + 8,
+        h: deep ? 30 : 22,
+        r: deep ? 12 : 9,
+        fill: colors.rail,
+        alpha: deep ? 0.88 : 0.78,
+        line: { width: 1.5, color: colors.line, alpha: 0.58 },
+        depth: 310,
+      });
+      continue;
+    }
+
+    fronts.push({
+      kind: "roundedRect",
+      x: left - 3,
+      y: slot.y + slot.h / 2 - 7,
+      w: slot.w + 6,
+      h: 14,
+      r: 7,
+      fill: colors.rail,
+      alpha: kind === "condiment-shelf" || kind === "grocery-shelf" || kind === "bakery-shelf" ? 0.88 : 0.76,
+      line: { width: 1.3, color: colors.line, alpha: 0.62 },
+      depth: 310,
+    });
+  }
+  return fronts;
+}
+
+function applyMarketFixtureFamily(level) {
+  if (TUTORIAL_IDS.has(level.id)) return;
+
+  // Later levels no longer reuse a full cooler illustration. Generate a fixture
+  // around the actual interactive slots so art, product scale and hit areas stay
+  // aligned even when a level mixes produce bins, chill shelves and dry shelving.
+  level.stage = {
+    ...(level.stage || {}),
+    fixtures: [],
+    shapes: [
+      ...marketFixtureShapes(level),
+      ...(level.deliveryShapes || []),
+    ],
+  };
+  level.fronts = marketFronts(level);
+  level.visualMode = `restock-${level.marketFixtureFamily || "cold-aisle"}`;
+}
+
 function applyFirstFocusFront(level) {
   if (level.id !== "fridge-br-1") return;
 
-  // A small foreground shelf lip seats the products into the cabinet instead of
-  // making them read like PNG stickers floating on glass. Replace legacy fronts
-  // because their geometry belongs to the old full three-door composition.
   level.fronts = [
     {
       kind: "roundedRect",
@@ -219,8 +384,9 @@ export function applySupermarketRestockVisualPolish() {
     if (level?.theme?.key !== "restock-cooler") continue;
     applyCoolerCut(level);
     applyDeliveryLayout(level);
+    applyMarketFixtureFamily(level);
     applyFirstFocusFront(level);
     softenTutorial(level);
-    level.revision = Math.max(37, Number(level.revision || 1));
+    level.revision = Math.max(40, Number(level.revision || 1));
   }
 }
