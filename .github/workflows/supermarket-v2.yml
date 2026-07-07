@@ -37,5 +37,8 @@ jobs:
       - name: Audit SKU planogram facings
         run: node scripts/audit-supermarket-v2-planogram.mjs
 
+      - name: Audit shift progression
+        run: node scripts/audit-supermarket-v2-progression.mjs
+
       - name: Compile production app
         run: npm run build
