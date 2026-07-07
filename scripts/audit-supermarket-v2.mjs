@@ -38,8 +38,12 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
   }
 }
 
-// Shift 1: three physical units, one compact wall bay, one complete row.
+// Shift 1: a partially stocked wall bay with three explicit visible gaps.
 {
+  if (visibleGapCount(shift1.bays[0]) !== 3) fail(`shift1:initial-gaps=${visibleGapCount(shift1.bays[0])}`);
+  const cells = shift1.bays[0].facings.map((facing) => facing.cell).join(",");
+  if (cells !== "0,2,4") fail(`shift1:existing-cells=${cells}`);
+
   const engine = new ShiftEngine(shift1);
   expectOk(engine.startShift(), "shift1:start");
   for (const stockCase of shift1.cases) expectOk(engine.loadCase(stockCase.id), `shift1:load:${stockCase.id}`);
@@ -71,8 +75,7 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
   if (remoteLoad.ok || remoteLoad.reason !== "must-load-in-backroom") fail(`shift1:remote-load=${remoteLoad.reason}`);
 }
 
-// Shift 2: bread and dairy must be physically separate. Wrong cross-department
-// placement is intentionally tested while the worker is standing at the dairy wall.
+// Shift 2: bread and dairy are physically separate and both start partially stocked.
 {
   const breakfastBay = shift2.bays.find((bay) => bay.id === "breakfast-bread-bay");
   const dairyBay = shift2.bays.find((bay) => bay.id === "dairy-bay-a");
@@ -82,6 +85,8 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
   if (dairyBay?.kind !== FIXTURE_KIND.WALL_COOLER || dairyBay?.department !== DEPARTMENT.DAIRY) {
     fail("shift2:dairy-bay-not-wall-cooler");
   }
+  if (visibleGapCount(breakfastBay) !== 2) fail(`shift2:breakfast-initial-gaps=${visibleGapCount(breakfastBay)}`);
+  if (visibleGapCount(dairyBay) !== 3) fail(`shift2:dairy-initial-gaps=${visibleGapCount(dairyBay)}`);
   if (fixtureCanTakeSku(dairyBay, "bread")) fail("shift2:bread-can-enter-dairy-wall");
   if (fixtureCanTakeSku(breakfastBay, "milk")) fail("shift2:milk-can-enter-breakfast-shelf");
 
@@ -103,22 +108,22 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
   if (wrong.ok || wrong.reason !== "wrong-department-or-fixture") fail(`shift2:wrong-placement-not-rejected=${wrong.reason}`);
 
   expectOk(engine.moveToScene("breakfast-aisle"), "shift2:move-breakfast");
-  expectOk(engine.placeUnit(breadUnit.id, "breakfast-bread-bay"), "shift2:place-bread");
+  expectOk(engine.placeUnit(breadUnit.id, "breakfast-bread-bay", 2), "shift2:place-bread");
   if (visibleGapCount(engine.state.bays["breakfast-bread-bay"]) !== 0) fail("shift2:bread-footprint-not-two-cells");
   expectOk(engine.faceBay("breakfast-bread-bay"), "shift2:face-breakfast");
 
   expectOk(engine.moveToScene("dairy-wall"), "shift2:move-dairy");
-  for (const skuId of ["milk", "yogurt", "cheese"]) {
+  for (const [skuId, cell] of [["milk", 1], ["yogurt", 3], ["cheese", 5]]) {
     const unit = unitBySku(engine, skuId);
     if (!unit) fail(`shift2:missing-unit=${skuId}`);
-    else expectOk(engine.placeUnit(unit.id, "dairy-bay-a"), `shift2:place:${skuId}`);
+    else expectOk(engine.placeUnit(unit.id, "dairy-bay-a", cell), `shift2:place:${skuId}`);
   }
   expectOk(engine.faceBay("dairy-bay-a"), "shift2:face-dairy");
   expectOk(engine.finishShift(), "shift2:finish");
 }
 
-// Shift 3: shelves change during the shift. A customer removal must create a real
-// new visible gap after the player had already recovered the bay.
+// Shift 3: finishing the first dairy recovery automatically triggers a customer
+// removal. The spare milk must recover the exact new gap before the worker leaves.
 {
   const engine = new ShiftEngine(shift3);
   expectOk(engine.startShift(), "shift3:start");
@@ -131,15 +136,36 @@ for (const shift of SUPERMARKET_V2_VERTICAL_SLICE) {
     if (!unit) fail(`shift3:missing-milk-unit-${i}`);
     else expectOk(engine.placeUnit(unit.id, "rush-dairy-bay"), `shift3:place-milk-${i}`);
   }
-  expectOk(engine.faceBay("rush-dairy-bay"), "shift3:face-dairy");
-  if (visibleGapCount(engine.state.bays["rush-dairy-bay"]) !== 0) fail("shift3:dairy-not-full-before-customer");
-  expectOk(engine.customerTakes("rush-dairy-bay", "milk"), "shift3:customer-takes");
-  if (visibleGapCount(engine.state.bays["rush-dairy-bay"]) !== 1) fail("shift3:customer-removal-did-not-create-gap");
+
+  const faceResult = engine.faceBay("rush-dairy-bay");
+  expectOk(faceResult, "shift3:face-dairy");
+  if (!faceResult.events?.some((event) => event.id === "customer-removes-milk")) {
+    fail("shift3:customer-event-not-triggered");
+  }
+  if (!engine.state.eventsTriggered.includes("customer-removes-milk")) fail("shift3:event-not-recorded");
+  if (visibleGapCount(engine.state.bays["rush-dairy-bay"]) !== 1) fail("shift3:customer-gap-not-created");
+
+  const spareMilk = unitBySku(engine, "milk");
+  if (!spareMilk) fail("shift3:missing-spare-milk");
+  else {
+    const gapCell = faceResult.events?.[0]?.result?.gapCell;
+    expectOk(engine.placeUnit(spareMilk.id, "rush-dairy-bay", gapCell), "shift3:recover-customer-gap");
+  }
+  expectOk(engine.faceBay("rush-dairy-bay"), "shift3:reface-dairy");
+
+  expectOk(engine.moveToScene("drinks-wall-rush"), "shift3:move-drinks");
+  for (let i = 0; i < 2; i += 1) {
+    const unit = unitBySku(engine, "juice");
+    if (!unit) fail(`shift3:missing-juice-unit-${i}`);
+    else expectOk(engine.placeUnit(unit.id, "rush-drinks-bay"), `shift3:place-juice-${i}`);
+  }
+  expectOk(engine.faceBay("rush-drinks-bay"), "shift3:face-drinks");
+  expectOk(engine.finishShift(), "shift3:finish");
 }
 
 if (errors.length) {
   errors.forEach((error) => console.error(`FAIL ${error}`));
   process.exitCode = 1;
 } else {
-  console.log("OK supermarket-v2 shifts=3 backroom=true scenes=physical capacity=footprint-aware customer-gap=true");
+  console.log("OK supermarket-v2 shifts=3 backroom=true scenes=physical gaps=explicit customer-event=dynamic capacity=footprint-aware");
 }
