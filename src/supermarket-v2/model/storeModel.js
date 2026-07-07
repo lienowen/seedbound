@@ -98,6 +98,7 @@ export function createShelfBay({
   kind,
   capacity,
   facings = [],
+  planogram = [],
   position,
 }) {
   if (!id) throw new Error("Shelf bay id is required");
@@ -105,6 +106,9 @@ export function createShelfBay({
   if (!Object.values(DEPARTMENT).includes(department)) throw new Error(`Unknown department: ${department}`);
   if (!Object.values(FIXTURE_KIND).includes(kind)) throw new Error(`Unknown fixture kind: ${kind}`);
   if (!Number.isInteger(capacity) || capacity <= 0) throw new Error("Shelf bay capacity must be a positive integer");
+  if (planogram.length && planogram.length !== capacity) {
+    throw new Error(`Shelf bay ${id} planogram must contain exactly ${capacity} cells`);
+  }
 
   return {
     id,
@@ -116,6 +120,7 @@ export function createShelfBay({
       ...facing,
       cell: Number.isInteger(facing.cell) ? facing.cell : index,
     })),
+    planogram: planogram.length ? [...planogram] : Array.from({ length: capacity }, () => null),
     position: { ...position },
   };
 }
@@ -141,7 +146,20 @@ export function visibleGapCount(bay) {
   return Math.max(0, Number(bay?.capacity || 0) - occupiedFacingCells(bay));
 }
 
-export function firstAvailableCell(bay, footprint = 1) {
+export function planogramAllowsSkuAtCell(bay, skuId, startCell, footprint = 1) {
+  if (!Array.isArray(bay?.planogram) || !bay.planogram.length) return true;
+  const width = Math.max(1, Number(footprint || 1));
+  const start = Number(startCell);
+  if (!Number.isInteger(start) || start < 0 || start + width > bay.capacity) return false;
+
+  for (let offset = 0; offset < width; offset += 1) {
+    const expectedSkuId = bay.planogram[start + offset];
+    if (expectedSkuId && expectedSkuId !== skuId) return false;
+  }
+  return true;
+}
+
+export function firstAvailableCell(bay, footprint = 1, skuId = null) {
   const width = Math.max(1, Number(footprint || 1));
   const capacity = Math.max(0, Number(bay?.capacity || 0));
   const occupied = occupiedCellSet(bay);
@@ -154,7 +172,9 @@ export function firstAvailableCell(bay, footprint = 1) {
         break;
       }
     }
-    if (available) return start;
+    if (!available) continue;
+    if (skuId && !planogramAllowsSkuAtCell(bay, skuId, start, width)) continue;
+    return start;
   }
   return -1;
 }
