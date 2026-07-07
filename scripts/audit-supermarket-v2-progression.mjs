@@ -58,6 +58,7 @@ expect(maxShiftNumber() === 3, `max-shift=${maxShiftNumber()}`);
   expect(afterOne.current === 2, `after-one-current=${afterOne.current}`);
   expect(afterOne.completed.join(",") === "1", `after-one-completed=${afterOne.completed.join(",")}`);
   expect(resolveInitialShift("") === 2, `resume-after-one=${resolveInitialShift("")}`);
+  expect(window.location.search.includes("shift=2"), `after-one-url=${window.location.search}`);
 }
 
 {
@@ -69,6 +70,7 @@ expect(maxShiftNumber() === 3, `max-shift=${maxShiftNumber()}`);
   expect(afterTwo.unlocked === 3, `after-two-unlocked=${afterTwo.unlocked}`);
   expect(afterTwo.current === 3, `after-two-current=${afterTwo.current}`);
   expect(afterTwo.completed.join(",") === "1,2", `after-two-completed=${afterTwo.completed.join(",")}`);
+  expect(window.location.search.includes("shift=3"), `after-two-url=${window.location.search}`);
 }
 
 {
@@ -77,6 +79,7 @@ expect(maxShiftNumber() === 3, `max-shift=${maxShiftNumber()}`);
   expect(afterThree.current === 3, `after-three-current=${afterThree.current}`);
   expect(afterThree.completed.join(",") === "1,2,3", `after-three-completed=${afterThree.completed.join(",")}`);
   expect(resolveInitialShift("") === 3, `resume-after-three=${resolveInitialShift("")}`);
+  expect(window.location.search.includes("shift=3"), `after-three-url=${window.location.search}`);
 }
 
 {
@@ -112,5 +115,5 @@ if (errors.length) {
   errors.forEach((error) => console.error(`FAIL ${error}`));
   process.exitCode = 1;
 } else {
-  console.log("OK supermarket-v2-progression shifts=3 next=true resume=true url-sync=true storage-block-safe=true");
+  console.log("OK supermarket-v2-progression shifts=3 next=true resume=true completion-url=true url-sync=true storage-block-safe=true");
 }
