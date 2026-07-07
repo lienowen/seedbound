@@ -2,8 +2,10 @@ import { FRIDGE_BR_CAMPAIGN } from "../src/levels/fridgePhaserLevel.js";
 import { StorageEngine } from "../src/game/StorageEngine.js";
 import { applyCoreConsistencyPatches } from "../src/runtime/coreConsistencyBootstrap.js";
 import { applyEngineConsistency } from "../src/runtime/engineConsistency.js";
+import { applyMidCampaignCapacityPolish } from "../src/runtime/midCampaignCapacityPolish.js";
 
 applyCoreConsistencyPatches();
+applyMidCampaignCapacityPolish();
 applyEngineConsistency();
 
 const NON_BLOCKING = new Set(["mustNeighbor"]);
@@ -95,7 +97,7 @@ function waveErrors(level) {
   const hidden = waves.reduce((sum, wave) => sum + wave.count, 0);
   let visible = movable - hidden;
   const errors = [];
-  if (visible < 1) errors.push(`wave:no-initial-stock`);
+  if (visible < 1) errors.push("wave:no-initial-stock");
   for (const wave of waves) {
     if (visible < wave.after) errors.push(`wave:need-${wave.after}-visible-${visible}`);
     visible += wave.count;

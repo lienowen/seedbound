@@ -3,11 +3,13 @@ import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
 import { applyCoreConsistencyPatches } from "./runtime/coreConsistencyBootstrap.js";
 import { applyEngineConsistency } from "./runtime/engineConsistency.js";
+import { applyMidCampaignCapacityPolish } from "./runtime/midCampaignCapacityPolish.js";
 import { applyPreviewConstraintPolish } from "./runtime/previewConstraintPolish.js";
 import "./fridge-phaser.css";
 
 // Apply data and engine consistency before campaign progress is read.
 applyCoreConsistencyPatches();
+applyMidCampaignCapacityPolish();
 applyEngineConsistency();
 applyPreviewConstraintPolish();
 

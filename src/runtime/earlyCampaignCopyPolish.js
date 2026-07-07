@@ -1,5 +1,6 @@
 import { CAMPAIGN_I18N } from "../i18n/campaign.js";
 import { applyBonusChallengePolish } from "./bonusChallengePolish.js";
+import { applyChapterContinuityPolish } from "./chapterContinuityPolish.js";
 import { applyMidCampaignEventPolish } from "./midCampaignEventPolish.js";
 import "./skipSafety.css";
 
@@ -35,4 +36,5 @@ export function applyEarlyCampaignCopyPolish() {
   CAMPAIGN_I18N.en = { ...CAMPAIGN_I18N.en, ...EN };
   applyBonusChallengePolish();
   applyMidCampaignEventPolish();
+  applyChapterContinuityPolish();
 }
