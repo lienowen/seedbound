@@ -65,8 +65,6 @@ function applyEarlyCurve(level, number) {
   const all = (level.items || []).map((item) => structuredClone(item));
   const selected = balancedSelection(all, profile.total);
 
-  // Keep only a few pre-stocked anchors. Too many fixed goods make the player feel
-  // like they entered a puzzle already half-obscured by clutter.
   const originalFixed = selected.filter((item) => item.fixed);
   const fixedIds = new Set(balancedSelection(originalFixed, profile.fixed).map((item) => item.id));
 
@@ -131,8 +129,6 @@ function allocateCategory(rows, category, slotNeed) {
     if (run) return run;
   }
 
-  // Fallback for large categories: choose the row with the largest free run first,
-  // then continue on the nearest row. This remains deterministic and visually calm.
   const picked = [];
   const rowOrder = preferredRows(category, rows.length);
   for (const rowIndex of rowOrder) {
@@ -200,15 +196,13 @@ function rebuildPlanogram(level) {
   level.planogram = planogram;
   level.objective = {
     type: "restock-planogram",
-    categories: categories,
+    categories,
   };
 }
 
 function applyFirstLevelFocus(level) {
   if (level.id !== "fridge-br-1") return;
 
-  // First contact must be one truthful action: three drinks, one shelf, one win.
-  // Never split 3 goods into a hidden 2+1 planogram across different cabinet cells.
   level.items = (level.items || [])
     .filter((item) => !item.fixed && item.prefs?.category === "beverages")
     .slice(0, 3)
@@ -229,13 +223,13 @@ function applyFirstLevelFocus(level) {
     category: "beverages",
     empty: false,
     x: 375,
-    y: 565,
-    w: 366,
-    h: 126,
+    y: 610,
+    w: 330,
+    h: 112,
     cols: 3,
     rows: 1,
     stackLayers: 1,
-    baseline: 0.82,
+    baseline: 0.84,
     depth: 150,
     tier: 1,
   }];
@@ -278,6 +272,6 @@ export function applySupermarketRestockProgressionPolish() {
     rebuildPlanogram(level);
     applyFirstLevelFocus(level);
     applyFeelCurve(level, number);
-    level.revision = Math.max(33, Number(level.revision || 1));
+    level.revision = Math.max(36, Number(level.revision || 1));
   }
 }
