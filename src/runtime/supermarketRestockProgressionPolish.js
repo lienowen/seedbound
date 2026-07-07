@@ -204,6 +204,54 @@ function rebuildPlanogram(level) {
   };
 }
 
+function applyFirstLevelFocus(level) {
+  if (level.id !== "fridge-br-1") return;
+
+  // First contact must be one truthful action: three drinks, one shelf, one win.
+  // Never split 3 goods into a hidden 2+1 planogram across different cabinet cells.
+  level.items = (level.items || [])
+    .filter((item) => !item.fixed && item.prefs?.category === "beverages")
+    .slice(0, 3)
+    .map((item) => ({
+      ...item,
+      fixed: false,
+      slot: undefined,
+      col: undefined,
+      row: undefined,
+      layer: undefined,
+    }));
+
+  const slotId = "restock_drinks_focus";
+  level.slots = [{
+    id: slotId,
+    zone: "shelf",
+    allow: [...ALL_TAGS],
+    category: "beverages",
+    empty: false,
+    x: 375,
+    y: 565,
+    w: 366,
+    h: 126,
+    cols: 3,
+    rows: 1,
+    stackLayers: 1,
+    baseline: 0.82,
+    depth: 150,
+    tier: 1,
+  }];
+  level.planogram = [{
+    slotId,
+    category: "beverages",
+    products: level.items.map((item) => item.image),
+  }];
+  level.objective = {
+    type: "restock-planogram",
+    categories: ["beverages"],
+    count: 3,
+  };
+  level.firstLevelFocus = true;
+}
+
 function applyFeelCurve(level, number) {
   const tuning = number <= 3
     ? { magnetPreviewDistance: 156, snapDistance: 104, snapDuration: 220 }
@@ -228,7 +276,8 @@ export function applySupermarketRestockProgressionPolish() {
     const number = levelNumber(level);
     applyEarlyCurve(level, number);
     rebuildPlanogram(level);
+    applyFirstLevelFocus(level);
     applyFeelCurve(level, number);
-    level.revision = Math.max(32, Number(level.revision || 1));
+    level.revision = Math.max(33, Number(level.revision || 1));
   }
 }
