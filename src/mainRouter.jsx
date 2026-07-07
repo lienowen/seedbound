@@ -1,7 +1,6 @@
 import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
-import "./fridge-phaser.css";
 import "./supermarket-v2/replenishment-planogram.css";
 
 const params = new URLSearchParams(window.location.search);
