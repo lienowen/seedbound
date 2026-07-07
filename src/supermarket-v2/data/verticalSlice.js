@@ -28,6 +28,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
     bays: [
       createShelfBay({
         id: "drinks-bay-a",
+        sceneId: "drinks-wall",
         department: DEPARTMENT.DRINKS,
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 3,
@@ -72,6 +73,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
     bays: [
       createShelfBay({
         id: "breakfast-bread-bay",
+        sceneId: "breakfast-aisle",
         department: DEPARTMENT.BREAKFAST,
         kind: FIXTURE_KIND.DRY_SHELF,
         capacity: 2,
@@ -80,6 +82,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
       }),
       createShelfBay({
         id: "dairy-bay-a",
+        sceneId: "dairy-wall",
         department: DEPARTMENT.DAIRY,
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 3,
@@ -125,6 +128,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
     bays: [
       createShelfBay({
         id: "rush-dairy-bay",
+        sceneId: "dairy-wall-rush",
         department: DEPARTMENT.DAIRY,
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 3,
@@ -135,6 +139,7 @@ export const SUPERMARKET_V2_VERTICAL_SLICE = [
       }),
       createShelfBay({
         id: "rush-drinks-bay",
+        sceneId: "drinks-wall-rush",
         department: DEPARTMENT.DRINKS,
         kind: FIXTURE_KIND.WALL_COOLER,
         capacity: 3,
