@@ -7,6 +7,19 @@ function clampShift(value) {
   return Math.max(1, Math.min(MAX_SHIFT, Math.trunc(numeric)));
 }
 
+function defaultProgress() {
+  return { unlocked: 1, current: 1, completed: [] };
+}
+
+function writeProgress(progress) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  } catch {
+    // Private browsing / blocked storage must never interrupt gameplay.
+  }
+  return progress;
+}
+
 export function readShiftProgress() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
@@ -18,7 +31,7 @@ export function readShiftProgress() {
         : [],
     };
   } catch {
-    return { unlocked: 1, current: 1, completed: [] };
+    return defaultProgress();
   }
 }
 
@@ -32,13 +45,11 @@ export function resolveInitialShift(search = window.location.search) {
 export function saveShiftArrival(shiftNumber) {
   const shift = clampShift(shiftNumber);
   const current = readShiftProgress();
-  const next = {
+  return writeProgress({
     ...current,
     current: shift,
     unlocked: Math.max(current.unlocked, shift),
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  return next;
+  });
 }
 
 export function saveShiftCompletion(shiftNumber) {
@@ -48,20 +59,22 @@ export function saveShiftCompletion(shiftNumber) {
   const completed = current.completed.includes(shift)
     ? current.completed
     : [...current.completed, shift].sort((a, b) => a - b);
-  const next = {
+  return writeProgress({
     unlocked: Math.max(current.unlocked, nextShift),
     current: nextShift,
     completed,
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  return next;
+  });
 }
 
 export function replaceShiftInUrl(shiftNumber) {
-  const shift = clampShift(shiftNumber);
-  const url = new URL(window.location.href);
-  url.searchParams.set("shift", String(shift));
-  window.history.replaceState({}, "", url);
+  try {
+    const shift = clampShift(shiftNumber);
+    const url = new URL(window.location.href);
+    url.searchParams.set("shift", String(shift));
+    window.history.replaceState({}, "", url);
+  } catch {
+    // URL synchronization is convenience only; gameplay state remains authoritative.
+  }
 }
 
 export function maxShiftNumber() {
