@@ -12,7 +12,10 @@ export function createI18n(locale) {
     ui,
     tReason(key, fallback = "") {
       if (!key) return fallback;
-      if (key.startsWith("reject.")) return reasons[key] || fallback || reasons["reject.generic"];
+      // Never leak internal reject keys into the player-facing toast. Some engine
+      // paths pass the raw key as `fallback`, so prefer the localized generic copy
+      // whenever a specific reject reason has not been authored yet.
+      if (key.startsWith("reject.")) return reasons[key] || reasons["reject.generic"] || fallback;
       return reasons[key] || fallback || key;
     },
     tItem(nameKey, fallback = "") {
