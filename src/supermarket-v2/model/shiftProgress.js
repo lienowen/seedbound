@@ -59,11 +59,17 @@ export function saveShiftCompletion(shiftNumber) {
   const completed = current.completed.includes(shift)
     ? current.completed
     : [...current.completed, shift].sort((a, b) => a - b);
-  return writeProgress({
+  const next = writeProgress({
     unlocked: Math.max(current.unlocked, nextShift),
     current: nextShift,
     completed,
   });
+
+  // Keep refresh/back-forward behavior aligned with persisted progress. The
+  // completion overlay may still show the just-finished shift, but a reload
+  // resumes at the newly unlocked next shift instead of jumping backward.
+  replaceShiftInUrl(nextShift);
+  return next;
 }
 
 export function replaceShiftInUrl(shiftNumber) {
