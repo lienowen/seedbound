@@ -79,7 +79,8 @@ export class ShiftEngine {
       });
     }
     this.completeMatchingTask(TASK_KIND.LOAD_CASE, { caseId });
-    return { ok: true, loadedUnits: stockCase.quantity };
+    const events = this.runTriggeredEvents();
+    return { ok: true, loadedUnits: stockCase.quantity, events };
   }
 
   placeUnit(unitId, bayId, requestedCell = null) {
@@ -116,14 +117,13 @@ export class ShiftEngine {
       if (occupied.has(cell + offset)) return { ok: false, reason: "no-contiguous-shelf-gap" };
     }
 
-    const facing = {
+    bay.facings.push({
       unitId: unit.id,
       skuId: unit.skuId,
       footprint,
       expiryDay: unit.expiryDay,
       cell,
-    };
-    bay.facings.push(facing);
+    });
     bay.facings.sort((a, b) => Number(a.cell || 0) - Number(b.cell || 0));
     bay.faced = false;
     this.state.cart.splice(unitIndex, 1);
@@ -131,7 +131,8 @@ export class ShiftEngine {
     this.state.clockSeconds += 2;
 
     this.completeMatchingTask(TASK_KIND.REPLENISH, { bayId, skuId: unit.skuId });
-    return { ok: true, bayFull: isShelfFull(bay), cell };
+    const events = this.runTriggeredEvents();
+    return { ok: true, bayFull: isShelfFull(bay), cell, events };
   }
 
   faceBay(bayId) {
@@ -140,13 +141,39 @@ export class ShiftEngine {
     if (!bay) return { ok: false, reason: "bay-not-found" };
     if (bay.sceneId !== this.state.currentSceneId) return { ok: false, reason: "wrong-scene" };
     if (!bay.facings.length) return { ok: false, reason: "nothing-to-face" };
+    if (visibleGapCount(bay) > 0) return { ok: false, reason: "bay-not-recovered" };
 
     bay.facings.sort((a, b) => Number(a.cell || 0) - Number(b.cell || 0));
     bay.faced = true;
     this.state.metrics.facingsCompleted += 1;
     this.state.clockSeconds += 3;
     this.completeMatchingTask(TASK_KIND.FACE, { bayId });
-    return { ok: true };
+    const events = this.runTriggeredEvents();
+    return { ok: true, events };
+  }
+
+  runTriggeredEvents() {
+    const triggered = [];
+    for (const event of this.definition.events || []) {
+      if (this.state.eventsTriggered.includes(event.id)) continue;
+      const afterTaskId = event.trigger?.afterTaskId;
+      if (afterTaskId && !this.state.completedTaskIds.includes(afterTaskId)) continue;
+
+      let result = { ok: true };
+      if (event.action?.type === "customer-takes") {
+        result = this.customerTakes(event.action.bayId, event.action.skuId);
+      }
+      if (!result.ok) continue;
+
+      this.state.eventsTriggered.push(event.id);
+      triggered.push({
+        id: event.id,
+        createsPriority: event.createsPriority || null,
+        action: clone(event.action || {}),
+        result: clone(result),
+      });
+    }
+    return triggered;
   }
 
   customerTakes(bayId, skuId) {
@@ -196,8 +223,9 @@ export class ShiftEngine {
         task.complete = true;
         this.state.completedTaskIds.push(task.id);
       }
-      break;
+      return task;
     }
+    return null;
   }
 
   isComplete() {
