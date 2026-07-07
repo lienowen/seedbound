@@ -73,6 +73,7 @@ export function applySupermarketRestockScenePolish() {
   const originalStartOnboarding = StorageScene.prototype.startOnboarding;
   const originalDisplayScaleFor = StorageScene.prototype.displayScaleFor;
   const originalBuildShelfCategoryTags = StorageScene.prototype.buildShelfCategoryTags;
+  const originalBuildFacingGhosts = StorageScene.prototype.buildFacingGhosts;
   const originalLayoutGoalCard = StorageScene.prototype.layoutGoalCard;
   const originalDrawPlacementPreview = StorageScene.prototype.drawPlacementPreview;
   const originalUpdateCampaignControls = StorageScene.prototype.updateCampaignControls;
@@ -112,6 +113,39 @@ export function applySupermarketRestockScenePolish() {
       }).setOrigin(0, 0).setDepth(62);
       this.categoryTags.push(tag);
     }
+  };
+
+  StorageScene.prototype.buildFacingGhosts = function buildRestockFacingMarkers() {
+    if (!isRestock(this)) return originalBuildFacingGhosts.call(this);
+
+    if (this.facingGhosts) this.facingGhosts.forEach((entry) => entry.ghost?.destroy?.());
+    this.facingGhosts = [];
+    const plan = this.level?.planogram;
+    if (!plan?.length || this.editMode) return;
+
+    for (const shelf of plan) {
+      const slot = this.findSlot(shelf.slotId);
+      if (!slot) continue;
+      shelf.products.forEach((imageKey, col) => {
+        const def = this.level.items.find((item) => item.image === imageKey);
+        if (!def) return;
+        const anchor = this.engine.placementAnchor({ slotId: slot.id, col, row: 0, layer: 0, rot: 0, itemId: def.id });
+        const fakeEntry = { status: "packed", slotId: slot.id, col, row: 0, layer: 0, rot: 0, x: anchor.x, y: anchor.y, itemId: def.id };
+        const point = this.displayPointFor(def, fakeEntry);
+
+        // A small shelf-edge notch reads like a missing facing/price position. It
+        // guides the eye without drawing a product-sized collision rectangle.
+        const marker = this.add.graphics();
+        marker.fillStyle(0x8d7358, isTutorial(this) ? 0.22 : 0.16);
+        marker.fillRoundedRect(-19, -3, 38, 6, 3);
+        marker.fillStyle(0xffffff, 0.36);
+        marker.fillRoundedRect(-14, -2, 28, 2, 1);
+        marker.setPosition(point.x, slot.y + 10).setDepth(60);
+        this.itemLayer.add(marker);
+        this.facingGhosts.push({ slotId: slot.id, col, ghost: marker });
+      });
+    }
+    this.updateFacingGhosts();
   };
 
   StorageScene.prototype.layoutGoalCard = function layoutRestockGoalCard(goal = "") {
