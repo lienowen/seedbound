@@ -5,7 +5,10 @@ import "./fridge-phaser.css";
 import "./supermarket-v2/replenishment-planogram.css";
 
 const params = new URLSearchParams(window.location.search);
-const useSupermarketV2 = params.get("v2") === "true" || params.get("mode") === "supermarket-v2";
+const forceLegacy = params.get("legacy") === "true"
+  || params.get("mode") === "legacy"
+  || params.get("v2") === "false";
+const useSupermarketV2 = !forceLegacy;
 
 const LegacyGame = lazy(() =>
   import("./legacyAppBootstrap.js")
