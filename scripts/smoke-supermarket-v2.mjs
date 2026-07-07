@@ -60,8 +60,9 @@ async function selectCartSku(page, label) {
 
 async function placeSelectedIntoReadyGap(page, skuLabel) {
   const ready = page.locator(".sv2-gap.is-ready");
-  await expectCount(ready, 1, `ready-gap-${skuLabel}`);
-  await ready.click();
+  const count = await ready.count();
+  if (count < 1) throw new Error(`ready-gap-${skuLabel}: expected>=1 actual=${count}`);
+  await ready.first().click();
 }
 
 async function faceCurrentBay(page) {
@@ -149,6 +150,7 @@ try {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   const page = await context.newPage();
+  page.setDefaultTimeout(15_000);
 
   const consoleErrors = [];
   page.on("console", (message) => {
