@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
 import { applyCoreConsistencyPatches } from "./runtime/coreConsistencyBootstrap.js";
+import { applySupermarketRestockProgressionPolish } from "./runtime/supermarketRestockProgressionPolish.js";
 import { applySupermarketRestockVisualPolish } from "./runtime/supermarketRestockVisualPolish.js";
 import { applyPreviewConstraintPolish } from "./runtime/previewConstraintPolish.js";
 import "./fridge-phaser.css";
@@ -11,6 +12,7 @@ import "./fridge-phaser.css";
 // commercial cooler levels now use category-labelled shelf facings as the single
 // source of truth.
 applyCoreConsistencyPatches();
+applySupermarketRestockProgressionPolish();
 applySupermarketRestockVisualPolish();
 applyPreviewConstraintPolish();
 
