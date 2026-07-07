@@ -30,6 +30,21 @@ function expectReason(result, reason, label) {
   expectReason(engine.placeUnit(green.id, "drinks-bay-a", 3), "wrong-planogram-facing", "shift1:wrong-green-facing");
 }
 
+// Automatic placement must also follow planogram labels, not just the first empty cell.
+{
+  const engine = new ShiftEngine(shift1);
+  engine.startShift();
+  shift1.cases.forEach((stockCase) => engine.loadCase(stockCase.id));
+  engine.moveToScene("drinks-wall");
+
+  for (const [skuId, expectedCell] of [["green-soda", 1], ["red-soda", 3], ["juice", 5]]) {
+    const unit = engine.state.cart.find((entry) => entry.skuId === skuId);
+    const result = engine.placeUnit(unit.id, "drinks-bay-a");
+    if (!result.ok) fail(`shift1:auto-${skuId}:${result.reason}`);
+    else if (result.cell !== expectedCell) fail(`shift1:auto-${skuId}-cell=${result.cell}!=${expectedCell}`);
+  }
+}
+
 // Dairy wall: milk/yogurt/cheese facings are distinct even though the fixture and
 // department are both valid for all three SKUs.
 {
@@ -46,9 +61,23 @@ function expectReason(result, reason, label) {
   expectReason(engine.placeUnit(milk.id, "dairy-bay-a", 3), "wrong-planogram-facing", "shift2:milk-in-yogurt-facing");
 }
 
+// Automatic dairy placement must land on each SKU's own missing facing.
+{
+  const engine = new ShiftEngine(shift2);
+  engine.startShift();
+  shift2.cases.forEach((stockCase) => engine.loadCase(stockCase.id));
+  engine.moveToScene("dairy-wall");
+
+  for (const [skuId, expectedCell] of [["milk", 1], ["yogurt", 3], ["cheese", 5]]) {
+    const unit = engine.state.cart.find((entry) => entry.skuId === skuId);
+    const result = engine.placeUnit(unit.id, "dairy-bay-a");
+    if (!result.ok) fail(`shift2:auto-${skuId}:${result.reason}`);
+    else if (result.cell !== expectedCell) fail(`shift2:auto-${skuId}-cell=${result.cell}!=${expectedCell}`);
+  }
+}
+
 // A two-cell product must start where two contiguous cells are available.
 {
-  const breadBay = shift2.bays.find((bay) => bay.id === "breakfast-bread-bay");
   const engine = new ShiftEngine(shift2);
   engine.startShift();
   shift2.cases.forEach((stockCase) => engine.loadCase(stockCase.id));
@@ -63,5 +92,5 @@ if (errors.length) {
   errors.forEach((error) => console.error(`FAIL ${error}`));
   process.exitCode = 1;
 } else {
-  console.log("OK supermarket-v2-planogram sku-facing=true footprint-contiguous=true");
+  console.log("OK supermarket-v2-planogram sku-facing=true auto-placement=true footprint-contiguous=true");
 }
