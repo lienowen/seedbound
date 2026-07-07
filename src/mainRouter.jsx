@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
 import "./fridge-phaser.css";
+import "./supermarket-v2/supermarket-v2-multi.css";
 
 const params = new URLSearchParams(window.location.search);
 const useSupermarketV2 = params.get("v2") === "true" || params.get("mode") === "supermarket-v2";
