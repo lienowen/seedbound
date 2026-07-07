@@ -1,7 +1,6 @@
 import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { redirectToLocaleIfNeeded } from "./i18n/locale.js";
-import "./supermarket-v2/replenishment-planogram.css";
 
 const params = new URLSearchParams(window.location.search);
 const forceLegacy = params.get("legacy") === "true"
