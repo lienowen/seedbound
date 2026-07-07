@@ -1,8 +1,10 @@
 import { CAMPAIGN_CHAPTERS, CAMPAIGN_FINALE, CAMPAIGN_I18N } from "../src/i18n/campaign.js";
 import { FRIDGE_BR_CAMPAIGN } from "../src/levels/fridgePhaserLevel.js";
 import { applyCoreConsistencyPatches } from "../src/runtime/coreConsistencyBootstrap.js";
+import { applySupermarketRestockProgressionPolish } from "../src/runtime/supermarketRestockProgressionPolish.js";
 
 applyCoreConsistencyPatches();
+applySupermarketRestockProgressionPolish();
 
 const errors = [];
 const levelIds = FRIDGE_BR_CAMPAIGN.map((level) => level.id);
@@ -37,6 +39,7 @@ for (const level of FRIDGE_BR_CAMPAIGN) {
     if (level.theme?.key !== "restock-cooler") errors.push(`restock-theme:${level.id}`);
     if (!level.planogram?.length) errors.push(`restock-planogram:${level.id}`);
     if ((level.items || []).some((item) => !item.prefs?.category)) errors.push(`restock-category:${level.id}`);
+    if (!level.restockPace) errors.push(`restock-pace:${level.id}`);
   }
 }
 
