@@ -2,11 +2,18 @@ import { useMemo, useRef, useState } from "react";
 import { assetUrl } from "../assetBase.js";
 import { SUPERMARKET_V2_VERTICAL_SLICE } from "./data/verticalSlice.js";
 import { ShiftEngine } from "./model/shiftEngine.js";
-import { FIXTURE_KIND, getSku, occupiedCellSet, visibleGapCount } from "./model/storeModel.js";
+import {
+  FIXTURE_KIND,
+  getSku,
+  occupiedCellSet,
+  planogramAllowsSkuAtCell,
+  visibleGapCount,
+} from "./model/storeModel.js";
 import "./replenishment-shift.css";
 
 const ERROR_COPY = {
   "wrong-department-or-fixture": "Wrong department. This product belongs somewhere else.",
+  "wrong-planogram-facing": "Wrong facing. Match the product to the shelf label and neighboring SKU.",
   "wrong-scene": "You are not standing at that fixture.",
   "no-shelf-capacity": "Shelf full. Extra stock must go back to backstock.",
   "no-contiguous-shelf-gap": "That product does not fit this gap.",
@@ -182,27 +189,48 @@ function FacingCell({ facing, bay }) {
   );
 }
 
-function ShelfCells({ bay, selectedUnitId, onPlaceAtCell, onDropUnit }) {
+function ShelfCells({ bay, selectedUnitId, selectedSkuId, onPlaceAtCell, onDropUnit }) {
   const occupied = occupiedCellSet(bay);
+  const selectedSku = getSku(selectedSkuId);
+  const selectedFootprint = Math.max(1, Number(selectedSku?.footprint || 1));
+
   return (
     <div className="sv2-facing-grid" style={{ gridTemplateColumns: `repeat(${bay.capacity}, minmax(0, 1fr))` }}>
       {Array.from({ length: bay.capacity }, (_, cell) => {
         if (occupied.has(cell)) return null;
+        const expectedSkuId = bay.planogram?.[cell] || null;
+        const expectedSku = getSku(expectedSkuId);
+        let canPlaceSelected = false;
+        if (selectedUnitId && selectedSkuId) {
+          canPlaceSelected = planogramAllowsSkuAtCell(bay, selectedSkuId, cell, selectedFootprint);
+          if (canPlaceSelected) {
+            for (let offset = 0; offset < selectedFootprint; offset += 1) {
+              if (occupied.has(cell + offset)) {
+                canPlaceSelected = false;
+                break;
+              }
+            }
+          }
+        }
+
         return (
           <button
             type="button"
-            className={`sv2-gap ${selectedUnitId ? "is-ready" : ""}`}
+            className={`sv2-gap ${selectedUnitId ? (canPlaceSelected ? "is-ready" : "is-wrong") : ""}`}
             key={`gap-${cell}`}
             style={{ gridColumn: `${cell + 1}` }}
+            disabled={!!selectedUnitId && !canPlaceSelected}
             onClick={() => onPlaceAtCell(cell)}
-            onDragOver={(event) => event.preventDefault()}
+            onDragOver={(event) => {
+              if (canPlaceSelected || !selectedUnitId) event.preventDefault();
+            }}
             onDrop={(event) => {
               event.preventDefault();
               onDropUnit(event.dataTransfer.getData("text/plain"), cell);
             }}
           >
             <span />
-            <small>GAP</small>
+            <small>{expectedSku?.label || "GAP"}</small>
           </button>
         );
       })}
@@ -211,7 +239,7 @@ function ShelfCells({ bay, selectedUnitId, onPlaceAtCell, onDropUnit }) {
   );
 }
 
-function Fixture({ bay, selectedUnitId, onPlaceAtCell, onDropUnit }) {
+function Fixture({ bay, selectedUnitId, selectedSkuId, onPlaceAtCell, onDropUnit }) {
   const dry = bay.kind === FIXTURE_KIND.DRY_SHELF;
   return (
     <div className={dry ? "sv2-dry-fixture" : "sv2-wall-cooler"}>
@@ -220,7 +248,13 @@ function Fixture({ bay, selectedUnitId, onPlaceAtCell, onDropUnit }) {
         <span>{dry ? "Ambient aisle bay" : "Perimeter wall cooler"}</span>
       </div>
       <div className="sv2-fixture-interior">
-        <ShelfCells bay={bay} selectedUnitId={selectedUnitId} onPlaceAtCell={onPlaceAtCell} onDropUnit={onDropUnit} />
+        <ShelfCells
+          bay={bay}
+          selectedUnitId={selectedUnitId}
+          selectedSkuId={selectedSkuId}
+          onPlaceAtCell={onPlaceAtCell}
+          onDropUnit={onDropUnit}
+        />
         <div className="sv2-price-rail">{String(bay.department).toUpperCase()} · {visibleGapCount(bay)} GAP{visibleGapCount(bay) === 1 ? "" : "S"}</div>
       </div>
       <div className="sv2-fixture-base" />
@@ -231,6 +265,7 @@ function Fixture({ bay, selectedUnitId, onPlaceAtCell, onDropUnit }) {
 function Department({ scene, state, bay, nextScene, selectedUnitId, onSelectUnit, onDragStart, onPlaceAtCell, onDropUnit, onFace, onNext }) {
   const gaps = visibleGapCount(bay);
   const full = gaps === 0;
+  const selectedSkuId = state.cart.find((unit) => unit.id === selectedUnitId)?.skuId || null;
   return (
     <section className={`sv2-stage sv2-department sv2-department-${scene.department}`}>
       <div className="sv2-perimeter-wall" aria-hidden="true"><span /></div>
@@ -240,13 +275,19 @@ function Department({ scene, state, bay, nextScene, selectedUnitId, onSelectUnit
         <p>{full ? (bay.faced ? "Bay recovered and faced. Move to the next priority." : "Stock is in. Pull products forward and straighten the facing.") : `${gaps} visible gap${gaps === 1 ? "" : "s"} remain.`}</p>
       </div>
 
-      <Fixture bay={bay} selectedUnitId={selectedUnitId} onPlaceAtCell={onPlaceAtCell} onDropUnit={onDropUnit} />
+      <Fixture
+        bay={bay}
+        selectedUnitId={selectedUnitId}
+        selectedSkuId={selectedSkuId}
+        onPlaceAtCell={onPlaceAtCell}
+        onDropUnit={onDropUnit}
+      />
 
       <Cart state={state} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} onDragStart={onDragStart} />
 
       <div className="sv2-stage-action">
         {!full ? (
-          <span>{selectedUnitId ? "Product selected — tap a highlighted gap or drag it onto the shelf." : "Select a cart unit, then choose a real shelf gap."}</span>
+          <span>{selectedUnitId ? "Product selected — matching shelf labels are highlighted." : "Select a cart unit, then choose its real planogram gap."}</span>
         ) : !bay.faced ? (
           <>
             <span>Stocked, but the products are still uneven.</span>
