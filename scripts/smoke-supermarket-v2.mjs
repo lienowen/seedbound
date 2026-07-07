@@ -1,17 +1,20 @@
 import { chromium } from "playwright";
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { mkdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 const HOST = "127.0.0.1";
 const PORT = 4173;
 const BASE_URL = `http://${HOST}:${PORT}`;
 const ARTIFACT_DIR = "artifacts/supermarket-v2";
+const VITE_BIN = fileURLToPath(new URL("../node_modules/vite/bin/vite.js", import.meta.url));
 
 await mkdir(ARTIFACT_DIR, { recursive: true });
 
 const preview = spawn(
-  process.platform === "win32" ? "npx.cmd" : "npx",
-  ["vite", "preview", "--host", HOST, "--port", String(PORT), "--strictPort"],
+  process.execPath,
+  [VITE_BIN, "preview", "--host", HOST, "--port", String(PORT), "--strictPort"],
   { stdio: ["ignore", "pipe", "pipe"] },
 );
 
@@ -34,6 +37,16 @@ async function waitForServer(timeoutMs = 20_000) {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`preview-timeout\n${previewOutput}`);
+}
+
+async function stopPreview() {
+  if (preview.exitCode != null) return;
+  preview.kill("SIGTERM");
+  await Promise.race([
+    once(preview, "exit"),
+    new Promise((resolve) => setTimeout(resolve, 3_000)),
+  ]);
+  if (preview.exitCode == null) preview.kill("SIGKILL");
 }
 
 async function expectCount(locator, count, label) {
@@ -70,6 +83,7 @@ async function faceCurrentBay(page) {
 }
 
 async function runShiftOne(page) {
+  console.log("SMOKE shift-1 start");
   await expectText(page.locator(".sv2-briefing h1"), /First Top-Up/, "shift1-title");
   await page.getByRole("button", { name: "Clock in" }).click();
   await expectCount(page.locator(".sv2-case"), 3, "shift1-case-count");
@@ -87,9 +101,11 @@ async function runShiftOne(page) {
   await page.locator(".sv2-complete").waitFor({ state: "visible" });
   await page.screenshot({ path: `${ARTIFACT_DIR}/shift-1-complete-mobile.png`, fullPage: true });
   await page.getByRole("button", { name: "Next shift" }).click();
+  console.log("SMOKE shift-1 complete");
 }
 
 async function runShiftTwo(page) {
+  console.log("SMOKE shift-2 start");
   await expectText(page.locator(".sv2-briefing h1"), /Breakfast Run/, "shift2-title");
   await page.getByRole("button", { name: "Clock in" }).click();
   await expectCount(page.locator(".sv2-case"), 4, "shift2-case-count");
@@ -110,9 +126,11 @@ async function runShiftTwo(page) {
   await page.locator(".sv2-complete").waitFor({ state: "visible" });
   await page.screenshot({ path: `${ARTIFACT_DIR}/shift-2-complete-mobile.png`, fullPage: true });
   await page.getByRole("button", { name: "Next shift" }).click();
+  console.log("SMOKE shift-2 complete");
 }
 
 async function runShiftThree(page) {
+  console.log("SMOKE shift-3 start");
   await expectText(page.locator(".sv2-briefing h1"), /Morning Rush/, "shift3-title");
   await page.getByRole("button", { name: "Clock in" }).click();
   await expectCount(page.locator(".sv2-case"), 2, "shift3-case-count");
@@ -142,11 +160,13 @@ async function runShiftThree(page) {
   await expectText(page.locator(".sv2-complete"), /three-shift vertical slice is complete/i, "shift3-final-copy");
   await expectCount(page.getByRole("button", { name: "Next shift" }), 0, "shift3-no-next-button");
   await page.screenshot({ path: `${ARTIFACT_DIR}/shift-3-complete-mobile.png`, fullPage: true });
+  console.log("SMOKE shift-3 complete");
 }
 
 let browser;
 try {
   await waitForServer();
+  console.log("SMOKE preview-ready");
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   const page = await context.newPage();
@@ -178,5 +198,5 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  preview.kill("SIGTERM");
+  await stopPreview();
 }
