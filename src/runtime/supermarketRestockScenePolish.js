@@ -337,11 +337,17 @@ export function applySupermarketRestockScenePolish() {
       this.goalLabel?.setVisible(false);
       this.coinPill?.bg?.setVisible(false);
       this.coinPill?.text?.setVisible(false);
-      this.progressPill?.bg?.setPosition(110, 0);
-      this.progressPill?.text?.setX(505);
 
-      // First level already has one goal card + one hand animation. A second toast
-      // duplicates the instruction and floats over the play path, so do not show it.
+      if (isFirstFocus(this)) {
+        this.phasePill?.bg?.setVisible(false);
+        this.phasePill?.text?.setVisible(false);
+        this.progressPill?.bg?.setPosition(250, 0);
+        this.progressPill?.text?.setX(645);
+      } else {
+        this.progressPill?.bg?.setPosition(110, 0);
+        this.progressPill?.text?.setX(505);
+      }
+
       if (!isFirstFocus(this)) this.setToastMessage(copy.intro);
     }
 
@@ -371,10 +377,14 @@ export function applySupermarketRestockScenePolish() {
     const result = originalStartOnboarding.call(this, sprite, hint);
     if (!isRestock(this) || !this.onboarding) return result;
 
-    this.onboarding.banner?.setPosition(0, isFirstFocus(this) ? -232 : -210);
-    this.onboarding.bannerText
-      ?.setY(isFirstFocus(this) ? 270 : 292)
-      .setFontSize(isFirstFocus(this) ? 16 : 18);
+    if (isFirstFocus(this)) {
+      this.onboarding.banner?.setVisible(false);
+      this.onboarding.bannerText?.setVisible(false);
+      return result;
+    }
+
+    this.onboarding.banner?.setPosition(0, -210);
+    this.onboarding.bannerText?.setY(292).setFontSize(18);
     return result;
   };
 
