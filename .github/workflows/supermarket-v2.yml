@@ -6,6 +6,7 @@ on:
       - "src/supermarket-v2/**"
       - "src/mainRouter.jsx"
       - "scripts/audit-supermarket-v2*.mjs"
+      - "scripts/smoke-supermarket-v2.mjs"
       - ".github/workflows/supermarket-v2.yml"
   push:
     branches:
@@ -17,7 +18,7 @@ permissions:
 jobs:
   audit-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -42,3 +43,9 @@ jobs:
 
       - name: Compile production app
         run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install chromium
+
+      - name: Run mobile browser smoke
+        run: node scripts/smoke-supermarket-v2.mjs
