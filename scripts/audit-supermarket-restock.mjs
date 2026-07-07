@@ -1,12 +1,20 @@
 import { FRIDGE_BR_CAMPAIGN } from "../src/levels/fridgePhaserLevel.js";
 import { StorageEngine } from "../src/game/StorageEngine.js";
 import { applyCoreConsistencyPatches } from "../src/runtime/coreConsistencyBootstrap.js";
+import { applySupermarketRestockProgressionPolish } from "../src/runtime/supermarketRestockProgressionPolish.js";
 
 applyCoreConsistencyPatches();
+applySupermarketRestockProgressionPolish();
 
 const errors = [];
 const restockLevels = FRIDGE_BR_CAMPAIGN.filter((level) => level.id?.startsWith("fridge-br-"));
 const forbiddenPrefs = ["zone", "needsCold", "needsWarm", "topShelf", "likesVisible", "mustNeighbors", "hatesNeighbors"];
+const expectedTotals = new Map([[4, 8], [5, 9], [6, 10], [7, 10], [8, 11], [9, 12], [10, 12]]);
+
+function levelNumber(level) {
+  const match = /^fridge-br-(\d+)$/.exec(level?.id || "");
+  return match ? Number(match[1]) : 0;
+}
 
 function truthfulPlacementExists(engine, item) {
   for (const slot of engine.level.slots) {
@@ -26,9 +34,58 @@ function truthfulPlacementExists(engine, item) {
   return false;
 }
 
+function rowGroups(slots) {
+  const sorted = [...slots].sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const rows = [];
+  for (const slot of sorted) {
+    let row = rows.find((candidate) => Math.abs(candidate.y - slot.y) <= 26);
+    if (!row) {
+      row = { y: slot.y, slots: [] };
+      rows.push(row);
+    }
+    row.slots.push(slot);
+  }
+  rows.forEach((row) => row.slots.sort((a, b) => a.x - b.x));
+  return rows.sort((a, b) => a.y - b.y);
+}
+
+function auditCategoryContinuity(level) {
+  const rows = rowGroups((level.slots || []).filter((slot) => slot.category));
+  const categoryRows = new Map();
+
+  rows.forEach((row, rowIndex) => {
+    const seenSegments = new Set();
+    let previous = null;
+    for (const slot of row.slots) {
+      const category = slot.category;
+      if (!category) continue;
+      if (!categoryRows.has(category)) categoryRows.set(category, new Set());
+      categoryRows.get(category).add(rowIndex);
+      if (category !== previous) {
+        if (seenSegments.has(category)) errors.push(`${level.id}:${category}:split-segment-row=${rowIndex}`);
+        seenSegments.add(category);
+        previous = category;
+      }
+    }
+  });
+
+  const number = levelNumber(level);
+  if (number <= 10) {
+    for (const [category, rowsUsed] of categoryRows) {
+      if (rowsUsed.size > 1) errors.push(`${level.id}:${category}:spans-${rowsUsed.size}-rows`);
+    }
+  }
+}
+
 for (const level of restockLevels) {
+  const number = levelNumber(level);
   if (level.theme?.key !== "restock-cooler") errors.push(`${level.id}:theme=${level.theme?.key || "missing"}`);
   if (!Array.isArray(level.planogram) || !level.planogram.length) errors.push(`${level.id}:missing-planogram`);
+
+  const expectedTotal = expectedTotals.get(number);
+  if (expectedTotal != null && level.items.length !== expectedTotal) {
+    errors.push(`${level.id}:comfort-curve-total=${level.items.length}!=${expectedTotal}`);
+  }
 
   const categoryCapacity = new Map();
   for (const slot of level.slots || []) {
@@ -58,6 +115,8 @@ for (const level of restockLevels) {
     if (capacity < need) errors.push(`${level.id}:${category}:capacity=${capacity}<${need}`);
   }
 
+  auditCategoryContinuity(level);
+
   const engine = new StorageEngine(level, { forceFresh: true, saveId: `__restock_audit_${level.id}` });
   for (const item of level.items.filter((entry) => !entry.fixed)) {
     if (!truthfulPlacementExists(engine, item)) errors.push(`${level.id}:${item.id}:no-truthful-placement`);
@@ -86,5 +145,5 @@ if (errors.length) {
   for (const error of errors) console.error(`FAIL ${error}`);
   process.exitCode = 1;
 } else {
-  console.log(`OK supermarket-restock levels=${restockLevels.length} tutorial=drinks-only category-model=clean`);
+  console.log(`OK supermarket-restock levels=${restockLevels.length} tutorial=drinks-only progression=comfortable planogram=contiguous`);
 }
