@@ -1,10 +1,12 @@
 import { FRIDGE_BR_CAMPAIGN } from "../src/levels/fridgePhaserLevel.js";
 import { applyCoreConsistencyPatches } from "../src/runtime/coreConsistencyBootstrap.js";
 import { applySupermarketRestockProgressionPolish } from "../src/runtime/supermarketRestockProgressionPolish.js";
+import { applySupermarketRestockNudgePolish } from "../src/runtime/supermarketRestockNudgePolish.js";
 import { applySupermarketRestockVisualPolish } from "../src/runtime/supermarketRestockVisualPolish.js";
 
 applyCoreConsistencyPatches();
 applySupermarketRestockProgressionPolish();
+applySupermarketRestockNudgePolish();
 applySupermarketRestockVisualPolish();
 
 const errors = [];
@@ -27,6 +29,12 @@ for (const level of FRIDGE_BR_CAMPAIGN.filter((entry) => entry.id?.startsWith("f
   if (tutorials.has(level.id)) {
     if (!level.fixtureCut) errors.push(`${level.id}:missing-focused-cut`);
     continue;
+  }
+
+  if (!level.legacyFixtureNudgesCleared) errors.push(`${level.id}:legacy-nudges-not-cleared`);
+  for (const item of level.items || []) {
+    if (Object.keys(item.nudge || {}).length) errors.push(`${level.id}:${item.id}:nudge-still-present`);
+    if (Object.keys(item.renderNudge || {}).length) errors.push(`${level.id}:${item.id}:render-nudge-still-present`);
   }
 
   if (!level.generatedSlotLayout) errors.push(`${level.id}:missing-generated-slot-layout`);
@@ -57,5 +65,5 @@ if (errors.length) {
   errors.forEach((error) => console.error(`FAIL ${error}`));
   process.exitCode = 1;
 } else {
-  console.log("OK restock-fixtures tutorials=cropped later-levels=generated families=4 gap>=60");
+  console.log("OK restock-fixtures tutorials=cropped later-levels=generated families=4 gap>=60 nudges=clean");
 }
