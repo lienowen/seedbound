@@ -12,6 +12,7 @@ const ERROR_COPY = {
   "no-contiguous-shelf-gap": "That product does not fit this gap.",
   "unit-not-on-cart": "That unit is no longer on your cart.",
   "required-work-incomplete": "Finish the priority work before clocking out.",
+  "bay-not-recovered": "Recover every visible gap before facing the bay.",
 };
 
 function productUrl(skuId) {
@@ -183,17 +184,10 @@ function FacingCell({ facing, bay }) {
 
 function ShelfCells({ bay, selectedUnitId, onPlaceAtCell, onDropUnit }) {
   const occupied = occupiedCellSet(bay);
-  const covered = new Set();
-  for (const facing of bay.facings) {
-    const start = Math.max(0, Number(facing.cell || 0));
-    const footprint = Math.max(1, Number(facing.footprint || 1));
-    for (let offset = 0; offset < footprint; offset += 1) covered.add(start + offset);
-  }
-
   return (
     <div className="sv2-facing-grid" style={{ gridTemplateColumns: `repeat(${bay.capacity}, minmax(0, 1fr))` }}>
       {Array.from({ length: bay.capacity }, (_, cell) => {
-        if (occupied.has(cell) || covered.has(cell)) return null;
+        if (occupied.has(cell)) return null;
         return (
           <button
             type="button"
@@ -226,12 +220,7 @@ function Fixture({ bay, selectedUnitId, onPlaceAtCell, onDropUnit }) {
         <span>{dry ? "Ambient aisle bay" : "Perimeter wall cooler"}</span>
       </div>
       <div className="sv2-fixture-interior">
-        <ShelfCells
-          bay={bay}
-          selectedUnitId={selectedUnitId}
-          onPlaceAtCell={onPlaceAtCell}
-          onDropUnit={onDropUnit}
-        />
+        <ShelfCells bay={bay} selectedUnitId={selectedUnitId} onPlaceAtCell={onPlaceAtCell} onDropUnit={onDropUnit} />
         <div className="sv2-price-rail">{String(bay.department).toUpperCase()} · {visibleGapCount(bay)} GAP{visibleGapCount(bay) === 1 ? "" : "S"}</div>
       </div>
       <div className="sv2-fixture-base" />
@@ -251,19 +240,9 @@ function Department({ scene, state, bay, nextScene, selectedUnitId, onSelectUnit
         <p>{full ? (bay.faced ? "Bay recovered and faced. Move to the next priority." : "Stock is in. Pull products forward and straighten the facing.") : `${gaps} visible gap${gaps === 1 ? "" : "s"} remain.`}</p>
       </div>
 
-      <Fixture
-        bay={bay}
-        selectedUnitId={selectedUnitId}
-        onPlaceAtCell={onPlaceAtCell}
-        onDropUnit={onDropUnit}
-      />
+      <Fixture bay={bay} selectedUnitId={selectedUnitId} onPlaceAtCell={onPlaceAtCell} onDropUnit={onDropUnit} />
 
-      <Cart
-        state={state}
-        selectedUnitId={selectedUnitId}
-        onSelectUnit={onSelectUnit}
-        onDragStart={onDragStart}
-      />
+      <Cart state={state} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} onDragStart={onDragStart} />
 
       <div className="sv2-stage-action">
         {!full ? (
@@ -305,7 +284,7 @@ function CompleteCard({ shift, score, onReplay }) {
 export function ReplenishmentShiftGame() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const requested = Number(params.get("shift") || 1);
-  const shiftNumber = Math.max(1, Math.min(2, Number.isFinite(requested) ? requested : 1));
+  const shiftNumber = Math.max(1, Math.min(3, Number.isFinite(requested) ? requested : 1));
   const shift = SUPERMARKET_V2_VERTICAL_SLICE[shiftNumber - 1];
   const engineRef = useRef(new ShiftEngine(shift));
   const shiftIdRef = useRef(shift.id);
@@ -382,6 +361,14 @@ export function ReplenishmentShiftGame() {
       sync(ERROR_COPY[result.reason] || result.reason);
       return;
     }
+
+    const triggeredEvent = result.events?.[0];
+    if (triggeredEvent) {
+      setSelectedUnitId(null);
+      sync(triggeredEvent.createsPriority || "Customer activity created a new shelf gap. Recover it before leaving.");
+      return;
+    }
+
     const finish = engine.finishShift();
     if (finish.ok) {
       setScore(finish.score);
@@ -408,12 +395,7 @@ export function ReplenishmentShiftGame() {
       {state.phase === "briefing" ? (
         <ShiftBriefing shift={shift} onStart={startShift} />
       ) : scene?.kind === "backroom" ? (
-        <Backroom
-          state={state}
-          nextScene={nextScene}
-          onLoadCase={loadCase}
-          onLeave={() => moveToScene(nextScene?.id)}
-        />
+        <Backroom state={state} nextScene={nextScene} onLoadCase={loadCase} onLeave={() => moveToScene(nextScene?.id)} />
       ) : currentBay ? (
         <Department
           scene={scene}
