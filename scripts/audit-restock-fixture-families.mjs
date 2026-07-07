@@ -29,9 +29,8 @@ for (const level of FRIDGE_BR_CAMPAIGN.filter((entry) => entry.id?.startsWith("f
     continue;
   }
 
-  if ((level.stage?.fixtures || []).length) {
-    errors.push(`${level.id}:reuses-full-cooler-image`);
-  }
+  if (!level.generatedSlotLayout) errors.push(`${level.id}:missing-generated-slot-layout`);
+  if ((level.stage?.fixtures || []).length) errors.push(`${level.id}:reuses-full-cooler-image`);
   if (level.visualMode !== `restock-${level.marketFixtureFamily}`) {
     errors.push(`${level.id}:visual-mode=${level.visualMode || "missing"}`);
   }
@@ -43,11 +42,20 @@ for (const level of FRIDGE_BR_CAMPAIGN.filter((entry) => entry.id?.startsWith("f
   if ((level.stage?.shapes || []).length <= (level.deliveryShapes?.length || 0)) {
     errors.push(`${level.id}:missing-generated-fixture-shapes`);
   }
+
+  const fixtureBottom = activeSlots.length
+    ? Math.max(...activeSlots.map((slot) => slot.y + slot.h / 2))
+    : 0;
+  const deliveryTop = Number(level.deliveryLayout?.y ?? Infinity);
+  if (!Number.isFinite(deliveryTop)) errors.push(`${level.id}:missing-delivery-layout`);
+  else if (deliveryTop - fixtureBottom < 60) {
+    errors.push(`${level.id}:fixture-delivery-gap=${Math.round(deliveryTop - fixtureBottom)}`);
+  }
 }
 
 if (errors.length) {
   errors.forEach((error) => console.error(`FAIL ${error}`));
   process.exitCode = 1;
 } else {
-  console.log("OK restock-fixtures tutorials=cropped later-levels=generated families=4");
+  console.log("OK restock-fixtures tutorials=cropped later-levels=generated families=4 gap>=60");
 }
