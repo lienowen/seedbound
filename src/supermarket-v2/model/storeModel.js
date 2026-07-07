@@ -112,20 +112,51 @@ export function createShelfBay({
     department,
     kind,
     capacity,
-    facings: [...facings],
+    facings: facings.map((facing, index) => ({
+      ...facing,
+      cell: Number.isInteger(facing.cell) ? facing.cell : index,
+    })),
     position: { ...position },
   };
 }
 
+export function occupiedCellSet(bay) {
+  const cells = new Set();
+  for (const facing of bay?.facings || []) {
+    const start = Math.max(0, Number(facing?.cell || 0));
+    const footprint = Math.max(1, Number(facing?.footprint || 1));
+    for (let offset = 0; offset < footprint; offset += 1) {
+      const cell = start + offset;
+      if (cell < Number(bay?.capacity || 0)) cells.add(cell);
+    }
+  }
+  return cells;
+}
+
 export function occupiedFacingCells(bay) {
-  return (bay?.facings || []).reduce(
-    (sum, facing) => sum + Math.max(1, Number(facing?.footprint || 1)),
-    0,
-  );
+  return occupiedCellSet(bay).size;
 }
 
 export function visibleGapCount(bay) {
   return Math.max(0, Number(bay?.capacity || 0) - occupiedFacingCells(bay));
+}
+
+export function firstAvailableCell(bay, footprint = 1) {
+  const width = Math.max(1, Number(footprint || 1));
+  const capacity = Math.max(0, Number(bay?.capacity || 0));
+  const occupied = occupiedCellSet(bay);
+
+  for (let start = 0; start <= capacity - width; start += 1) {
+    let available = true;
+    for (let offset = 0; offset < width; offset += 1) {
+      if (occupied.has(start + offset)) {
+        available = false;
+        break;
+      }
+    }
+    if (available) return start;
+  }
+  return -1;
 }
 
 export function isShelfFull(bay) {
