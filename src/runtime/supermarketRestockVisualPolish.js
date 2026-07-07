@@ -4,6 +4,32 @@ let applied = false;
 
 const TUTORIAL_IDS = new Set(["fridge-br-1", "fridge-br-2", "fridge-br-3"]);
 
+const COOLER_CUTS = {
+  // Cut from the existing 1448x1086 cooler art instead of forcing the whole
+  // three-door illustration into every level. These are scene-specific crops.
+  "fridge-br-1": {
+    crop: { x: 430, y: 160, w: 588, h: 850 },
+    cx: 375,
+    cy: 180,
+    w: 520,
+    h: 750,
+  },
+  "fridge-br-2": {
+    crop: { x: 205, y: 120, w: 1038, h: 900 },
+    cx: 375,
+    cy: 200,
+    w: 650,
+    h: 565,
+  },
+  "fridge-br-3": {
+    crop: { x: 85, y: 95, w: 1278, h: 930 },
+    cx: 375,
+    cy: 205,
+    w: 690,
+    h: 502,
+  },
+};
+
 function movableItems(level) {
   return (level.items || []).filter((item) => !item.fixed);
 }
@@ -106,6 +132,23 @@ function applyDeliveryLayout(level) {
   level.visualMode = "restock-market";
 }
 
+function applyCoolerCut(level) {
+  const cut = COOLER_CUTS[level.id];
+  if (!cut || !Array.isArray(level.stage?.fixtures) || !level.stage.fixtures.length) return;
+
+  const [first, ...rest] = level.stage.fixtures;
+  level.stage.fixtures = [{
+    ...first,
+    crop: { ...cut.crop },
+    cx: cut.cx,
+    cy: cut.cy,
+    w: cut.w,
+    h: cut.h,
+    originY: 0,
+  }, ...rest];
+  level.fixtureCut = true;
+}
+
 function softenTutorial(level) {
   if (!TUTORIAL_IDS.has(level.id)) return;
   level.tuning = {
@@ -122,8 +165,9 @@ export function applySupermarketRestockVisualPolish() {
 
   for (const level of FRIDGE_BR_CAMPAIGN) {
     if (level?.theme?.key !== "restock-cooler") continue;
+    applyCoolerCut(level);
     applyDeliveryLayout(level);
     softenTutorial(level);
-    level.revision = Math.max(31, Number(level.revision || 1));
+    level.revision = Math.max(34, Number(level.revision || 1));
   }
 }
