@@ -115,12 +115,19 @@ function applyFixtureCuts(scene) {
   }
 }
 
+function clearStatusBadges(scene) {
+  if (!scene.statusBadges) return;
+  for (const record of scene.statusBadges.values()) record?.container?.destroy?.();
+  scene.statusBadges.clear();
+}
+
 export function applySupermarketRestockScenePolish() {
   if (applied) return;
   applied = true;
 
   const originalCreate = StorageScene.prototype.create;
   const originalUpdateChrome = StorageScene.prototype.updateChrome;
+  const originalUpdateStatusBadges = StorageScene.prototype.updateStatusBadges;
   const originalHasOnboarded = StorageScene.prototype.hasOnboarded;
   const originalMarkOnboarded = StorageScene.prototype.markOnboarded;
   const originalStartOnboarding = StorageScene.prototype.startOnboarding;
@@ -148,6 +155,14 @@ export function applySupermarketRestockScenePolish() {
       };
     }
     return originalUpdateChrome.call(this, patch);
+  };
+
+  StorageScene.prototype.updateStatusBadges = function updateRestockStatusBadges(itemStatus = {}) {
+    if (isTutorial(this)) {
+      clearStatusBadges(this);
+      return;
+    }
+    return originalUpdateStatusBadges.call(this, itemStatus);
   };
 
   StorageScene.prototype.buildShelfCategoryTags = function buildRestockCategoryTags() {
