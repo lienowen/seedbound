@@ -1,6 +1,5 @@
 import { assetUrl } from "../assetBase.js";
 import { getSku } from "./model/storeModel.js";
-import { ProductArt } from "./ProductArt.jsx";
 
 export function StockBox({ skuId, quantity, loaded, onPick }) {
   const sku = getSku(skuId);
@@ -13,7 +12,7 @@ export function StockBox({ skuId, quantity, loaded, onPick }) {
     >
       <img className="stock-box-image" src={assetUrl(`objects/box-${skuId}.png`)} alt="" />
       <div className="stock-box-content">
-        <ProductArt skuId={skuId} className="stock-box-product" />
+        <img className="stock-box-product" src={assetUrl(`tidy/${skuId}.png`)} alt={sku?.label || skuId} />
         <span>{sku?.label || skuId}</span>
         <small>{quantity} units</small>
       </div>
