@@ -66,3 +66,24 @@
   border-radius: 16px;
   font-size: 16px;
 }
+
+/* T1 scene emphasis */
+.sv2-stage {
+  min-height: min(720px, calc(100vh - 120px));
+}
+
+.sv2-backroom {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.18), transparent),
+    linear-gradient(180deg, #ddd7cd 0%, #ece4d8 58%, #bca47f 58%, #a98d68 100%);
+}
+
+/* Make interactive objects feel like objects, not controls */
+.sv2-case,
+.sv2-cart {
+  filter: drop-shadow(0 10px 14px rgba(40,30,20,.16));
+}
+
+.sv2-case:hover {
+  transform: translateY(-3px) scale(1.02);
+}
